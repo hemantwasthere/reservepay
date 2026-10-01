@@ -7,6 +7,9 @@ skip-lint = false
 [programs.localnet]
 reservepay = "ERFq8y9tC4bjMk4AbLoM7zZXtvRcxsHdCMa9GpSnwxsU"
 
+[programs.devnet]
+reservepay = "ERFq8y9tC4bjMk4AbLoM7zZXtvRcxsHdCMa9GpSnwxsU"
+
 [registry]
 url = "https://api.apr.dev"
 

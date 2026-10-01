@@ -703,7 +703,7 @@ const questions = [
   ],
   [
     "Can I use ReservePay for real payments today?",
-    "Not yet. This checkout is an interactive simulation and does not submit payment transactions. The Solana program has been tested on localnet; a devnet deployment and wallet-signed checkout are still to come.",
+    "Not yet. This checkout is an interactive simulation and does not submit payment transactions. The merchant dashboard is live on Solana devnet for wallet-signed registration, reserve deposits, and withdrawals. Buyer checkout is still in development.",
   ],
 ];
 
@@ -934,8 +934,8 @@ export function App() {
                 <RotateCcw size={17} />
               </div>
               <p className="protocol-stage">
-                <span className="status-dot neutral" /> In development · Tested
-                on Solana localnet
+                <span className="status-dot" /> Devnet preview · Deployed
+                on Solana
               </p>
             </div>
           </section>
