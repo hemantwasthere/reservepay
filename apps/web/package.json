@@ -4,22 +4,36 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "typecheck": "tsc -b --pretty false"
+    "dev": "convex dev --start \"bun run dev:web\"",
+    "dev:web": "vite --host 127.0.0.1",
+    "dev:backend": "convex dev",
+    "build": "tsc -b && vite build && bun run scripts/prerender.ts && bun run scripts/verify-build.ts",
+    "typecheck": "tsc -b --pretty false && tsc -p convex/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "codegen": "convex codegen",
+    "deploy:backend": "convex deploy"
   },
   "dependencies": {
     "@reservepay/core": "workspace:*",
     "@solana/web3.js": "1.98.4",
+    "@wallet-standard/app": "1.1.1",
+    "@wallet-standard/base": "1.1.1",
+    "@wallet-standard/features": "1.1.1",
+    "convex": "1.46.0",
     "lucide-react": "0.468.0",
-    "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
-    "@types/react": "19.1.16",
-    "@types/react-dom": "19.1.9",
-    "@vitejs/plugin-react": "4.7.0",
-    "typescript": "5.9.3",
-    "vite": "6.4.1"
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.2",
+    "tailwindcss": "4.3.3",
+    "@tailwindcss/vite": "4.3.3",
+    "convex-test": "0.0.60",
+    "vitest": "5.0.3",
+    "@edge-runtime/vm": "5.0.0"
   }
 }
