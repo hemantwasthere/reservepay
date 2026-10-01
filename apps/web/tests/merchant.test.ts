@@ -1,11 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  ComputeBudgetProgram,
   Connection,
   Keypair,
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
-import { exactAmount, parseAmount } from "../src/merchant/client";
+import {
+  exactAmount,
+  merchantClient,
+  parseAmount,
+  type ReserveAction,
+} from "../src/merchant/client";
 import {
   transactionResult,
   validateSignedTransaction,
@@ -80,7 +86,14 @@ describe("signed reserve transactions", () => {
   });
   it("rejects a signed transaction whose transfer was changed", () => {
     const original = transaction();
-    const changed = transaction();
+    const changed = Transaction.from(
+      original.serialize({ requireAllSignatures: false }),
+    );
+    changed.instructions[0] = SystemProgram.transfer({
+      fromPubkey: signer.publicKey,
+      toPubkey: recipient,
+      lamports: 2,
+    });
     changed.sign(signer);
     expect(() =>
       validateSignedTransaction(original, changed.serialize()),
@@ -95,6 +108,68 @@ describe("signed reserve transactions", () => {
       ),
     ).toThrow();
   });
+});
+
+describe("wallet priority fees", () => {
+  it.each<ReserveAction>(["register", "fund", "withdraw"])(
+    "preserves the prepared %s transaction through automatic wallet fee handling",
+    async (action) => {
+      const signer = Keypair.generate();
+      const getFeeForMessage = vi.fn(async () => ({ value: 5200 }));
+      const connection = {
+        getLatestBlockhash: vi.fn(async () => ({
+          blockhash: Keypair.generate().publicKey.toBase58(),
+          lastValidBlockHeight: 100,
+        })),
+        getFeeForMessage,
+        getMinimumBalanceForRentExemption: vi.fn(async () => 1_000_000),
+        getAccountInfo: vi.fn(async () => null),
+      } as unknown as Connection;
+      const client = merchantClient(connection);
+      vi.spyOn(client, "read").mockResolvedValue({
+        ready: true,
+        registered: action !== "register",
+        merchant: "",
+        vault: "",
+        reserveBps: 500,
+        reserve: 20_000_000n,
+        locked: 0n,
+        walletBalance: 20_000_000n,
+        lamports: 1_000_000_000,
+        completedOrders: 0n,
+        refundedOrders: 0n,
+        volume: 0n,
+        slot: 1,
+      });
+      const { transaction } = await client.prepare(
+        signer.publicKey,
+        action,
+        1_000_000n,
+      );
+      const walletTransaction = Transaction.from(
+        transaction.serialize({ requireAllSignatures: false }),
+      );
+      if (
+        !walletTransaction.instructions.some((instruction) =>
+          instruction.programId.equals(ComputeBudgetProgram.programId),
+        )
+      ) {
+        walletTransaction.add(
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 375_000 }),
+        );
+      }
+      walletTransaction.sign(signer);
+      expect(
+        validateSignedTransaction(transaction, walletTransaction.serialize())
+          .signature,
+      ).toBeTruthy();
+      expect(getFeeForMessage).toHaveBeenCalledWith(
+        transaction.compileMessage(),
+        "confirmed",
+      );
+    },
+  );
 });
 
 describe("transaction recovery", () => {

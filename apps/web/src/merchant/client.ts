@@ -1,5 +1,6 @@
 import { BN, Program, type IdlAccounts } from "@coral-xyz/anchor";
 import {
+  ComputeBudgetProgram,
   Connection,
   PublicKey,
   SystemProgram,
@@ -161,7 +162,10 @@ export function merchantClient(
           "This amount is backing open orders and cannot be withdrawn.",
         );
       const { merchant, reserveVault, tokenAccount } = addresses(authority);
-      const transaction = new Transaction();
+      const transaction = new Transaction().add(
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000 }),
+      );
       if (action === "register") {
         transaction.add(
           await program.methods
