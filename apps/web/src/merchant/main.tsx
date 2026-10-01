@@ -1,13 +1,17 @@
+import { ToastProvider } from "../lib/Toast";
 import "./polyfills";
 import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, hydrateRoot } from "react-dom/client";
 import { MerchantApp } from "./MerchantApp";
-import "../styles.css";
-import "../motion.css";
-import "./merchant.css";
 
-createRoot(document.getElementById("root")!).render(
+const app = (
   <StrictMode>
-    <MerchantApp />
-  </StrictMode>,
+    <ToastProvider>
+      <MerchantApp />
+    </ToastProvider>
+  </StrictMode>
 );
+
+const root = document.getElementById("root")!;
+if (root.hasChildNodes()) hydrateRoot(root, app);
+else createRoot(root).render(app);

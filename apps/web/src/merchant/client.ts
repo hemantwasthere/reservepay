@@ -1,4 +1,5 @@
-import { BN, Program, type IdlAccounts } from "@coral-xyz/anchor";
+import { Program, type IdlAccounts } from "@coral-xyz/anchor";
+import BN from "bn.js";
 import {
   ComputeBudgetProgram,
   Connection,

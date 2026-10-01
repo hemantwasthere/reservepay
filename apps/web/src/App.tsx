@@ -1,3 +1,5 @@
+import { KeyboardShortcuts } from "./lib/KeyboardShortcuts";
+import { useToast } from "./lib/Toast";
 import {
   ArrowDown,
   ArrowRight,
@@ -63,10 +65,21 @@ function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="site-header">
+    <header
+      className="site-header"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && menuOpen) {
+          setMenuOpen(false);
+          event.currentTarget
+            .querySelector<HTMLButtonElement>(".menu-button")
+            ?.focus();
+        }
+      }}
+    >
       <Logo />
       <nav
         className={menuOpen ? "navigation is-open" : "navigation"}
+        id="main-navigation"
         aria-label="Main navigation"
       >
         <a href="#how" onClick={() => setMenuOpen(false)}>
@@ -96,6 +109,7 @@ function AppHeader() {
           className="menu-button"
           aria-label={menuOpen ? "Close navigation" : "Open navigation"}
           aria-expanded={menuOpen}
+          aria-controls="main-navigation"
           onClick={() => setMenuOpen(!menuOpen)}
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -269,6 +283,7 @@ function ReserveVisual() {
 }
 
 function CheckoutDemo() {
+  const { notify } = useToast();
   const [amountInput, setAmountInput] = useState("100");
   const [reserveBps, setReserveBps] = useState(500);
   const store = useDemoStore();
@@ -313,14 +328,37 @@ function CheckoutDemo() {
     if (pending || !store.connected) return;
     setPending(true);
     setError("");
+    notify({
+      id: "demo-payment",
+      title: "Saving demo payment",
+      tone: "loading",
+    });
     try {
-      setSelectedOrder(await operation());
+      const order = await operation();
+      setSelectedOrder(order);
+      notify({
+        id: "demo-payment",
+        title:
+          order.status === "refunded"
+            ? "Demo refund complete"
+            : order.status === "completed"
+              ? "Demo order completed"
+              : "Demo payment protected",
+        description: "This is a simulation. No wallet funds were moved.",
+        tone: "success",
+      });
     } catch (cause) {
-      setError(
+      const message =
         cause instanceof ConvexError
           ? String(cause.data)
-          : "Could not save this demo payment. Please try again.",
-      );
+          : "Could not save this demo payment. Please try again.";
+      setError(message);
+      notify({
+        id: "demo-payment",
+        title: "Could not save demo payment",
+        description: message,
+        tone: "error",
+      });
     } finally {
       setPending(false);
     }
@@ -716,7 +754,7 @@ export function App() {
       </a>
       <div className="page-shell">
         <AppHeader />
-        <main id="main">
+        <main id="main" tabIndex={-1}>
           <section className="hero section-frame">
             <div className="hero-copy" data-reveal-stagger>
               <a className="hero-kicker" href="#protocol">
@@ -934,8 +972,8 @@ export function App() {
                 <RotateCcw size={17} />
               </div>
               <p className="protocol-stage">
-                <span className="status-dot" /> Devnet preview · Deployed
-                on Solana
+                <span className="status-dot" /> Devnet preview · Deployed on
+                Solana
               </p>
             </div>
           </section>
@@ -1000,6 +1038,7 @@ export function App() {
             <span>
               <span className="status-dot" /> BUILT ON SOLANA
             </span>
+            <KeyboardShortcuts />
             <a href="#top">BACK TO TOP ↑</a>
           </div>
         </footer>

@@ -13,6 +13,7 @@ export type WalletOption = {
   name: string;
   accounts(): ConnectedAccount[];
   connect(): Promise<ConnectedAccount[]>;
+  reconnect(): Promise<ConnectedAccount[]>;
   disconnect(): Promise<void>;
   signTransaction?: (
     address: string,
@@ -76,6 +77,11 @@ export function standardWallet(wallet: Wallet): WalletOption | null {
       accounts(
         (await provider.features["standard:connect"].connect()).accounts,
       ),
+    reconnect: async () =>
+      accounts(
+        (await provider.features["standard:connect"].connect({ silent: true }))
+          .accounts,
+      ),
     disconnect: () => provider.features["standard:disconnect"].disconnect(),
     subscribe: (listener) =>
       provider.features["standard:events"].on("change", (event) => {
@@ -90,7 +96,9 @@ type PhantomProvider = {
   isPhantom?: boolean;
   signTransaction?: (transaction: Transaction) => Promise<Transaction>;
   publicKey?: PublicKey | null;
-  connect(): Promise<{ publicKey: PublicKey }>;
+  connect(options?: {
+    onlyIfTrusted: boolean;
+  }): Promise<{ publicKey: PublicKey }>;
   disconnect(): Promise<void>;
   on(event: string, listener: PhantomListener): void;
   removeListener(event: string, listener: PhantomListener): void;
@@ -123,6 +131,8 @@ export function legacyPhantom(): WalletOption | null {
     name: "Phantom",
     accounts: () => accounts(provider.publicKey),
     connect: async () => accounts((await provider.connect()).publicKey),
+    reconnect: async () =>
+      accounts((await provider.connect({ onlyIfTrusted: true })).publicKey),
     disconnect: () => provider.disconnect(),
     subscribe: (listener) => {
       const change: PhantomListener = (key) => listener(accounts(key));

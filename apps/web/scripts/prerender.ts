@@ -12,15 +12,23 @@ const server = await createServer({
 });
 
 try {
-  const { render } = await server.ssrLoadModule("/src/entry-server.tsx");
-  const path = resolve("dist/index.html");
-  const template = await readFile(path, "utf8");
-  const marker = '<div id="root"></div>';
-  if (!template.includes(marker)) throw new Error("Prerender root is missing.");
-  await writeFile(
-    path,
-    template.replace(marker, () => `<div id="root">${render()}</div>`),
+  const { render, renderMerchant } = await server.ssrLoadModule(
+    "/src/entry-server.tsx",
   );
+  for (const [file, content] of [
+    ["dist/index.html", render()],
+    ["dist/app/index.html", renderMerchant()],
+  ]) {
+    const path = resolve(file);
+    const template = await readFile(path, "utf8");
+    const marker = '<div id="root"></div>';
+    if (!template.includes(marker))
+      throw new Error("Prerender root is missing.");
+    await writeFile(
+      path,
+      template.replace(marker, () => `<div id="root">${content}</div>`),
+    );
+  }
   await writeFile(
     resolve("dist/robots.txt"),
     `User-agent: *\nAllow: /\n\nSitemap: ${site.url}sitemap.xml\n`,
@@ -29,7 +37,9 @@ try {
     resolve("dist/sitemap.xml"),
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${site.url}</loc></url></urlset>\n`,
   );
-  console.log("Prerendered landing page, robots.txt, and sitemap.xml.");
+  console.log(
+    "Prerendered landing and dashboard pages, robots.txt, and sitemap.xml.",
+  );
 } finally {
   await server.close();
   await rm(cacheDir, { recursive: true, force: true });

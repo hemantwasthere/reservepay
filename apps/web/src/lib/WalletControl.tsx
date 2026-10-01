@@ -5,10 +5,10 @@ import {
   ArrowLeftRight,
   Check,
   ChevronDown,
+  Copy,
   LoaderCircle,
   LogOut,
   Wallet,
-  X,
 } from "lucide-react";
 import {
   legacyPhantom,
@@ -16,6 +16,13 @@ import {
   type ConnectedAccount,
   type WalletOption,
 } from "./wallets";
+
+import { useToast } from "./Toast";
+import {
+  readWalletSession,
+  rememberWallet,
+  walletSessionKey,
+} from "./wallet-session";
 
 const shorten = (address: string) =>
   `${address.slice(0, 4)}…${address.slice(-4)}`;
@@ -27,9 +34,11 @@ export type WalletConnection = {
 
 export function WalletControl({
   onChange,
+  onLoadingChange,
   locked = false,
 }: {
   onChange?: (connection: WalletConnection | null) => void;
+  onLoadingChange?: (loading: boolean) => void;
   locked?: boolean;
 }) {
   const [options, setOptions] = useState<WalletOption[]>([]);
@@ -40,13 +49,32 @@ export function WalletControl({
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [panel, setPanel] = useState<"manage" | "choose" | null>(null);
   const [busy, setBusy] = useState("");
-  const [message, setMessage] = useState("");
+  const [initializing, setInitializing] = useState(true);
+  const { notify, dismiss } = useToast();
+  const setMessage = (description: string, tone: "info" | "error" = "info") => {
+    if (description)
+      notify({
+        id: "wallet-message",
+        title: "Wallet connection",
+        description,
+        tone,
+      });
+    else dismiss("wallet-message");
+  };
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const operation = useRef(0);
+  const attempted = useRef(new Set<object>());
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const pending = useRef(false);
   const activeRef = useRef(active);
   const unsubscribe = useRef<() => void>(() => {});
   const panelId = useId();
+
+  useEffect(() => {
+    onLoadingChange?.(initializing || busy === "Reconnecting…");
+  }, [initializing, busy, onLoadingChange]);
 
   const close = () => {
     setPanel(null);
@@ -56,7 +84,38 @@ export function WalletControl({
   const updateActive = (next: typeof active) => {
     activeRef.current = next;
     setActive(next);
-    onChange?.(next);
+    rememberWallet(
+      next ? { name: next.wallet.name, address: next.account.address } : null,
+    );
+    onChangeRef.current?.(next);
+  };
+
+  const adopt = (
+    wallet: WalletOption,
+    nextAccounts: ConnectedAccount[],
+    preferred?: string,
+  ) => {
+    const account =
+      nextAccounts.find((item) => item.address === preferred) ??
+      nextAccounts[0];
+    if (!account) throw new Error("No Solana account was shared.");
+    unsubscribe.current();
+    updateActive({ wallet, account });
+    setAccounts(nextAccounts);
+    unsubscribe.current = wallet.subscribe((updated) => {
+      if (activeRef.current?.wallet.identity !== wallet.identity) return;
+      setAccounts(updated);
+      const next =
+        updated.find(
+          (item) => item.address === activeRef.current?.account.address,
+        ) ?? updated[0];
+      updateActive(next ? { wallet, account: next } : null);
+      if (!next) {
+        setPanel(null);
+        if (!pending.current)
+          setMessage("Wallet disconnected. Connect again to continue.");
+      }
+    });
   };
 
   useEffect(() => {
@@ -75,12 +134,68 @@ export function WalletControl({
     const register = registry.on("register", refresh);
     const unregister = registry.on("unregister", refresh);
     window.addEventListener("focus", refresh);
+    const discoveryTimer = setTimeout(() => setInitializing(false), 1500);
     return () => {
+      clearTimeout(discoveryTimer);
+      operation.current++;
+      pending.current = false;
+      attempted.current.clear();
       register();
       unregister();
       unsubscribe.current();
       window.removeEventListener("focus", refresh);
     };
+  }, []);
+
+  useEffect(() => {
+    const saved = readWalletSession();
+    if (!saved) setInitializing(false);
+    if (!saved || activeRef.current || pending.current) return;
+    const wallet = options.find((item) => item.name === saved.name);
+    if (!wallet || attempted.current.has(wallet.identity)) return;
+    attempted.current.add(wallet.identity);
+    const request = ++operation.current;
+    pending.current = true;
+    setBusy("Reconnecting…");
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Wallet unavailable")), 8000);
+    });
+    void Promise.race([wallet.reconnect(), timeout])
+      .then((next) => {
+        if (operation.current === request) adopt(wallet, next, saved.address);
+      })
+      .catch(() => {
+        if (operation.current === request)
+          setMessage("Unlock your wallet, then connect to continue.");
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        if (operation.current === request) {
+          pending.current = false;
+          setBusy("");
+          setInitializing(false);
+        }
+      });
+  }, [options]);
+
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (
+        (event.key === walletSessionKey || event.key === null) &&
+        !readWalletSession()
+      ) {
+        operation.current++;
+        pending.current = false;
+        setBusy("");
+        unsubscribe.current();
+        updateActive(null);
+        setAccounts([]);
+        setPanel(null);
+      }
+    };
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
   }, []);
 
   useEffect(() => {
@@ -105,29 +220,20 @@ export function WalletControl({
   const connect = async (wallet: WalletOption) => {
     if (pending.current || locked) return;
     pending.current = true;
+    const request = ++operation.current;
     setBusy("Connecting…");
     setMessage("");
     try {
       const nextAccounts = await wallet.connect();
+      if (operation.current !== request) return;
       if (!nextAccounts[0]) throw new Error("No Solana account was shared.");
       const previous = activeRef.current;
-      unsubscribe.current();
-      updateActive({ wallet, account: nextAccounts[0] });
-      setAccounts(nextAccounts);
-      unsubscribe.current = wallet.subscribe((updated) => {
-        if (activeRef.current?.wallet.identity !== wallet.identity) return;
-        setAccounts(updated);
-        const account =
-          updated.find(
-            (item) => item.address === activeRef.current?.account.address,
-          ) ?? updated[0];
-        updateActive(account ? { wallet, account } : null);
-        if (!account) {
-          setPanel(null);
-          setMessage(
-            "Wallet disconnected. Connect again to use your new account.",
-          );
-        }
+      adopt(wallet, nextAccounts);
+      notify({
+        id: "wallet-message",
+        title: previous ? "Wallet switched" : "Wallet connected",
+        description: `${wallet.name} · ${shorten(nextAccounts[0].address)}`,
+        tone: "success",
       });
       close();
       if (
@@ -144,15 +250,19 @@ export function WalletControl({
         }
       }
     } catch {
+      if (operation.current !== request) return;
       setMessage(
         activeRef.current
           ? "Wallet switch cancelled or unavailable. Your current wallet is still connected."
           : "Could not connect. Approve the request in your wallet or try again.",
+        "error",
       );
     } finally {
-      pending.current = false;
-      setBusy("");
-      requestAnimationFrame(() => trigger.current?.focus());
+      if (operation.current === request) {
+        pending.current = false;
+        setBusy("");
+        requestAnimationFrame(() => trigger.current?.focus());
+      }
     }
   };
 
@@ -167,11 +277,16 @@ export function WalletControl({
       unsubscribe.current();
       updateActive(null);
       setAccounts([]);
-      setMessage("");
+      notify({
+        id: "wallet-message",
+        title: "Wallet disconnected",
+        description: "You can connect again whenever you’re ready.",
+      });
       close();
     } catch {
       setMessage(
         "Could not disconnect. Please try again or disconnect in your wallet.",
+        "error",
       );
     } finally {
       pending.current = false;
@@ -195,28 +310,45 @@ export function WalletControl({
       <button
         ref={trigger}
         className="button button-dark wallet-button"
+        aria-label={
+          active
+            ? `Wallet options for ${active.wallet.name}, ${shorten(active.account.address)}`
+            : undefined
+        }
+        aria-keyshortcuts="Alt+Shift+W"
+        aria-busy={Boolean(busy) || initializing}
         aria-expanded={Boolean(panel)}
         aria-controls={panelId}
-        disabled={Boolean(busy) || locked}
+        disabled={Boolean(busy) || initializing || locked}
         onClick={() => {
           setMessage("");
           setPanel(panel ? null : active ? "manage" : "choose");
         }}
       >
-        {busy ? (
+        {busy || initializing ? (
           <LoaderCircle size={15} className="pending-spinner" />
         ) : active ? (
           <Check size={15} />
         ) : (
           <Wallet size={15} />
         )}
-        {busy || (active ? shorten(active.account.address) : "Connect wallet")}
+        {busy ||
+          (initializing
+            ? "Loading wallet…"
+            : active
+              ? shorten(active.account.address)
+              : "Connect wallet")}
         {active && !busy && (
           <ChevronDown size={12} className="wallet-chevron" />
         )}
       </button>
       {panel && (
-        <div className="wallet-panel" id={panelId} aria-label="Wallet options">
+        <div
+          className="wallet-panel"
+          id={panelId}
+          role="region"
+          aria-label="Wallet options"
+        >
           {panel === "manage" && active ? (
             <>
               <div className="wallet-panel-heading">
@@ -224,6 +356,29 @@ export function WalletControl({
                 <span className="status-dot">CONNECTED</span>
               </div>
               <p className="wallet-address">{active.account.address}</p>
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(active.account.address);
+                    notify({
+                      id: "wallet-copy",
+                      title: "Wallet address copied",
+                      description: shorten(active.account.address),
+                      tone: "success",
+                    });
+                  } catch {
+                    notify({
+                      id: "wallet-copy",
+                      title: "Could not copy address",
+                      description:
+                        "Select the address above and copy it manually.",
+                      tone: "error",
+                    });
+                  }
+                }}
+              >
+                <Copy size={14} aria-hidden="true" /> Copy address
+              </button>
               <button
                 onClick={() => {
                   setMessage("");
@@ -311,28 +466,6 @@ export function WalletControl({
               )}
             </>
           )}
-          {message && (
-            <div className="wallet-message" role="status">
-              {message}
-              <button
-                aria-label="Dismiss wallet message"
-                onClick={() => setMessage("")}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-      {!panel && message && (
-        <div className="wallet-message" role="status">
-          {message}
-          <button
-            aria-label="Dismiss wallet message"
-            onClick={() => setMessage("")}
-          >
-            <X size={15} />
-          </button>
         </div>
       )}
     </div>

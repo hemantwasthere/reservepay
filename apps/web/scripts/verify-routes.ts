@@ -24,6 +24,18 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     const html = await response.text();
     const dashboard = path !== "/";
     assert.ok(
+      html.includes(dashboard ? "merchant-main" : "Good commerce."),
+      `${name}: initial page content is missing at ${path}`,
+    );
+    assert.ok(
+      html.includes("/fonts/dm-sans-latin.woff2"),
+      `${name}: font preload is missing`,
+    );
+    assert.ok(
+      !html.includes("fonts.googleapis.com"),
+      `${name}: fonts must be served locally`,
+    );
+    assert.ok(
       html.includes(
         `<title>${dashboard ? "Merchant dashboard | ReservePay" : site.title}</title>`,
       ),

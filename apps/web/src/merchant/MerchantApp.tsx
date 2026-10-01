@@ -1,3 +1,5 @@
+import { KeyboardShortcuts } from "../lib/KeyboardShortcuts";
+import { useToast } from "../lib/Toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
@@ -6,7 +8,7 @@ import {
   CheckCheck,
   CircleHelp,
   ExternalLink,
-  LayoutDashboard,
+  ChartNoAxesCombined,
   LoaderCircle,
   LockKeyhole,
   RefreshCw,
@@ -50,6 +52,7 @@ const errorMessage = (error: unknown) =>
 export function MerchantApp() {
   const [active, setActive] = useState<WalletConnection | null>(null);
   const [locked, setLocked] = useState(false);
+  const [walletLoading, setWalletLoading] = useState(true);
   const activeRef = useRef(active);
   const onChange = useCallback((next: WalletConnection | null) => {
     activeRef.current = next;
@@ -81,14 +84,18 @@ export function MerchantApp() {
           <span className="network-badge">
             <span /> Devnet
           </span>
-          <WalletControl onChange={onChange} locked={locked} />
+          <WalletControl
+            onChange={onChange}
+            onLoadingChange={setWalletLoading}
+            locked={locked}
+          />
         </div>
       </header>
       <div className="merchant-layout">
-        <aside className="merchant-sidebar">
+        <aside className="merchant-sidebar" aria-label="Workspace navigation">
           <span className="merchant-eyebrow">YOUR WORKSPACE</span>
           <a href="/app" className="sidebar-active" aria-current="page">
-            <LayoutDashboard size={16} /> Overview
+            <ChartNoAxesCombined size={17} aria-hidden="true" /> Overview
           </a>
           <div className="sidebar-note">
             <ShieldCheck size={22} />
@@ -106,7 +113,7 @@ export function MerchantApp() {
             <ArrowUpRight size={13} />
           </a>
         </aside>
-        <main id="merchant-main" className="merchant-main">
+        <main id="merchant-main" className="merchant-main" tabIndex={-1}>
           <div className="merchant-page-heading">
             <div>
               <div className="merchant-eyebrow">RESERVE / OVERVIEW</div>
@@ -130,10 +137,12 @@ export function MerchantApp() {
           <MerchantWorkspace
             key={active?.account.address ?? "disconnected"}
             active={active}
+            walletLoading={walletLoading}
             isCurrent={isCurrent}
             setLocked={setLocked}
           />
           <footer className="merchant-footer">
+            <KeyboardShortcuts dashboard />
             <span>
               <span className="status-dot" /> Built on Solana · Devnet only
             </span>
@@ -153,13 +162,16 @@ export function MerchantApp() {
 
 function MerchantWorkspace({
   active,
+  walletLoading,
   isCurrent,
   setLocked,
 }: {
   active: WalletConnection | null;
+  walletLoading: boolean;
   isCurrent: (value: WalletConnection) => boolean;
   setLocked: (locked: boolean) => void;
 }) {
+  const { notify, dismiss } = useToast();
   const [state, setState] = useState<MerchantState | null>(null);
   const [readError, setReadError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -179,24 +191,49 @@ function MerchantWorkspace({
   const mounted = useRef(true);
   const current = () => mounted.current && Boolean(active && isCurrent(active));
 
-  const refresh = useCallback(async () => {
-    if (!active || refreshInFlight.current) return;
-    refreshInFlight.current = true;
-    setRefreshing(true);
-    try {
-      const next = await client.read(new PublicKey(active.account.address));
-      if (mounted.current && isCurrent(active)) {
-        setState(next);
-        setReadError("");
+  const refresh = useCallback(
+    async (manual = false) => {
+      if (!active || refreshInFlight.current) return;
+      refreshInFlight.current = true;
+      setRefreshing(true);
+      if (manual)
+        notify({
+          id: "balance-refresh",
+          title: "Refreshing balances",
+          description: "Reading confirmed balances from Solana devnet.",
+          tone: "loading",
+        });
+      try {
+        const next = await client.read(new PublicKey(active.account.address));
+        if (mounted.current && isCurrent(active)) {
+          setState(next);
+          setReadError("");
+          if (manual)
+            notify({
+              id: "balance-refresh",
+              title: "Balances updated",
+              description: "Your reserve is up to date.",
+              tone: "success",
+            });
+        }
+      } catch (error) {
+        if (mounted.current && isCurrent(active)) {
+          setReadError(`Could not refresh balances. ${errorMessage(error)}`);
+          if (manual)
+            notify({
+              id: "balance-refresh",
+              title: "Could not refresh balances",
+              description: errorMessage(error),
+              tone: "error",
+            });
+        }
+      } finally {
+        refreshInFlight.current = false;
+        if (mounted.current) setRefreshing(false);
       }
-    } catch (error) {
-      if (mounted.current && isCurrent(active))
-        setReadError(`Could not refresh balances. ${errorMessage(error)}`);
-    } finally {
-      refreshInFlight.current = false;
-      if (mounted.current) setRefreshing(false);
-    }
-  }, [active, isCurrent]);
+    },
+    [active, isCurrent, notify],
+  );
 
   useEffect(() => {
     mounted.current = true;
@@ -270,6 +307,41 @@ function MerchantWorkspace({
     };
   }, [pending, refresh]);
 
+  useEffect(() => {
+    if (!active || !(busy || pending || message)) return;
+    notify({
+      id: `transaction:${active.account.address}`,
+      title: busy
+        ? "Transaction in progress"
+        : pending
+          ? `${labels[pending.action]} pending`
+          : receipt?.result === "confirmed"
+            ? `${labels[receipt.transaction.action]} complete`
+            : "Transaction needs attention",
+      description:
+        busy || message || "Waiting for confirmation on Solana devnet.",
+      tone:
+        busy || pending
+          ? "loading"
+          : receipt?.result === "confirmed"
+            ? "success"
+            : "error",
+      href:
+        pending || receipt
+          ? explorer((pending ?? receipt!.transaction).signature, "tx")
+          : undefined,
+    });
+  }, [active, busy, pending, message, receipt, notify]);
+
+  useEffect(
+    () => () => {
+      if (active) dismiss(`transaction:${active.account.address}`);
+      dismiss("balance-refresh");
+    },
+    [active, dismiss],
+  );
+
+  const loading = Boolean(walletLoading || (active && !state && !readError));
   const position = state ? reservePosition(state.reserve, state.locked) : null;
   const maxAmount =
     action === "fund"
@@ -381,7 +453,10 @@ function MerchantWorkspace({
         <span className="merchant-eyebrow">RESERVE POSITION</span>
         <button
           className="text-button"
-          onClick={() => void refresh()}
+          onClick={() => void refresh(true)}
+          data-shortcut="refresh"
+          aria-keyshortcuts="Alt+Shift+R"
+          aria-busy={refreshing}
           disabled={!active || refreshing || Boolean(busy)}
         >
           <RefreshCw
@@ -391,21 +466,30 @@ function MerchantWorkspace({
           {refreshing ? "Refreshing…" : "Refresh"}
         </button>
       </div>
-      <div className="reserve-stats">
+      <div
+        className="reserve-stats"
+        aria-busy={loading}
+        aria-label="Reserve balances"
+      >
         <Stat
           icon={<ShieldCheck size={17} />}
+          loading={loading}
+          tone="info"
           label="Total reserve"
           amount={state?.reserve}
           note="Held in your reserve vault"
         />
         <Stat
           icon={<LockKeyhole size={17} />}
+          loading={loading}
+          tone="warning"
           label="Backing open orders"
           amount={state?.locked}
           note="Protected until orders resolve"
         />
         <Stat
           icon={<ArrowUpRight size={17} />}
+          loading={loading}
           label="Available to withdraw"
           amount={position?.available}
           note="Collateral you can move freely"
@@ -441,9 +525,11 @@ function MerchantWorkspace({
             <div>
               <span className="merchant-eyebrow">GETTING STARTED</span>
               <h2>
-                {state?.registered
-                  ? "A reserve you control."
-                  : "Your first protected payment starts here."}
+                {loading
+                  ? "Loading your reserve…"
+                  : state?.registered
+                    ? "A reserve you control."
+                    : "Your first protected payment starts here."}
               </h2>
             </div>
             <ShieldCheck size={23} />
@@ -475,7 +561,16 @@ function MerchantWorkspace({
               description="Deposit test USDC to back future protected orders."
             />
           </div>
-          {!active ? (
+          {walletLoading ? (
+            <div className="setup-footer" role="status">
+              <LoaderCircle
+                size={16}
+                className="pending-spinner"
+                aria-hidden="true"
+              />
+              <span>Checking your wallet connection…</span>
+            </div>
+          ) : !active ? (
             <div className="setup-footer">
               <Wallet size={16} />
               <span>Connect your wallet in the top right to begin.</span>
@@ -487,12 +582,17 @@ function MerchantWorkspace({
                 disabled={!enabled || !state}
                 onClick={() => void submit("register")}
               >
-                {busy ? (
+                {busy || pending || loading ? (
                   <LoaderCircle size={15} className="pending-spinner" />
                 ) : (
                   <ArrowUpRight size={15} />
                 )}
-                {busy || "Register merchant"}
+                {busy ||
+                  (pending
+                    ? "Confirming registration…"
+                    : loading
+                      ? "Loading merchant…"
+                      : "Register merchant")}
               </button>
               <span>One-time setup · Devnet SOL rent applies</span>
             </div>
@@ -541,6 +641,7 @@ function MerchantWorkspace({
             </button>
           </div>
           <form
+            aria-busy={Boolean(busy || pending)}
             onSubmit={(event) => {
               event.preventDefault();
               if (amountValid) void submit(action);
@@ -559,6 +660,8 @@ function MerchantWorkspace({
                 onChange={(event) => setAmount(event.target.value)}
                 disabled={!state?.registered || Boolean(busy || pending)}
                 aria-describedby="amount-help"
+                aria-invalid={Boolean(amount && !amountValid)}
+                aria-keyshortcuts="Alt+Shift+A"
               />
               <button
                 type="button"
@@ -596,7 +699,7 @@ function MerchantWorkspace({
               className="button button-dark transfer-submit"
               disabled={!enabled || !state?.registered || !amountValid}
             >
-              {busy ? (
+              {busy || pending ? (
                 <LoaderCircle size={15} className="pending-spinner" />
               ) : action === "fund" ? (
                 <ArrowDownLeft size={15} />
@@ -604,6 +707,7 @@ function MerchantWorkspace({
                 <ArrowUpRight size={15} />
               )}
               {busy ||
+                (pending ? "Confirming transaction…" : undefined) ||
                 (action === "fund" ? "Add to reserve" : "Withdraw to wallet")}
             </button>
           </form>
@@ -615,7 +719,6 @@ function MerchantWorkspace({
       {(pending || message) && (
         <div
           className={`transaction-notice ${receipt?.result === "confirmed" ? "transaction-confirmed" : ""}`}
-          role="status"
         >
           <div>
             {pending ? (
@@ -654,6 +757,7 @@ function MerchantWorkspace({
             </span>
           </div>
           <div
+            role="img"
             className="reserve-allocation"
             aria-label={
               state
@@ -738,15 +842,21 @@ function Stat({
   amount,
   note,
   accent = false,
+  loading = false,
+  tone,
 }: {
   icon: React.ReactNode;
   label: string;
   amount?: bigint;
   note: string;
   accent?: boolean;
+  loading?: boolean;
+  tone?: "info" | "warning";
 }) {
   return (
-    <section className={`reserve-stat ${accent ? "reserve-stat-accent" : ""}`}>
+    <section
+      className={`reserve-stat ${accent ? "reserve-stat-accent" : ""} ${tone ? `reserve-stat-${tone}` : ""}`}
+    >
       <div>
         <span>{label}</span>
         {icon}
@@ -754,7 +864,16 @@ function Stat({
       <strong
         title={amount === undefined ? undefined : `${exactAmount(amount)} USDC`}
       >
-        {amount === undefined ? "—" : formatUsdc(amount)}
+        {loading ? (
+          <>
+            <span className="balance-skeleton" aria-hidden="true" />
+            <span className="sr-only">Loading balance</span>
+          </>
+        ) : amount === undefined ? (
+          "—"
+        ) : (
+          formatUsdc(amount)
+        )}
         <small>USDC</small>
       </strong>
       <p>{note}</p>

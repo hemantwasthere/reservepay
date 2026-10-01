@@ -1,3 +1,5 @@
+import { MerchantApp } from "./merchant/MerchantApp";
+import { ToastProvider } from "./lib/Toast";
 import { StrictMode } from "react";
 import { renderToString } from "react-dom/server";
 import { App } from "./App";
@@ -7,8 +9,20 @@ export function render() {
   return renderToString(
     <StrictMode>
       <DemoProvider>
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
       </DemoProvider>
+    </StrictMode>,
+  );
+}
+
+export function renderMerchant() {
+  return renderToString(
+    <StrictMode>
+      <ToastProvider>
+        <MerchantApp />
+      </ToastProvider>
     </StrictMode>,
   );
 }

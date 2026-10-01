@@ -1,5 +1,39 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "DM Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: optional;
+  src: url(/fonts/dm-sans-latin.woff2) format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url(/fonts/ibm-plex-mono-400-latin.woff2) format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: optional;
+  src: url(/fonts/ibm-plex-mono-500-latin.woff2) format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
 @theme {
   --font-sans: "DM Sans", sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
@@ -407,7 +441,7 @@ svg {
   font: 8px var(--mono);
   letter-spacing: 0.6px;
   padding: 16px 20px;
-  color: #818976;
+  color: var(--muted);
 }
 .visual-meta {
   border-bottom: 1px solid var(--line);
@@ -508,7 +542,7 @@ svg {
 .destination > span {
   font: 7px var(--mono);
   letter-spacing: 0.6px;
-  color: #757f69;
+  color: var(--muted);
   white-space: nowrap;
 }
 .destination > strong {
@@ -518,11 +552,11 @@ svg {
   font-weight: 500;
 }
 .destination > strong span {
-  color: #909985;
+  color: var(--muted);
 }
 .destination > small {
   font-size: 9px;
-  color: #7a8271;
+  color: var(--muted);
 }
 .reserve-destination {
   background: #edf3e5;
@@ -550,7 +584,7 @@ svg {
   justify-content: space-between;
   gap: 5px;
   font-size: 8px;
-  color: #7e8673;
+  color: var(--muted);
   margin-top: 10px;
 }
 .foundation-label span {
@@ -591,7 +625,7 @@ svg {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  color: #727769;
+  color: var(--muted);
   font-size: 11px;
 }
 .principles-strip svg {
@@ -603,10 +637,10 @@ svg {
   gap: 13px;
   font: 9px var(--mono);
   letter-spacing: 1.3px;
-  color: #69765e;
+  color: var(--muted);
 }
 .section-label > span {
-  color: #919a87;
+  color: var(--muted);
 }
 .section-heading {
   display: flex;
@@ -656,7 +690,7 @@ h2 > span {
 }
 .step-top span {
   font: 9px var(--mono);
-  color: #8d9484;
+  color: var(--muted);
 }
 .flow-grid h3 {
   font-size: 15px;
@@ -673,7 +707,7 @@ h2 > span {
   display: block;
   font: 7px var(--mono);
   letter-spacing: 0.6px;
-  color: #859078;
+  color: var(--muted);
   border-top: 1px solid var(--line);
   padding-top: 16px;
   margin-top: 24px;
@@ -700,7 +734,7 @@ h2 > span {
   border-bottom: 1px solid var(--line);
   font: 8px var(--mono);
   letter-spacing: 0.9px;
-  color: #7d8770;
+  color: var(--muted);
 }
 .panel-topline > span {
   display: flex;
@@ -717,7 +751,7 @@ h2 > span {
   letter-spacing: 1px;
   background: #edf0e7;
   border: 1px solid #dce2d3;
-  color: #7a856c;
+  color: var(--muted);
   padding: 4px 6px;
 }
 .checkout-panel {
@@ -757,7 +791,7 @@ h2 > span {
 }
 .muted-label {
   font: 7px var(--mono);
-  color: #818b75;
+  color: var(--muted);
   letter-spacing: 1px;
 }
 .product-row h3 {
@@ -775,12 +809,12 @@ h2 > span {
   justify-content: space-between;
   font-size: 11px;
   margin-bottom: 11px;
-  color: #707966;
+  color: var(--muted);
 }
 .amount-label span {
   font: 7px var(--mono);
   letter-spacing: 0.7px;
-  color: #8a9380;
+  color: var(--muted);
 }
 .amount-input {
   display: flex;
@@ -878,7 +912,7 @@ h2 > span {
   padding: 0 13px;
   background: #e7efdd;
   border: 1px solid #ccdcbe;
-  color: #557544;
+  color: var(--green);
   font-size: 12px;
 }
 .payment-status .icon-button {
@@ -929,7 +963,7 @@ h2 > span {
 }
 .settlement-values dt {
   font-size: 9px;
-  color: #7c8770;
+  color: var(--muted);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -957,7 +991,7 @@ h2 > span {
 .settlement-values dd small {
   font: 8px var(--mono);
   letter-spacing: 0;
-  color: #929b86;
+  color: var(--muted);
 }
 .rate-control {
   margin-top: 26px;
@@ -967,7 +1001,7 @@ h2 > span {
   justify-content: space-between;
   align-items: center;
   font-size: 10px;
-  color: #78826c;
+  color: var(--muted);
 }
 .rate-control strong {
   font: 11px var(--mono);
@@ -1007,7 +1041,7 @@ h2 > span {
   display: flex;
   justify-content: space-between;
   font: 7px var(--mono);
-  color: #8c9680;
+  color: var(--muted);
   letter-spacing: 0.3px;
 }
 .coverage-note {
@@ -1044,7 +1078,7 @@ h2 > span {
   align-items: center;
   gap: 8px;
   font-size: 9px;
-  color: #8b9580;
+  color: var(--muted);
 }
 .resolution-actions .button {
   min-height: 34px;
@@ -1065,7 +1099,7 @@ h2 > span {
   justify-content: space-between;
   gap: 16px;
   margin-top: 17px;
-  color: #849078;
+  color: var(--muted);
   font-size: 9px;
 }
 .workbench-footer span:first-child {
@@ -1287,7 +1321,7 @@ h2 > span {
 }
 .protocol-rules > div > span:first-child {
   font: 9px var(--mono);
-  color: #8b977e;
+  color: var(--muted);
 }
 .protocol-rules > div > p {
   font-size: 12px;
@@ -1303,7 +1337,7 @@ h2 > span {
   gap: 8px;
   padding: 18px 15px;
   font-size: 9px;
-  color: #8b9581;
+  color: var(--muted);
 }
 .faq-section {
   padding: 68px 64px 76px;
@@ -1402,7 +1436,7 @@ footer {
   gap: 26px;
   align-items: center;
   font-size: 10px;
-  color: #76816a;
+  color: var(--muted);
 }
 .footer-links a:last-child {
   display: flex;
@@ -1416,7 +1450,7 @@ footer {
   border-top: 1px solid var(--line);
   min-height: 59px;
   font: 8px var(--mono);
-  color: #8b9581;
+  color: var(--muted);
 }
 .footer-bottom > span:nth-child(2) {
   display: flex;
@@ -2175,7 +2209,7 @@ footer {
   align-items: center;
   gap: 8px;
   padding: 9px 8px;
-  color: #69765e;
+  color: var(--muted);
   font: 9px var(--mono);
   letter-spacing: 0.5px;
 }
@@ -2259,4 +2293,257 @@ footer {
   .wallet-panel {
     right: -35px;
   }
+}
+
+:root {
+  --info: #395f78;
+  --info-soft: #edf2f5;
+  --warning: #806022;
+  --warning-soft: #f6f0e3;
+  --danger: #a04436;
+  --danger-soft: #faf0ed;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+html {
+  scrollbar-gutter: stable;
+}
+.wallet-address,
+.wallet-hint,
+.wallet-detected {
+  color: var(--muted);
+}
+.wallet-panel {
+  border-radius: 6px;
+}
+.wallet-panel button {
+  min-height: 42px;
+  border-radius: 3px;
+}
+.wallet-panel button:has(.lucide-log-out) {
+  color: var(--danger);
+}
+.toast-viewport {
+  position: fixed;
+  z-index: 100;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: min(380px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  outline: none;
+}
+.toast {
+  --toast-accent: var(--info);
+  --toast-soft: var(--info-soft);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 17px 12px 17px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--toast-accent);
+  border-radius: 6px;
+  background: var(--white);
+  box-shadow:
+    0 8px 32px #24282014,
+    0 2px 4px #24282006;
+  pointer-events: auto;
+  animation: toast-enter 180ms ease-out;
+}
+.toast > svg {
+  color: var(--toast-accent);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.toast > div {
+  flex: 1;
+  min-width: 0;
+}
+.toast strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 550;
+}
+.toast p {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.toast a {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--toast-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  margin-top: 5px;
+}
+.toast-success {
+  --toast-accent: var(--green);
+  --toast-soft: #edf2e5;
+}
+.toast-error {
+  --toast-accent: var(--danger);
+  --toast-soft: var(--danger-soft);
+}
+.toast-loading {
+  --toast-accent: var(--warning);
+  --toast-soft: var(--warning-soft);
+}
+.toast-dismiss,
+.shortcuts-heading button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--muted);
+}
+.toast-dismiss:hover {
+  background: var(--toast-soft);
+  color: var(--toast-accent);
+}
+.shortcuts-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px;
+  min-height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 10px var(--mono);
+}
+.shortcuts-trigger:hover {
+  color: var(--green);
+}
+.shortcuts-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  margin: auto;
+  border: 1px solid #c8d1be;
+  border-radius: 8px;
+  padding: 26px;
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: 0 24px 90px #24282026;
+}
+.shortcuts-dialog::backdrop {
+  background: #24282050;
+}
+.shortcuts-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.shortcuts-heading h2 {
+  font-size: 18px;
+  letter-spacing: -0.4px;
+}
+.shortcuts-dialog p {
+  font: 12px/1.7 var(--font-sans);
+  color: var(--muted);
+  margin: 12px 0 22px;
+}
+.shortcuts-dialog dl {
+  margin: 0 0 22px;
+}
+.shortcuts-dialog dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font: 12px var(--font-sans);
+}
+.shortcuts-dialog dd {
+  margin: 0;
+  white-space: nowrap;
+}
+kbd {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 3px 5px;
+  background: var(--paper);
+  font: 10px var(--mono);
+}
+.shortcuts-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  font: 12px var(--font-sans);
+}
+.shortcuts-toggle input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--green);
+}
+.shortcuts-dialog .shortcuts-note {
+  margin-bottom: 0;
+  font-size: 11px;
+}
+@keyframes toast-enter {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (max-width: 640px) {
+  .toast-viewport {
+    right: 16px;
+    bottom: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+@media (forced-colors: active) {
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  summary:focus-visible {
+    outline-color: Highlight;
+  }
+  .toast {
+    border: 2px solid CanvasText;
+  }
+}
+
+.merchant-section .section-label > span {
+  color: #b6c4a8;
+}
+
+.payment-status.refunded {
+  color: var(--info);
+  background: var(--info-soft);
+  border-color: #cedce5;
 }

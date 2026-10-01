@@ -51,6 +51,18 @@ function fixture() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("wallet connections", () => {
+  it("requests only previously authorized accounts on reconnect", async () => {
+    const { wallet, connect } = fixture();
+    const option = standardWallet(wallet)!;
+    expect(await option.reconnect()).toEqual([
+      { address: "solana-account", label: undefined },
+    ]);
+    expect(connect).toHaveBeenCalledWith({ silent: true });
+    connect.mockRejectedValueOnce(new Error("Wallet locked"));
+    await expect(option.reconnect()).rejects.toThrow("Wallet locked");
+    expect(connect).toHaveBeenCalledTimes(2);
+    expect(connect).toHaveBeenLastCalledWith({ silent: true });
+  });
   it("only exposes Solana accounts from a multichain wallet", async () => {
     const { wallet } = fixture();
     const option = standardWallet(wallet)!;
@@ -117,6 +129,8 @@ describe("wallet connections", () => {
     });
     const option = legacyPhantom()!;
     expect(await option.connect()).toEqual([{ address: "phantom-account" }]);
+    expect(await option.reconnect()).toEqual([{ address: "phantom-account" }]);
+    expect(provider.connect).toHaveBeenLastCalledWith({ onlyIfTrusted: true });
     const update = vi.fn();
     const unsubscribe = option.subscribe(update);
     listeners.get("accountChanged")?.({ toString: () => "second-account" });

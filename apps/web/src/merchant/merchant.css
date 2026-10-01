@@ -277,7 +277,7 @@
   background: var(--paper);
   border-radius: 50%;
   font: 10px var(--mono);
-  color: #92998b;
+  color: var(--muted);
   transition: background 0.3s;
 }
 .step-active .step-number {
@@ -607,19 +607,6 @@
   border-color: #c9dcb9;
   background: #edf6e7;
 }
-.merchant-main > * {
-  animation: merchant-enter 0.35s ease both;
-}
-@keyframes merchant-enter {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 @keyframes reserve-drift {
   to {
     background-position: 33px 0;
@@ -812,5 +799,91 @@
   .reserve-allocation > span,
   .faucet-card > a svg {
     transition: none;
+  }
+}
+
+.faucet-token > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  min-height: 24px;
+}
+.faucet-token,
+.merchant-footer,
+.transfer-security {
+  color: var(--muted);
+}
+.merchant-footer {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.merchant-footer .shortcuts-trigger {
+  order: 1;
+}
+.network-badge {
+  color: var(--info);
+}
+.network-badge > span {
+  background: var(--info);
+  box-shadow: 0 0 0 3px var(--info-soft);
+}
+.devnet-notice {
+  background: var(--info-soft);
+  border-color: #d5e0e7;
+}
+.devnet-notice p,
+.devnet-notice strong,
+.notice-icon {
+  color: var(--info);
+}
+.reserve-stat-info {
+  background: #f2f5f6;
+  border-color: #dbe3e7;
+}
+.reserve-stat-info > div svg,
+.reserve-stat-info > strong {
+  color: var(--info);
+}
+.reserve-stat-warning {
+  background: #f8f5ed;
+  border-color: #e7dfcf;
+}
+.reserve-stat-warning > div svg,
+.reserve-stat-warning > strong {
+  color: var(--warning);
+}
+.reserve-allocation > span,
+.allocation-legend span:first-child i {
+  background: #a7884c;
+}
+.reserve-amount input[aria-invalid="true"] {
+  color: var(--danger);
+}
+.reserve-amount:has(input[aria-invalid="true"]) {
+  border-color: var(--danger);
+}
+.balance-skeleton {
+  display: inline-block;
+  width: 86px;
+  height: 30px;
+  border-radius: 3px;
+  background: linear-gradient(
+    100deg,
+    #dce2d580 25%,
+    #f4f6ee 50%,
+    #dce2d580 75%
+  );
+  background-size: 200% 100%;
+  animation: balance-shimmer 1.8s ease-in-out infinite;
+}
+@keyframes balance-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .balance-skeleton {
+    animation: none;
   }
 }

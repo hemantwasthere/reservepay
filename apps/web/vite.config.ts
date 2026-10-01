@@ -18,6 +18,30 @@ const routeDashboard: Connect.NextHandleFunction = (
 
 export default defineConfig({
   appType: "mpa",
+  cacheDir: resolve(
+    import.meta.dirname,
+    "node_modules/.vite",
+    `dev-${process.pid}`,
+  ),
+  resolve: { dedupe: ["react", "react-dom"] },
+  optimizeDeps: {
+    include: [
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "lucide-react",
+      "convex/react",
+      "@coral-xyz/anchor",
+      "@solana/web3.js",
+      "@solana/spl-token",
+      "@wallet-standard/app",
+      "bn.js",
+      "buffer",
+      "bs58",
+    ],
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -28,6 +52,22 @@ export default defineConfig({
       },
       configurePreviewServer(server) {
         server.middlewares.use(routeDashboard);
+      },
+    },
+    {
+      name: "reservepay-initial-content",
+      async transformIndexHtml(html, context) {
+        if (!context.server) return html;
+        const { render, renderMerchant } = await context.server.ssrLoadModule(
+          "/src/entry-server.tsx",
+        );
+        const content = context.filename.endsWith("/app/index.html")
+          ? renderMerchant()
+          : render();
+        return html.replace(
+          '<div id="root"></div>',
+          () => `<div id="root">${content}</div>`,
+        );
       },
     },
     {
