@@ -365,7 +365,7 @@ export function App() {
           program. Every open order is fully covered before payment clears.
         </p>
         <a
-          href="https://github.com/hemant-neatlogs/reservepay"
+          href="https://github.com/hemantwasthere/reservepay"
           target="_blank"
           rel="noreferrer"
         >
