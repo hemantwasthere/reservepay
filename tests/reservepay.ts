@@ -1,0 +1,277 @@
+import * as anchor from "@coral-xyz/anchor";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  createMint,
+  getAccount,
+  getAssociatedTokenAddressSync,
+  getOrCreateAssociatedTokenAccount,
+  mintTo,
+} from "@solana/spl-token";
+import {
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
+import { expect } from "chai";
+import { Reservepay } from "../target/types/reservepay";
+
+describe("reservepay", () => {
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
+  const workspaceProgram = anchor.workspace
+    .Reservepay as anchor.Program<Reservepay>;
+  const payer = (provider.wallet as anchor.Wallet & { payer: Keypair }).payer;
+  const buyer = Keypair.generate();
+  let mint: PublicKey;
+  let merchant: PublicKey;
+  let reserveVault: PublicKey;
+  let merchantTokenAccount: PublicKey;
+  let buyerTokenAccount: PublicKey;
+
+  before(async () => {
+    const signature = await provider.connection.requestAirdrop(
+      buyer.publicKey,
+      2 * LAMPORTS_PER_SOL,
+    );
+    await provider.connection.confirmTransaction(signature, "confirmed");
+    mint = await createMint(
+      provider.connection,
+      payer,
+      payer.publicKey,
+      null,
+      6,
+    );
+    merchant = PublicKey.findProgramAddressSync(
+      [Buffer.from("merchant"), payer.publicKey.toBuffer(), mint.toBuffer()],
+      workspaceProgram.programId,
+    )[0];
+    reserveVault = getAssociatedTokenAddressSync(mint, merchant, true);
+    merchantTokenAccount = (
+      await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        payer,
+        mint,
+        payer.publicKey,
+      )
+    ).address;
+    buyerTokenAccount = (
+      await getOrCreateAssociatedTokenAccount(
+        provider.connection,
+        payer,
+        mint,
+        buyer.publicKey,
+      )
+    ).address;
+    await mintTo(
+      provider.connection,
+      payer,
+      mint,
+      merchantTokenAccount,
+      payer,
+      200_000_000,
+    );
+    await mintTo(
+      provider.connection,
+      payer,
+      mint,
+      buyerTokenAccount,
+      payer,
+      300_000_000,
+    );
+  });
+
+  it("initializes a fully covered merchant reserve", async () => {
+    const protocol = PublicKey.findProgramAddressSync(
+      [Buffer.from("protocol")],
+      workspaceProgram.programId,
+    )[0];
+
+    await workspaceProgram.methods
+      .initializeProtocol(payer.publicKey, 500)
+      .accountsStrict({
+        protocol,
+        authority: payer.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    await workspaceProgram.methods
+      .registerMerchant()
+      .accountsStrict({
+        protocol,
+        merchant,
+        reserveVault,
+        mint,
+        authority: payer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    await workspaceProgram.methods
+      .fundReserve(new anchor.BN(190_000_000))
+      .accountsStrict({
+        merchant,
+        source: merchantTokenAccount,
+        reserveVault,
+        authority: payer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const reserve = await getAccount(provider.connection, reserveVault);
+    const merchantState =
+      await workspaceProgram.account.merchant.fetch(merchant);
+    expect(reserve.amount).to.equal(190_000_000n);
+    expect(merchantState.reserveBps).to.equal(500);
+    expect(merchantState.lockedLiability.toNumber()).to.equal(0);
+  });
+
+  it("pays the merchant immediately and refunds the buyer in full", async () => {
+    const protocol = PublicKey.findProgramAddressSync(
+      [Buffer.from("protocol")],
+      workspaceProgram.programId,
+    )[0];
+    const reference = Array.from(Buffer.from("refund-order-001"));
+    const order = PublicKey.findProgramAddressSync(
+      [Buffer.from("order"), merchant.toBuffer(), Buffer.from(reference)],
+      workspaceProgram.programId,
+    )[0];
+
+    await workspaceProgram.methods
+      .createOrder(reference, new anchor.BN(100_000_000), new anchor.BN(3_600))
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        buyerTokenAccount,
+        merchantTokenAccount,
+        reserveVault,
+        mint,
+        buyer: buyer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([buyer])
+      .rpc();
+
+    const buyerAfterPayment = await getAccount(
+      provider.connection,
+      buyerTokenAccount,
+    );
+    const merchantAfterPayment = await getAccount(
+      provider.connection,
+      merchantTokenAccount,
+    );
+    expect(buyerAfterPayment.amount).to.equal(200_000_000n);
+    expect(merchantAfterPayment.amount).to.equal(105_000_000n);
+
+    let blocked = false;
+    try {
+      await workspaceProgram.methods
+        .withdrawReserve(new anchor.BN(96_000_000))
+        .accountsStrict({
+          merchant,
+          reserveVault,
+          destination: merchantTokenAccount,
+          authority: payer.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+    } catch {
+      blocked = true;
+    }
+    expect(blocked).to.equal(true);
+
+    await workspaceProgram.methods
+      .refundOrder()
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        reserveVault,
+        buyerTokenAccount,
+        resolver: payer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const buyerAfterRefund = await getAccount(
+      provider.connection,
+      buyerTokenAccount,
+    );
+    const orderState = await workspaceProgram.account.order.fetch(order);
+    expect(buyerAfterRefund.amount).to.equal(300_000_000n);
+    expect(orderState.status).to.deep.equal({ refunded: {} });
+  });
+
+  it("releases clean orders and lets merchants withdraw surplus", async () => {
+    const protocol = PublicKey.findProgramAddressSync(
+      [Buffer.from("protocol")],
+      workspaceProgram.programId,
+    )[0];
+    const reference = Array.from(Buffer.from("settle-order-001"));
+    const order = PublicKey.findProgramAddressSync(
+      [Buffer.from("order"), merchant.toBuffer(), Buffer.from(reference)],
+      workspaceProgram.programId,
+    )[0];
+
+    await workspaceProgram.methods
+      .createOrder(reference, new anchor.BN(100_000_000), new anchor.BN(3_600))
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        buyerTokenAccount,
+        merchantTokenAccount,
+        reserveVault,
+        mint,
+        buyer: buyer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([buyer])
+      .rpc();
+
+    await workspaceProgram.methods
+      .completeOrder()
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        reserveVault,
+        merchantTokenAccount,
+        caller: payer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    await workspaceProgram.methods
+      .withdrawReserve(new anchor.BN(95_000_000))
+      .accountsStrict({
+        merchant,
+        reserveVault,
+        destination: merchantTokenAccount,
+        authority: payer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const reserve = await getAccount(provider.connection, reserveVault);
+    const merchantState =
+      await workspaceProgram.account.merchant.fetch(merchant);
+    const merchantBalance = await getAccount(
+      provider.connection,
+      merchantTokenAccount,
+    );
+    expect(reserve.amount).to.equal(0n);
+    expect(merchantBalance.amount).to.equal(300_000_000n);
+    expect(merchantState.lockedLiability.toNumber()).to.equal(0);
+    expect(merchantState.totalVolume.toNumber()).to.equal(200_000_000);
+    expect(merchantState.completedOrders.toNumber()).to.equal(1);
+    expect(merchantState.refundedOrders.toNumber()).to.equal(1);
+  });
+});
