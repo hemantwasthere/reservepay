@@ -328,11 +328,6 @@ function CheckoutDemo() {
     if (pending || !store.connected) return;
     setPending(true);
     setError("");
-    notify({
-      id: "demo-payment",
-      title: "Saving demo payment",
-      tone: "loading",
-    });
     try {
       const order = await operation();
       setSelectedOrder(order);

@@ -7,6 +7,7 @@ export function KeyboardShortcuts({
   dashboard?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const backdropPressed = useRef(false);
   const title = useId();
   const [enabled, setEnabled] = useState(true);
   useEffect(() => {
@@ -73,6 +74,28 @@ export function KeyboardShortcuts({
         ref={dialog}
         className="shortcuts-dialog"
         aria-labelledby={title}
+        onPointerDown={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          backdropPressed.current =
+            event.target === event.currentTarget &&
+            (event.clientX < bounds.left ||
+              event.clientX > bounds.right ||
+              event.clientY < bounds.top ||
+              event.clientY > bounds.bottom);
+        }}
+        onClick={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          if (
+            backdropPressed.current &&
+            event.target === event.currentTarget &&
+            (event.clientX < bounds.left ||
+              event.clientX > bounds.right ||
+              event.clientY < bounds.top ||
+              event.clientY > bounds.bottom)
+          )
+            event.currentTarget.close();
+          backdropPressed.current = false;
+        }}
         onKeyDown={(event) => {
           if (event.key !== "Tab") return;
           const controls =

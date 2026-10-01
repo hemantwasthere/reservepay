@@ -142,17 +142,19 @@ export function MerchantApp() {
             setLocked={setLocked}
           />
           <footer className="merchant-footer">
-            <KeyboardShortcuts dashboard />
             <span>
               <span className="status-dot" /> Built on Solana · Devnet only
             </span>
-            <a
-              href={explorer(PROGRAM_ID.toBase58())}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View program <ExternalLink size={12} />
-            </a>
+            <div className="merchant-footer-actions">
+              <a
+                href={explorer(PROGRAM_ID.toBase58())}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View program <ExternalLink size={12} />
+              </a>
+              <KeyboardShortcuts dashboard />
+            </div>
           </footer>
         </main>
       </div>
@@ -196,25 +198,13 @@ function MerchantWorkspace({
       if (!active || refreshInFlight.current) return;
       refreshInFlight.current = true;
       setRefreshing(true);
-      if (manual)
-        notify({
-          id: "balance-refresh",
-          title: "Refreshing balances",
-          description: "Reading confirmed balances from Solana devnet.",
-          tone: "loading",
-        });
+      if (manual) dismiss("balance-refresh");
       try {
         const next = await client.read(new PublicKey(active.account.address));
         if (mounted.current && isCurrent(active)) {
           setState(next);
           setReadError("");
-          if (manual)
-            notify({
-              id: "balance-refresh",
-              title: "Balances updated",
-              description: "Your reserve is up to date.",
-              tone: "success",
-            });
+          dismiss("balance-refresh");
         }
       } catch (error) {
         if (mounted.current && isCurrent(active)) {
@@ -232,7 +222,7 @@ function MerchantWorkspace({
         if (mounted.current) setRefreshing(false);
       }
     },
-    [active, isCurrent, notify],
+    [active, isCurrent, notify, dismiss],
   );
 
   useEffect(() => {
@@ -308,30 +298,23 @@ function MerchantWorkspace({
   }, [pending, refresh]);
 
   useEffect(() => {
-    if (!active || !(busy || pending || message)) return;
+    if (!active) return;
+    if (busy || pending) {
+      dismiss(`transaction:${active.account.address}`);
+      return;
+    }
+    if (!message) return;
     notify({
       id: `transaction:${active.account.address}`,
-      title: busy
-        ? "Transaction in progress"
-        : pending
-          ? `${labels[pending.action]} pending`
-          : receipt?.result === "confirmed"
-            ? `${labels[receipt.transaction.action]} complete`
-            : "Transaction needs attention",
-      description:
-        busy || message || "Waiting for confirmation on Solana devnet.",
-      tone:
-        busy || pending
-          ? "loading"
-          : receipt?.result === "confirmed"
-            ? "success"
-            : "error",
-      href:
-        pending || receipt
-          ? explorer((pending ?? receipt!.transaction).signature, "tx")
-          : undefined,
+      title:
+        receipt?.result === "confirmed"
+          ? `${labels[receipt.transaction.action]} complete`
+          : "Transaction needs attention",
+      description: message,
+      tone: receipt?.result === "confirmed" ? "success" : "error",
+      href: receipt ? explorer(receipt.transaction.signature, "tx") : undefined,
     });
-  }, [active, busy, pending, message, receipt, notify]);
+  }, [active, busy, pending, message, receipt, notify, dismiss]);
 
   useEffect(
     () => () => {

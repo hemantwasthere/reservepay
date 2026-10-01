@@ -818,8 +818,14 @@
   align-items: center;
   flex-wrap: wrap;
 }
-.merchant-footer .shortcuts-trigger {
-  order: 1;
+.merchant-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-left: auto;
+}
+.merchant-footer-actions > a {
+  min-height: 30px;
 }
 .network-badge {
   color: var(--info);

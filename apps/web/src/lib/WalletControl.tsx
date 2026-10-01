@@ -50,9 +50,12 @@ export function WalletControl({
   const [panel, setPanel] = useState<"manage" | "choose" | null>(null);
   const [busy, setBusy] = useState("");
   const [initializing, setInitializing] = useState(true);
+  const [copiedAddress, setCopiedAddress] = useState("");
+  const [hint, setHint] = useState("");
   const { notify, dismiss } = useToast();
   const setMessage = (description: string, tone: "info" | "error" = "info") => {
-    if (description)
+    setHint(tone === "info" ? description : "");
+    if (description && tone === "error")
       notify({
         id: "wallet-message",
         title: "Wallet connection",
@@ -73,6 +76,12 @@ export function WalletControl({
   const panelId = useId();
 
   useEffect(() => {
+    if (!copiedAddress) return;
+    const timer = setTimeout(() => setCopiedAddress(""), 2000);
+    return () => clearTimeout(timer);
+  }, [copiedAddress]);
+
+  useEffect(() => {
     onLoadingChange?.(initializing || busy === "Reconnecting…");
   }, [initializing, busy, onLoadingChange]);
 
@@ -84,6 +93,7 @@ export function WalletControl({
   const updateActive = (next: typeof active) => {
     activeRef.current = next;
     setActive(next);
+    setCopiedAddress("");
     rememberWallet(
       next ? { name: next.wallet.name, address: next.account.address } : null,
     );
@@ -112,8 +122,6 @@ export function WalletControl({
       updateActive(next ? { wallet, account: next } : null);
       if (!next) {
         setPanel(null);
-        if (!pending.current)
-          setMessage("Wallet disconnected. Connect again to continue.");
       }
     });
   };
@@ -229,12 +237,6 @@ export function WalletControl({
       if (!nextAccounts[0]) throw new Error("No Solana account was shared.");
       const previous = activeRef.current;
       adopt(wallet, nextAccounts);
-      notify({
-        id: "wallet-message",
-        title: previous ? "Wallet switched" : "Wallet connected",
-        description: `${wallet.name} · ${shorten(nextAccounts[0].address)}`,
-        tone: "success",
-      });
       close();
       if (
         previous &&
@@ -277,11 +279,6 @@ export function WalletControl({
       unsubscribe.current();
       updateActive(null);
       setAccounts([]);
-      notify({
-        id: "wallet-message",
-        title: "Wallet disconnected",
-        description: "You can connect again whenever you’re ready.",
-      });
       close();
     } catch {
       setMessage(
@@ -321,7 +318,7 @@ export function WalletControl({
         aria-controls={panelId}
         disabled={Boolean(busy) || initializing || locked}
         onClick={() => {
-          setMessage("");
+          dismiss("wallet-message");
           setPanel(panel ? null : active ? "manage" : "choose");
         }}
       >
@@ -360,12 +357,8 @@ export function WalletControl({
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(active.account.address);
-                    notify({
-                      id: "wallet-copy",
-                      title: "Wallet address copied",
-                      description: shorten(active.account.address),
-                      tone: "success",
-                    });
+                    dismiss("wallet-copy");
+                    setCopiedAddress(active.account.address);
                   } catch {
                     notify({
                       id: "wallet-copy",
@@ -377,7 +370,16 @@ export function WalletControl({
                   }
                 }}
               >
-                <Copy size={14} aria-hidden="true" /> Copy address
+                {copiedAddress === active.account.address ? (
+                  <Check size={14} aria-hidden="true" />
+                ) : (
+                  <Copy size={14} aria-hidden="true" />
+                )}
+                <span aria-live="polite">
+                  {copiedAddress === active.account.address
+                    ? "Copied"
+                    : "Copy address"}
+                </span>
               </button>
               <button
                 onClick={() => {
@@ -466,6 +468,7 @@ export function WalletControl({
               )}
             </>
           )}
+          {hint && <p className="wallet-hint">{hint}</p>}
         </div>
       )}
     </div>
