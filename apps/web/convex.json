@@ -1,0 +1,4 @@
+{
+  "functions": "convex/",
+  "codegen": { "staticApi": false, "staticDataModel": false }
+}

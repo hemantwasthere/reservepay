@@ -9,18 +9,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./settlement": {
+      "types": "./dist/settlement.d.ts",
+      "import": "./dist/settlement.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run src && node --input-type=module -e 'await import(\"./dist/index.js\")'"
   },
   "dependencies": {
     "@solana/web3.js": "1.98.4"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
-    "vitest": "3.2.4"
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
   }
 }

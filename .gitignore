@@ -10,3 +10,9 @@ coverage
 .env.local
 test-ledger
 .yarn
+
+.convex
+.env.*
+
+.vercel
+.env*

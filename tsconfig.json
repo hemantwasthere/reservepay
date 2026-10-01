@@ -1,14 +1,22 @@
 {
   "compilerOptions": {
     "esModuleInterop": true,
-    "lib": ["ES2022", "DOM"],
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2022",
-    "types": ["mocha", "chai"]
+    "types": [
+      "mocha",
+      "chai"
+    ]
   },
-  "include": ["tests/**/*.ts"]
+  "include": [
+    "tests/**/*.ts"
+  ]
 }
