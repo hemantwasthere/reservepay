@@ -28,7 +28,8 @@
     "convex": "1.46.0",
     "lucide-react": "0.468.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "tweetnacl": "1.0.3"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

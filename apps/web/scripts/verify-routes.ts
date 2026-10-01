@@ -16,15 +16,25 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     "/app/index.html",
     "/app?source=header",
     "/app/?source=header",
+    "/pay/test-link",
+    "/pay/test-link/",
+    "/pay/test-link?source=merchant",
   ]) {
     const response = await fetch(`${base}${path}`, {
       headers: { accept: "text/html" },
     });
     assert.equal(response.status, 200, `${name}: ${path}`);
     const html = await response.text();
-    const dashboard = path !== "/";
+    const dashboard = path.startsWith("/app");
+    const checkout = path.startsWith("/pay");
     assert.ok(
-      html.includes(dashboard ? "merchant-main" : "Good commerce."),
+      html.includes(
+        dashboard
+          ? "merchant-main"
+          : checkout
+            ? "checkout-main"
+            : "Good commerce.",
+      ),
       `${name}: initial page content is missing at ${path}`,
     );
     assert.ok(
@@ -37,13 +47,13 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     );
     assert.ok(
       html.includes(
-        `<title>${dashboard ? "Merchant dashboard | ReservePay" : site.title}</title>`,
+        `<title>${dashboard ? "Merchant dashboard | ReservePay" : checkout ? "Protected checkout | ReservePay" : site.title}</title>`,
       ),
       `${name}: wrong page at ${path}`,
     );
     assert.equal(
       html.includes('name="robots" content="noindex, nofollow"'),
-      dashboard,
+      dashboard || checkout,
       `${name}: wrong indexing rules at ${path}`,
     );
   }

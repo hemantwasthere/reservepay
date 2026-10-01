@@ -1,20 +1,18 @@
-import { PaymentProvider } from "../payments/PaymentProvider";
-import { ToastProvider } from "../lib/Toast";
-import "./polyfills";
+import "../merchant/polyfills";
 import { StrictMode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
-import { MerchantApp } from "./MerchantApp";
-
+import { ToastProvider } from "../lib/Toast";
+import { PaymentProvider } from "./PaymentProvider";
+import { CheckoutApp } from "./CheckoutApp";
 const app = (
   <StrictMode>
     <ToastProvider>
       <PaymentProvider>
-        <MerchantApp />
+        <CheckoutApp />
       </PaymentProvider>
     </ToastProvider>
   </StrictMode>
 );
-
 const root = document.getElementById("root")!;
 if (root.hasChildNodes()) hydrateRoot(root, app);
 else createRoot(root).render(app);

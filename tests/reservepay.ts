@@ -1,3 +1,4 @@
+import { paymentClient } from "../apps/web/src/payments/chain";
 import * as anchor from "@coral-xyz/anchor";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -324,5 +325,68 @@ describe("reservepay", () => {
       rejected = true;
     }
     expect(rejected).to.equal(true);
+  });
+  it("pays a single-use checkout through the browser client and verifies the receipt", async () => {
+    // The previous test leaves this merchant with 15 USDC collateral.
+    const client = paymentClient(provider.connection, mint);
+    const terms = {
+      merchant: buyer.publicKey.toBase58(),
+      reference: "ce".repeat(16),
+      title: "Checkout integration",
+      amount: "10000000",
+      protectionSeconds: 86400,
+      issuedAt: Date.now(),
+    };
+    const before = await merchantClient(provider.connection, mint).read(
+      buyer.publicKey,
+    );
+    const payerBefore = await getAccount(
+      provider.connection,
+      merchantTokenAccount,
+    );
+    const prepared = await client.prepare(terms, payer.publicKey);
+    prepared.transaction.sign(payer);
+    const signed = validateSignedTransaction(
+      prepared.transaction,
+      prepared.transaction.serialize(),
+    );
+    const signature = await provider.connection.sendRawTransaction(
+      signed.bytes,
+    );
+    const confirmation = await provider.connection.confirmTransaction(
+      {
+        signature,
+        blockhash: prepared.blockhash,
+        lastValidBlockHeight: prepared.lastValidBlockHeight,
+      },
+      "confirmed",
+    );
+    expect(confirmation.value.err).to.equal(null);
+    const receipt = await client.readOrder(terms, "confirmed");
+    expect(receipt?.buyer).to.equal(payer.publicKey.toBase58());
+    expect(receipt?.reserveAmount).to.equal("500000");
+    expect(receipt?.status).to.equal("paid");
+    expect(receipt!.expiresAt - receipt!.createdAt).to.equal(86400000);
+    const after = await merchantClient(provider.connection, mint).read(
+      buyer.publicKey,
+    );
+    expect(after.reserve - before.reserve).to.equal(500000n);
+    expect(after.walletBalance - before.walletBalance).to.equal(9500000n);
+    expect(after.locked - before.locked).to.equal(10000000n);
+    expect(
+      payerBefore.amount -
+        (await getAccount(provider.connection, merchantTokenAccount)).amount,
+    ).to.equal(10000000n);
+    let rejected = false;
+    try {
+      await client.prepare(terms, payer.publicKey);
+    } catch (error) {
+      rejected = String(error).includes("already been paid");
+    }
+    expect(rejected).to.equal(true);
+    expect(
+      (await merchantClient(provider.connection, mint).read(buyer.publicKey))
+        .locked,
+    ).to.equal(after.locked);
   });
 });

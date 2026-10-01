@@ -196,3 +196,37 @@ describe("wallet transaction signing", () => {
     expect(signTransaction).not.toHaveBeenCalled();
   });
 });
+
+describe("payment link approval", () => {
+  it("signs the exact message and refuses wallet-modified messages", async () => {
+    const { wallet } = fixture();
+    const selected = {
+      ...account("selected", "solana:devnet"),
+      features: ["solana:signMessage" as const],
+    };
+    const message = new Uint8Array([1, 2, 3]),
+      signature = new Uint8Array(64);
+    const signMessage = vi.fn(async () => [
+      { signedMessage: message, signature },
+    ]);
+    const option = standardWallet({
+      ...wallet,
+      accounts: [selected],
+      features: {
+        ...wallet.features,
+        "solana:signMessage": { version: "1.0.0", signMessage },
+      },
+    })!;
+    expect(await option.signMessage!("selected", message)).toEqual(signature);
+    expect(signMessage).toHaveBeenCalledWith({ account: selected, message });
+    signMessage.mockResolvedValue([
+      { signedMessage: new Uint8Array([4]), signature },
+    ]);
+    await expect(option.signMessage!("selected", message)).rejects.toThrow(
+      "changed the approval",
+    );
+    await expect(option.signMessage!("another", message)).rejects.toThrow(
+      "cannot approve",
+    );
+  });
+});

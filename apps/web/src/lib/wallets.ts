@@ -1,4 +1,7 @@
-import type { SolanaSignTransactionFeature } from "@solana/wallet-standard-features";
+import type {
+  SolanaSignTransactionFeature,
+  SolanaSignMessageFeature,
+} from "@solana/wallet-standard-features";
 import { Transaction } from "@solana/web3.js";
 import type { Wallet } from "@wallet-standard/base";
 import type {
@@ -15,6 +18,7 @@ export type WalletOption = {
   connect(): Promise<ConnectedAccount[]>;
   reconnect(): Promise<ConnectedAccount[]>;
   disconnect(): Promise<void>;
+  signMessage?: (address: string, message: Uint8Array) => Promise<Uint8Array>;
   signTransaction?: (
     address: string,
     transaction: Uint8Array,
@@ -46,7 +50,32 @@ export function standardWallet(wallet: Wallet): WalletOption | null {
   const signing = wallet.features["solana:signTransaction"] as
     | SolanaSignTransactionFeature["solana:signTransaction"]
     | undefined;
+  const messageSigning = wallet.features["solana:signMessage"] as
+    | SolanaSignMessageFeature["solana:signMessage"]
+    | undefined;
   return {
+    signMessage: messageSigning
+      ? async (address, message) => {
+          const account = wallet.accounts.find(
+            (item) => item.address === address,
+          );
+          if (!account || !account.features.includes("solana:signMessage"))
+            throw new Error("This wallet cannot approve payment links.");
+          const [result] = await messageSigning.signMessage({
+            account,
+            message,
+          });
+          if (
+            !result ||
+            result.signedMessage.length !== message.length ||
+            !result.signedMessage.every(
+              (byte, index) => byte === message[index],
+            )
+          )
+            throw new Error("Your wallet changed the approval message.");
+          return result.signature;
+        }
+      : undefined,
     signTransaction: signing?.supportedTransactionVersions.includes("legacy")
       ? async (address, transaction) => {
           const account = wallet.accounts.find(
@@ -94,6 +123,10 @@ type PublicKey = { toString(): string };
 type PhantomListener = (key?: PublicKey | null) => void;
 type PhantomProvider = {
   isPhantom?: boolean;
+  signMessage?: (
+    message: Uint8Array,
+    encoding?: string,
+  ) => Promise<{ signature: Uint8Array }>;
   signTransaction?: (transaction: Transaction) => Promise<Transaction>;
   publicKey?: PublicKey | null;
   connect(options?: {
@@ -117,6 +150,13 @@ export function legacyPhantom(): WalletOption | null {
   const accounts = (key?: PublicKey | null) =>
     key ? [{ address: key.toString() }] : [];
   return {
+    signMessage: provider.signMessage
+      ? async (address, message) => {
+          if (provider.publicKey?.toString() !== address)
+            throw new Error("Wallet changed. Reconnect and try again.");
+          return (await provider.signMessage!(message, "utf8")).signature;
+        }
+      : undefined,
     signTransaction: provider.signTransaction
       ? async (address, bytes) => {
           if (provider.publicKey?.toString() !== address)

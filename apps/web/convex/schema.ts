@@ -1,7 +1,14 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { termsFields, receiptFields } from "./paymentValidators";
 
 export default defineSchema({
+  paymentLinks: defineTable({
+    ...termsFields,
+    receipt: v.optional(v.object(receiptFields)),
+  })
+    .index("by_merchant", ["merchant"])
+    .index("by_reference", ["merchant", "reference"]),
   demoOrders: defineTable({
     sessionKey: v.string(),
     requestId: v.string(),

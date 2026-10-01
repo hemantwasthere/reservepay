@@ -12,12 +12,13 @@ const server = await createServer({
 });
 
 try {
-  const { render, renderMerchant } = await server.ssrLoadModule(
+  const { render, renderMerchant, renderCheckout } = await server.ssrLoadModule(
     "/src/entry-server.tsx",
   );
   for (const [file, content] of [
     ["dist/index.html", render()],
     ["dist/app/index.html", renderMerchant()],
+    ["dist/pay/index.html", renderCheckout()],
   ]) {
     const path = resolve(file);
     const template = await readFile(path, "utf8");

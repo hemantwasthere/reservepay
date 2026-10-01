@@ -12,11 +12,32 @@
     {
       "source": "/app/",
       "destination": "/app/index.html"
+    },
+    {
+      "source": "/pay/:id",
+      "destination": "/pay/index.html"
+    },
+    {
+      "source": "/pay/:id/",
+      "destination": "/pay/index.html"
+    },
+    {
+      "source": "/pay",
+      "destination": "/pay/index.html"
     }
   ],
   "headers": [
     {
       "source": "/app(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/pay(.*)",
       "headers": [
         {
           "key": "X-Robots-Tag",

@@ -1,3 +1,4 @@
+import { PaymentLinks } from "../payments/PaymentLinks";
 import { KeyboardShortcuts } from "../lib/KeyboardShortcuts";
 import { useToast } from "../lib/Toast";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -96,6 +97,9 @@ export function MerchantApp() {
           <span className="merchant-eyebrow">YOUR WORKSPACE</span>
           <a href="/app" className="sidebar-active" aria-current="page">
             <ChartNoAxesCombined size={17} aria-hidden="true" /> Overview
+          </a>
+          <a href="#payment-links">
+            <ArrowUpRight size={17} aria-hidden="true" /> Payment links
           </a>
           <div className="sidebar-note">
             <ShieldCheck size={22} />
@@ -728,6 +732,14 @@ function MerchantWorkspace({
           )}
         </div>
       )}
+      <PaymentLinks
+        active={active}
+        registered={Boolean(state?.registered)}
+        locked={Boolean(busy || pending)}
+        setLocked={setLocked}
+        isCurrent={isCurrent}
+        onPaid={() => void refresh()}
+      />
       <div className="merchant-bottom-grid">
         <section className="reserve-card reserve-breakdown">
           <div className="reserve-card-heading">

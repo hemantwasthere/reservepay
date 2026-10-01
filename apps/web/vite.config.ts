@@ -13,6 +13,9 @@ const routeDashboard: Connect.NextHandleFunction = (
   if (path === "/app" || path === "/app/") {
     request.url = `/app/index.html${query.length ? `?${query.join("?")}` : ""}`;
   }
+  if (/^\/pay(?:\/[^/]+)?\/?$/.test(path)) {
+    request.url = `/pay/index.html${query.length ? `?${query.join("?")}` : ""}`;
+  }
   next();
 };
 
@@ -58,12 +61,13 @@ export default defineConfig({
       name: "reservepay-initial-content",
       async transformIndexHtml(html, context) {
         if (!context.server) return html;
-        const { render, renderMerchant } = await context.server.ssrLoadModule(
-          "/src/entry-server.tsx",
-        );
+        const { render, renderMerchant, renderCheckout } =
+          await context.server.ssrLoadModule("/src/entry-server.tsx");
         const content = context.filename.endsWith("/app/index.html")
           ? renderMerchant()
-          : render();
+          : context.filename.endsWith("/pay/index.html")
+            ? renderCheckout()
+            : render();
         return html.replace(
           '<div id="root"></div>',
           () => `<div id="root">${content}</div>`,
@@ -73,7 +77,8 @@ export default defineConfig({
     {
       name: "reservepay-seo",
       transformIndexHtml: (_, context) =>
-        context.filename.endsWith("/app/index.html")
+        context.filename.endsWith("/app/index.html") ||
+        context.filename.endsWith("/pay/index.html")
           ? []
           : [
               { tag: "title", children: site.title },
@@ -126,6 +131,7 @@ export default defineConfig({
       input: {
         landing: resolve(import.meta.dirname, "index.html"),
         app: resolve(import.meta.dirname, "app/index.html"),
+        pay: resolve(import.meta.dirname, "pay/index.html"),
       },
     },
   },

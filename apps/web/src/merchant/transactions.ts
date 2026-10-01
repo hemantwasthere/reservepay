@@ -62,7 +62,7 @@ export function validateSignedTransaction(
 
 export async function transactionResult(
   rpc: Connection,
-  pending: PendingTransaction,
+  pending: Pick<PendingTransaction, "signature" | "lastValidBlockHeight">,
 ): Promise<TransactionResult> {
   const getStatus = async () =>
     (
