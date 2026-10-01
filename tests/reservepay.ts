@@ -15,6 +15,8 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 import { expect } from "chai";
+import { merchantClient } from "../apps/web/src/merchant/client";
+import { validateSignedTransaction } from "../apps/web/src/merchant/transactions";
 import { Reservepay } from "../target/types/reservepay";
 
 describe("reservepay", () => {
@@ -273,5 +275,54 @@ describe("reservepay", () => {
     expect(merchantState.totalVolume.toNumber()).to.equal(200_000_000);
     expect(merchantState.completedOrders.toNumber()).to.equal(1);
     expect(merchantState.refundedOrders.toNumber()).to.equal(1);
+  });
+  it("registers, funds and withdraws using the dashboard transaction client", async () => {
+    const client = merchantClient(provider.connection, mint);
+    const before = await client.read(buyer.publicKey);
+    expect(before.ready).to.equal(true);
+    expect(before.registered).to.equal(false);
+    const transact = async (
+      action: "register" | "fund" | "withdraw",
+      amount = 0n,
+    ) => {
+      const prepared = await client.prepare(buyer.publicKey, action, amount);
+      const original = anchor.web3.Transaction.from(
+        prepared.transaction.serialize({ requireAllSignatures: false }),
+      );
+      prepared.transaction.sign(buyer);
+      const signed = validateSignedTransaction(
+        original,
+        prepared.transaction.serialize(),
+      );
+      const signature = await provider.connection.sendRawTransaction(
+        signed.bytes,
+      );
+      expect(signature).to.equal(signed.signature);
+      const confirmation = await provider.connection.confirmTransaction(
+        {
+          signature,
+          blockhash: prepared.blockhash,
+          lastValidBlockHeight: prepared.lastValidBlockHeight,
+        },
+        "confirmed",
+      );
+      expect(confirmation.value.err).to.equal(null);
+    };
+    await transact("register");
+    expect((await client.read(buyer.publicKey)).registered).to.equal(true);
+    await transact("fund", 25_000_000n);
+    expect((await client.read(buyer.publicKey)).reserve).to.equal(25_000_000n);
+    await transact("withdraw", 10_000_000n);
+    const after = await client.read(buyer.publicKey);
+    expect(after.reserve).to.equal(15_000_000n);
+    expect(after.walletBalance).to.equal(before.walletBalance - 15_000_000n);
+    expect(after.locked).to.equal(0n);
+    let rejected = false;
+    try {
+      await client.prepare(buyer.publicKey, "withdraw", 16_000_000n);
+    } catch {
+      rejected = true;
+    }
+    expect(rejected).to.equal(true);
   });
 });

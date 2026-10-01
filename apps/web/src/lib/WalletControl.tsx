@@ -20,7 +20,18 @@ import {
 const shorten = (address: string) =>
   `${address.slice(0, 4)}…${address.slice(-4)}`;
 
-export function WalletControl() {
+export type WalletConnection = {
+  wallet: WalletOption;
+  account: ConnectedAccount;
+};
+
+export function WalletControl({
+  onChange,
+  locked = false,
+}: {
+  onChange?: (connection: WalletConnection | null) => void;
+  locked?: boolean;
+}) {
   const [options, setOptions] = useState<WalletOption[]>([]);
   const [active, setActive] = useState<{
     wallet: WalletOption;
@@ -45,6 +56,7 @@ export function WalletControl() {
   const updateActive = (next: typeof active) => {
     activeRef.current = next;
     setActive(next);
+    onChange?.(next);
   };
 
   useEffect(() => {
@@ -91,7 +103,7 @@ export function WalletControl() {
   }, [panel]);
 
   const connect = async (wallet: WalletOption) => {
-    if (pending.current) return;
+    if (pending.current || locked) return;
     pending.current = true;
     setBusy("Connecting…");
     setMessage("");
@@ -146,7 +158,7 @@ export function WalletControl() {
 
   const disconnect = async () => {
     const current = activeRef.current;
-    if (!current || pending.current) return;
+    if (!current || pending.current || locked) return;
     pending.current = true;
     setBusy("Disconnecting…");
     setMessage("");
@@ -185,7 +197,7 @@ export function WalletControl() {
         className="button button-dark wallet-button"
         aria-expanded={Boolean(panel)}
         aria-controls={panelId}
-        disabled={Boolean(busy)}
+        disabled={Boolean(busy) || locked}
         onClick={() => {
           setMessage("");
           setPanel(panel ? null : active ? "manage" : "choose");
@@ -217,11 +229,11 @@ export function WalletControl() {
                   setMessage("");
                   setPanel("choose");
                 }}
-                disabled={Boolean(busy)}
+                disabled={Boolean(busy) || locked}
               >
                 <ArrowLeftRight size={14} /> Switch wallet
               </button>
-              <button onClick={disconnect} disabled={Boolean(busy)}>
+              <button onClick={disconnect} disabled={Boolean(busy) || locked}>
                 <LogOut size={14} /> Disconnect
               </button>
             </>
@@ -246,7 +258,7 @@ export function WalletControl() {
                 accounts.map((account) => (
                   <button
                     key={account.address}
-                    disabled={Boolean(busy)}
+                    disabled={Boolean(busy) || locked}
                     onClick={() => {
                       updateActive({ wallet: active.wallet, account });
                       close();
@@ -263,7 +275,9 @@ export function WalletControl() {
                   key={`${wallet.name}-${index}`}
                   onClick={() => connect(wallet)}
                   disabled={
-                    Boolean(busy) || wallet.identity === active?.wallet.identity
+                    Boolean(busy) ||
+                    locked ||
+                    wallet.identity === active?.wallet.identity
                   }
                 >
                   <Wallet size={14} />

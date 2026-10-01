@@ -129,3 +129,56 @@ describe("wallet connections", () => {
     expect(listeners.size).toBe(0);
   });
 });
+
+describe("wallet transaction signing", () => {
+  it("passes the selected account and explicit devnet chain to the wallet", async () => {
+    const { wallet } = fixture();
+    const shared = {
+      ...account("selected", "solana:devnet"),
+      features: ["solana:signTransaction" as const],
+    };
+    const bytes = new Uint8Array([1, 2, 3]);
+    const signTransaction = vi.fn(async () => [{ signedTransaction: bytes }]);
+    const option = standardWallet({
+      ...wallet,
+      accounts: [shared],
+      features: {
+        ...wallet.features,
+        "solana:signTransaction": {
+          version: "1.0.0",
+          supportedTransactionVersions: ["legacy"],
+          signTransaction,
+        },
+      },
+    })!;
+    expect(await option.signTransaction!("selected", bytes)).toEqual(bytes);
+    expect(signTransaction).toHaveBeenCalledWith({
+      account: shared,
+      transaction: bytes,
+      chain: "solana:devnet",
+    });
+    await expect(option.signTransaction!("old-account", bytes)).rejects.toThrow(
+      "devnet",
+    );
+    expect(signTransaction).toHaveBeenCalledTimes(1);
+  });
+  it("does not request a signature from an account without devnet support", async () => {
+    const { wallet } = fixture();
+    const signTransaction = vi.fn();
+    const option = standardWallet({
+      ...wallet,
+      features: {
+        ...wallet.features,
+        "solana:signTransaction": {
+          version: "1.0.0",
+          supportedTransactionVersions: ["legacy"],
+          signTransaction,
+        },
+      },
+    })!;
+    await expect(
+      option.signTransaction!("solana-account", new Uint8Array()),
+    ).rejects.toThrow("devnet");
+    expect(signTransaction).not.toHaveBeenCalled();
+  });
+});

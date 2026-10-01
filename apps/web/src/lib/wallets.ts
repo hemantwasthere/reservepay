@@ -1,3 +1,5 @@
+import type { SolanaSignTransactionFeature } from "@solana/wallet-standard-features";
+import { Transaction } from "@solana/web3.js";
 import type { Wallet } from "@wallet-standard/base";
 import type {
   StandardConnectFeature,
@@ -12,6 +14,10 @@ export type WalletOption = {
   accounts(): ConnectedAccount[];
   connect(): Promise<ConnectedAccount[]>;
   disconnect(): Promise<void>;
+  signTransaction?: (
+    address: string,
+    transaction: Uint8Array,
+  ) => Promise<Uint8Array>;
   subscribe(listener: (accounts: ConnectedAccount[]) => void): () => void;
 };
 
@@ -36,7 +42,33 @@ export function standardWallet(wallet: Wallet): WalletOption | null {
         account.chains.some((chain) => chain.startsWith("solana:")),
       )
       .map(({ address, label }) => ({ address, label }));
+  const signing = wallet.features["solana:signTransaction"] as
+    | SolanaSignTransactionFeature["solana:signTransaction"]
+    | undefined;
   return {
+    signTransaction: signing?.supportedTransactionVersions.includes("legacy")
+      ? async (address, transaction) => {
+          const account = wallet.accounts.find(
+            (item) => item.address === address,
+          );
+          if (
+            !account ||
+            !account.chains.includes("solana:devnet") ||
+            !account.features.includes("solana:signTransaction")
+          )
+            throw new Error(
+              "Select Solana devnet in your wallet, then reconnect.",
+            );
+          const [result] = await signing.signTransaction({
+            account,
+            transaction,
+            chain: "solana:devnet",
+          });
+          if (!result)
+            throw new Error("Your wallet did not return a signed transaction.");
+          return result.signedTransaction;
+        }
+      : undefined,
     identity: wallet,
     name: wallet.name,
     accounts: () => accounts(wallet.accounts),
@@ -56,6 +88,7 @@ type PublicKey = { toString(): string };
 type PhantomListener = (key?: PublicKey | null) => void;
 type PhantomProvider = {
   isPhantom?: boolean;
+  signTransaction?: (transaction: Transaction) => Promise<Transaction>;
   publicKey?: PublicKey | null;
   connect(): Promise<{ publicKey: PublicKey }>;
   disconnect(): Promise<void>;
@@ -76,6 +109,16 @@ export function legacyPhantom(): WalletOption | null {
   const accounts = (key?: PublicKey | null) =>
     key ? [{ address: key.toString() }] : [];
   return {
+    signTransaction: provider.signTransaction
+      ? async (address, bytes) => {
+          if (provider.publicKey?.toString() !== address)
+            throw new Error("Wallet account changed. Reconnect and try again.");
+          const signed = await provider.signTransaction!(
+            Transaction.from(bytes),
+          );
+          return new Uint8Array(signed.serialize());
+        }
+      : undefined,
     identity: provider,
     name: "Phantom",
     accounts: () => accounts(provider.publicKey),

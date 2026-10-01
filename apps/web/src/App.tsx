@@ -28,8 +28,6 @@ import { useDemoStore, type DemoOrder } from "./lib/demo-store";
 import { PaymentHistory } from "./lib/PaymentHistory";
 import { useScrollReveal } from "./lib/use-scroll-reveal";
 
-import { WalletControl } from "./lib/WalletControl";
-
 type DemoState = "ready" | "paid" | "completed" | "refunded";
 const sourceUrl = "https://github.com/hemantwasthere/reservepay";
 
@@ -91,7 +89,9 @@ function AppHeader() {
         >
           <Github size={17} />
         </a>
-        <WalletControl />
+        <a className="button button-dark" href="/app">
+          Open app <ArrowUpRight size={15} />
+        </a>
         <button
           className="menu-button"
           aria-label={menuOpen ? "Close navigation" : "Open navigation"}

@@ -63,3 +63,10 @@ assert.equal([...sitemap.matchAll(/<loc>/g)].length, 1);
 console.log(
   "SEO checks passed: prerendered content, metadata, structured data, links, icons, and crawler files.",
 );
+
+const dashboard = await readFile("dist/app/index.html", "utf8");
+assert.match(dashboard, /<title>Merchant dashboard \| ReservePay<\/title>/);
+assert.match(dashboard, /name="robots" content="noindex, nofollow"/);
+assert.ok(!dashboard.includes("application/ld+json"));
+assert.ok(!dashboard.includes('rel="canonical"'));
+assert.ok(html.includes('href="/app"'));
