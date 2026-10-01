@@ -1,10 +1,10 @@
 export const site = {
-  url: "https://reservepay-delta.vercel.app/",
+  url: "https://reservepayyy.vercel.app/",
   name: "ReservePay",
   title: "ReservePay | Protected USDC Payments on Solana",
   description:
     "Explore protected USDC payments on Solana. ReservePay pairs instant merchant settlement with reserves that back full refunds for open orders.",
-  image: "https://reservepay-delta.vercel.app/og-image.png",
+  image: "https://reservepayyy.vercel.app/og-image.png",
 };
 
 export const structuredData = {
