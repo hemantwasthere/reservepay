@@ -1,13 +1,35 @@
 import { resolve } from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig, type Connect } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { site, structuredData } from "./src/lib/seo.ts";
 
+const routeDashboard: Connect.NextHandleFunction = (
+  request,
+  _response,
+  next,
+) => {
+  const [path, ...query] = (request.url ?? "/").split("?");
+  if (path === "/app" || path === "/app/") {
+    request.url = `/app/index.html${query.length ? `?${query.join("?")}` : ""}`;
+  }
+  next();
+};
+
 export default defineConfig({
+  appType: "mpa",
   plugins: [
     react(),
     tailwindcss(),
+    {
+      name: "reservepay-dashboard-route",
+      configureServer(server) {
+        server.middlewares.use(routeDashboard);
+      },
+      configurePreviewServer(server) {
+        server.middlewares.use(routeDashboard);
+      },
+    },
     {
       name: "reservepay-seo",
       transformIndexHtml: (_, context) =>

@@ -7,7 +7,7 @@
     "dev": "convex dev --start \"bun run dev:web\"",
     "dev:web": "vite --host 127.0.0.1",
     "dev:backend": "convex dev",
-    "build": "tsc -b && vite build && bun run scripts/prerender.ts && bun run scripts/verify-build.ts",
+    "build": "tsc -b && vite build && bun run scripts/prerender.ts && bun run scripts/verify-build.ts && bun run scripts/verify-routes.ts",
     "typecheck": "tsc -b --pretty false && tsc -p convex/tsconfig.json --noEmit",
     "test": "vitest run",
     "codegen": "convex codegen",

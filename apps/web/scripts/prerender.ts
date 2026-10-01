@@ -1,9 +1,12 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
 import { createServer } from "vite";
 import { site } from "../src/lib/seo";
 
+const cacheDir = await mkdtemp(join(tmpdir(), "reservepay-prerender-"));
 const server = await createServer({
+  cacheDir,
   server: { middlewareMode: true, watch: null, ws: false },
   appType: "custom",
 });
@@ -29,4 +32,5 @@ try {
   console.log("Prerendered landing page, robots.txt, and sitemap.xml.");
 } finally {
   await server.close();
+  await rm(cacheDir, { recursive: true, force: true });
 }
