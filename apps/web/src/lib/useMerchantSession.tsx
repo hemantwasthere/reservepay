@@ -1,4 +1,5 @@
 import {
+  Component,
   useCallback,
   useEffect,
   useMemo,
@@ -71,17 +72,28 @@ function ConfiguredSession({
 
 function useMerchantSession(active: WalletConnection | null): MerchantSession {
   const address = active?.account.address ?? null;
-  const [token, setToken] = useState<string | null>(null);
+  const [stored, setStored] = useState<{
+    address: string;
+    token: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const { notify } = useToast();
   const requestNonce = useMutation(api.auth.requestNonce);
   const signInAction = useAction(api.authActions.signIn);
   const signOutMutation = useMutation(api.auth.signOut);
 
-  // Each wallet keeps its own token; switching wallets swaps the session.
+  // Each wallet keeps its own token; switching wallets swaps the session. The
+  // token is stored with its address so a stale token from the previous
+  // wallet is never paired with the new one, not even for one render.
   useEffect(() => {
-    setToken(address ? (readSession(address)?.token ?? null) : null);
+    setStored(() => {
+      if (!address) return null;
+      const token = readSession(address)?.token ?? null;
+      return token ? { address, token } : null;
+    });
   }, [address]);
+
+  const token = stored && stored.address === address ? stored.token : null;
 
   const me = useQuery(api.auth.me, token ? { session: token } : "skip");
 
@@ -89,7 +101,7 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
   useEffect(() => {
     if (address && token && me === null) {
       rememberSession(address, null);
-      setToken(null);
+      setStored(null);
     }
   }, [address, token, me]);
 
@@ -127,7 +139,7 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
         signature,
       });
       rememberSession(address, session);
-      setToken(session.token);
+      setStored({ address, token: session.token });
     } catch (error) {
       notify({
         title: "Could not sign in",
@@ -147,13 +159,13 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
   const expire = useCallback(() => {
     if (!address) return;
     rememberSession(address, null);
-    setToken(null);
+    setStored(null);
   }, [address]);
 
   const signOut = useCallback(async () => {
     if (!address || !token) return;
     rememberSession(address, null);
-    setToken(null);
+    setStored(null);
     try {
       await signOutMutation({ session: token });
     } catch {}
@@ -166,4 +178,34 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
     signOut,
     expire,
   };
+}
+
+export const isExpiredSessionError = (error: unknown) =>
+  error instanceof Error && error.message.includes("Sign in again");
+
+// Session-gated queries throw when the session expires. Catch that, expire
+// the session, and let the parent render the signed-out UI instead of a
+// crashed page. Resets when the token changes.
+export class SessionErrorBoundary extends Component<
+  { resetKey: unknown; onExpire: () => void; children: ReactNode },
+  { failed: boolean; resetKey: unknown }
+> {
+  state = { failed: false, resetKey: this.props.resetKey };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  static getDerivedStateFromProps(
+    props: { resetKey: unknown },
+    state: { resetKey: unknown },
+  ) {
+    return props.resetKey !== state.resetKey
+      ? { failed: false, resetKey: props.resetKey }
+      : null;
+  }
+  componentDidCatch(error: unknown) {
+    if (isExpiredSessionError(error)) this.props.onExpire();
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
 }

@@ -76,6 +76,7 @@ export function MerchantPayments({
         <PaymentLinks
           active={active}
           session={session.token}
+          onSessionExpired={session.expire}
           registered={Boolean(state?.registered && state.ready)}
           locked={locked}
           setLocked={setLocked}

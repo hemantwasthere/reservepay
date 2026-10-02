@@ -15,6 +15,7 @@ import { KeyboardShortcuts } from "../lib/KeyboardShortcuts";
 import { useToast } from "../lib/Toast";
 import {
   MerchantSessionGate,
+  SessionErrorBoundary,
   type MerchantSession,
 } from "../lib/useMerchantSession";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -579,7 +580,7 @@ function MerchantWorkspace({
   };
 
   return (
-    <SessionData token={session.token}>
+    <SessionData token={session.token} onExpire={session.expire}>
       {({ profile, links }) => {
         const titles = Object.fromEntries(
           (links ?? []).map((link) => [link.reference, link.title]),
@@ -756,16 +757,22 @@ function MerchantWorkspace({
             <SetupStep
               number="02"
               done={Boolean(profile)}
-              active={Boolean(active && !profile)}
+              active={Boolean(session.status === "signed-in" && profile === null)}
               title="Create your profile"
               description={
-                <>
-                  Add your business name on the{" "}
-                  <a className={"text-primary underline"} href="/app/profile">
-                    Profile page
-                  </a>{" "}
-                  so buyers recognize you. Sign in first.
-                </>
+                profile ? (
+                  <>{profile.displayName} · Shown to buyers on checkout</>
+                ) : session.status === "signed-in" ? (
+                  <>
+                    Add your business name on the{" "}
+                    <a className={"text-primary underline"} href="/app/profile">
+                      Profile page
+                    </a>{" "}
+                    so buyers recognize you.
+                  </>
+                ) : (
+                  "Sign in, then add your business name on the Profile page so buyers recognize you."
+                )
               }
             />
             <SetupStep
@@ -1198,13 +1205,17 @@ type SessionData = {
 // a session is possible. Without a token nothing is queried.
 function SessionData({
   token,
+  onExpire,
   children,
 }: {
   token: string | null;
+  onExpire: () => void;
   children: (data: SessionData) => React.ReactNode;
 }) {
   return token ? (
-    <SessionQueries token={token}>{children}</SessionQueries>
+    <SessionErrorBoundary resetKey={token} onExpire={onExpire}>
+      <SessionQueries token={token}>{children}</SessionQueries>
+    </SessionErrorBoundary>
   ) : (
     children({ profile: null, links: undefined })
   );

@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "../../convex/_generated/api";
 import type { WalletConnection } from "../lib/WalletControl";
-import type { MerchantSession } from "../lib/useMerchantSession";
+import {
+  SessionErrorBoundary,
+  type MerchantSession,
+} from "../lib/useMerchantSession";
 import { useToast } from "../lib/Toast";
 import { SignInCard } from "./SignInCard";
 import { validateProfile } from "./profile";
@@ -47,10 +50,20 @@ export function MerchantProfile({
     );
   if (session.status !== "signed-in" || !session.token)
     return <SignInCard active={active} session={session} />;
-  return <ProfileForm token={session.token} />;
+  return (
+    <SessionErrorBoundary resetKey={session.token} onExpire={session.expire}>
+      <ProfileForm token={session.token} onExpire={session.expire} />
+    </SessionErrorBoundary>
+  );
 }
 
-function ProfileForm({ token }: { token: string }) {
+function ProfileForm({
+  token,
+  onExpire,
+}: {
+  token: string;
+  onExpire: () => void;
+}) {
   const { notify } = useToast();
   const save = useMutation(api.merchants.save);
   const profile = useQuery(api.merchants.me, { session: token });
@@ -89,13 +102,14 @@ function ProfileForm({ token }: { token: string }) {
         tone: "success",
       });
     } catch (cause) {
-      setError(
+      const message =
         cause instanceof ConvexError && typeof cause.data === "string"
           ? cause.data
           : cause instanceof Error
             ? cause.message
-            : "Could not save your profile.",
-      );
+            : "Could not save your profile.";
+      if (message.includes("Sign in again")) onExpire();
+      setError(message);
     } finally {
       setBusy(false);
     }
