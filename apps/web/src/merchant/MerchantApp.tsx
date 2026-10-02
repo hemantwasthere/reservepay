@@ -1,4 +1,13 @@
-import { PaymentLinks } from "../payments/PaymentLinks";
+import { Input } from "@/components/ui/input";
+import { Card, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import {
+  WorkspaceSidebar,
+  WorkspaceSidebarTrigger,
+  type WorkspacePage,
+} from "./WorkspaceSidebar";
+import { MerchantPayments } from "./MerchantPayments";
 import { KeyboardShortcuts } from "../lib/KeyboardShortcuts";
 import { useToast } from "../lib/Toast";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -50,7 +59,7 @@ const errorMessage = (error: unknown) =>
     ? error.message
     : "Something went wrong. Refresh and try again.";
 
-export function MerchantApp() {
+export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
   const [active, setActive] = useState<WalletConnection | null>(null);
   const [locked, setLocked] = useState(false);
   const [walletLoading, setWalletLoading] = useState(true);
@@ -67,22 +76,65 @@ export function MerchantApp() {
     [],
   );
   return (
-    <div className="merchant-shell">
-      <a className="skip-link" href="#merchant-main">
+    <SidebarProvider
+      className="min-h-screen flex-col"
+      style={
+        {
+          "--sidebar-width": "15rem",
+          "--sidebar-width-icon": "4rem",
+        } as React.CSSProperties
+      }
+    >
+      <a
+        className={
+          "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-white p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
+        }
+        href="#merchant-main"
+      >
         Skip to dashboard
       </a>
-      <header className="merchant-header">
-        <a className="brand" href="/" aria-label="ReservePay home">
-          <span className="brand-mark" aria-hidden="true">
+      <header
+        className={
+          "merchant-header min-h-[88px] flex items-center gap-[34px] py-[20px] px-[34px] [border-bottom:1px_solid_var(--line)] bg-card max-[860px]:min-h-[78px] max-[860px]:py-[16px] max-[860px]:px-[24px] max-[640px]:px-3 max-[640px]:py-4 max-[640px]:gap-[8px] max-[640px]:[&_.brand]:text-[17px] max-[380px]:[&_.brand]:text-[14px] max-[380px]:px-2 max-[380px]:[&_.wallet-button]:px-2 max-[640px]:[&_.brand-mark]:w-[24px] max-[640px]:[&_.brand-mark]:h-[24px] max-[640px]:[&_.wallet-button]:min-h-[37px] max-[640px]:[&_.wallet-button]:text-[10px] max-[640px]:[&_.wallet-button]:gap-[6px] max-[640px]:[&_.wallet-button]:py-0 max-[640px]:[&_.wallet-button]:px-[10px] sticky top-0 z-30 h-[88px] shrink-0"
+        }
+      >
+        <WorkspaceSidebarTrigger />
+        <a
+          className={
+            "brand inline-flex items-center text-[22px] tracking-[-1px] font-[650] whitespace-nowrap max-[900px]:text-[20px] max-[700px]:text-[20px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:[transform:skewY(-12deg)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:rounded-[1.5px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:first-child]:[transform:skewY(-12deg)_translateY(-1px)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:last-child]:[transform:skewY(-12deg)_translateY(1px)_scaleX(0.94)] motion-reduce:[&:hover_.brand-mark_span]:[transform:skewY(-24deg)]"
+          }
+          href="/"
+          aria-label="ReservePay home"
+        >
+          <span
+            className={
+              "brand-mark relative w-[25px] h-[28px] block mr-[10px] [&_span]:absolute [&_span]:left-[1px] [&_span]:w-[22px] [&_span]:h-[6px] [&_span]:bg-primary [&_span]:[transform:skewY(-24deg)] [&_span]:rounded-[1px] [&_span]:[transition:transform_420ms_var(--ease-settle),_border-radius_420ms_ease] [&_span:nth-child(1)]:top-[4px] [&_span:nth-child(2)]:top-[12px] [&_span:nth-child(3)]:top-[20px] max-[700px]:w-[22px] max-[700px]:mr-[7px] max-[700px]:[&_span]:w-[20px]"
+            }
+            aria-hidden="true"
+          >
             <span />
             <span />
             <span />
           </span>
-          ReservePay<span className="brand-period">.</span>
+          ReservePay<span className={"brand-period text-primary"}>.</span>
         </a>
-        <span className="workspace-label">MERCHANT WORKSPACE</span>
-        <div className="merchant-header-actions">
-          <span className="network-badge">
+        <span
+          className={
+            "workspace-label [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground pl-[28px] [border-left:1px_solid_var(--line)] max-[1100px]:hidden"
+          }
+        >
+          MERCHANT WORKSPACE
+        </span>
+        <div
+          className={
+            "merchant-header-actions ml-auto flex items-center gap-[23px] max-[640px]:gap-[10px]"
+          }
+        >
+          <span
+            className={
+              "network-badge inline-flex gap-[7px] items-center [font:11px_var(--mono)] [color:var(--info)] [&>span]:w-[6px] [&>span]:h-[6px] [&>span]:rounded-[50%] [&>span]:bg-[#709155] [&>span]:[background:var(--info)] [&>span]:shadow-[0_0_0_3px_var(--info-soft)] max-[640px]:text-[9px] max-[640px]:gap-[4px] max-[640px]:hidden"
+            }
+          >
             <span /> Devnet
           </span>
           <WalletControl
@@ -92,44 +144,65 @@ export function MerchantApp() {
           />
         </div>
       </header>
-      <div className="merchant-layout">
-        <aside className="merchant-sidebar" aria-label="Workspace navigation">
-          <span className="merchant-eyebrow">YOUR WORKSPACE</span>
-          <a href="/app" className="sidebar-active" aria-current="page">
-            <ChartNoAxesCombined size={17} aria-hidden="true" /> Overview
-          </a>
-          <a href="#payment-links">
-            <ArrowUpRight size={17} aria-hidden="true" /> Payment links
-          </a>
-          <div className="sidebar-note">
-            <ShieldCheck size={22} />
-            <strong>
-              A little reserve.
-              <br />A lot of trust.
-            </strong>
-            <p>
-              Collateral stays in your on-chain reserve, ready to protect your
-              customers.
-            </p>
-          </div>
-          <a className="sidebar-help" href="/#faq-title">
-            <CircleHelp size={15} /> How ReservePay works{" "}
-            <ArrowUpRight size={13} />
-          </a>
-        </aside>
-        <main id="merchant-main" className="merchant-main" tabIndex={-1}>
-          <div className="merchant-page-heading">
+      <div className={"flex min-h-[calc(100svh-88px)]"}>
+        <WorkspaceSidebar page={page} />
+        <main
+          id="merchant-main"
+          className={
+            "merchant-main min-w-[0] [padding:42px_clamp(24px,_3.5vw,_56px)_0] min-[1600px]:pt-[52px] max-[1100px]:[padding:30px_24px_0] max-[860px]:max-w-[800px] max-[860px]:my-0 max-[860px]:mx-auto max-[860px]:w-[100%] max-[640px]:[padding:27px_16px_0] motion-reduce:[&>*]:animate-[none] flex-1"
+          }
+          tabIndex={-1}
+        >
+          <div
+            className={
+              "merchant-page-heading flex items-center justify-between gap-[16px] mb-[28px] [&_h1]:text-[clamp(27px,_3vw,_39px)] [&_h1]:leading-[1.2] [&_h1]:tracking-[-1.4px] [&_h1]:[margin:14px_0_12px] [&_h1_em]:text-primary [&_p]:text-[12px] [&_p]:text-muted-foreground max-[640px]:[&_h1]:text-[30px] max-[640px]:[&_h1]:tracking-[-1px] max-[640px]:[&_p]:text-[11px]"
+            }
+          >
             <div>
-              <div className="merchant-eyebrow">RESERVE / OVERVIEW</div>
+              <div
+                className={
+                  "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+                }
+              >
+                {page === "payments"
+                  ? "PAYMENTS / PAYMENT LINKS"
+                  : "RESERVE / OVERVIEW"}
+              </div>
               <h1>
-                Your reserve, <em>in balance.</em>
+                {page === "payments" ? (
+                  <>
+                    Your next payment, <em>one link away.</em>
+                  </>
+                ) : (
+                  <>
+                    Your reserve, <em>in balance.</em>
+                  </>
+                )}
               </h1>
-              <p>The foundation for protected payments. Yours to manage.</p>
+              <p>
+                {page === "payments"
+                  ? "Create a checkout, share it, and follow every protected payment."
+                  : "The foundation for protected payments. Yours to manage."}
+              </p>
             </div>
-            <span className="pilot-tag">DEVNET PREVIEW</span>
+            <span
+              className={
+                "pilot-tag py-[8px] px-[10px] [border:1px_dashed_#becbb2] [font:9px_var(--mono)] tracking-[1px] text-primary whitespace-nowrap max-[1100px]:hidden"
+              }
+            >
+              DEVNET PREVIEW
+            </span>
           </div>
-          <div className="devnet-notice">
-            <span className="notice-icon">
+          <div
+            className={
+              "devnet-notice flex gap-[10px] py-[13px] px-[16px] [border:1px_solid_#dce5d3] bg-[#edf2e7] rounded-[3px] mb-[29px] [background:var(--info-soft)] border-[#d5e0e7] [&_p]:text-[11px] [&_p]:text-[#626e57] [&_p]:leading-[1.6] [&_p]:[color:var(--info)] [&_strong]:font-[500] [&_strong]:text-[#3e5133] [&_strong]:[color:var(--info)] max-[640px]:p-[12px] max-[640px]:mb-[22px] max-[640px]:items-start"
+            }
+          >
+            <span
+              className={
+                "notice-icon flex items-center text-[#7a8e6c] [color:var(--info)] max-[640px]:pt-[2px]"
+              }
+            >
               <CircleHelp size={15} />
             </span>
             <p>
@@ -138,18 +211,42 @@ export function MerchantApp() {
               approval.
             </p>
           </div>
-          <MerchantWorkspace
-            key={active?.account.address ?? "disconnected"}
-            active={active}
-            walletLoading={walletLoading}
-            isCurrent={isCurrent}
-            setLocked={setLocked}
-          />
-          <footer className="merchant-footer">
+          {page === "payments" ? (
+            <MerchantPayments
+              key={active?.account.address ?? "disconnected"}
+              active={active}
+              walletLoading={walletLoading}
+              locked={locked}
+              isCurrent={isCurrent}
+              setLocked={setLocked}
+            />
+          ) : (
+            <MerchantWorkspace
+              key={active?.account.address ?? "disconnected"}
+              active={active}
+              walletLoading={walletLoading}
+              isCurrent={isCurrent}
+              setLocked={setLocked}
+            />
+          )}
+          <footer
+            className={
+              "merchant-footer flex justify-between gap-[14px] py-[23px] px-0 [border-top:1px_solid_var(--line)] mt-[29px] [font:9px_var(--mono)] text-muted-foreground items-center flex-wrap [&_span]:inline-flex [&_span]:gap-[7px] [&_span]:items-center [&_a]:inline-flex [&_a]:gap-[7px] [&_a]:items-center max-[640px]:text-[8px] max-[640px]:gap-[8px]"
+            }
+          >
             <span>
-              <span className="status-dot" /> Built on Solana · Devnet only
+              <span
+                className={
+                  'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+                }
+              />{" "}
+              Built on Solana · Devnet only
             </span>
-            <div className="merchant-footer-actions">
+            <div
+              className={
+                "merchant-footer-actions flex items-center gap-[20px] ml-auto [&>a]:min-h-[30px]"
+              }
+            >
               <a
                 href={explorer(PROGRAM_ID.toBase58())}
                 target="_blank"
@@ -157,12 +254,12 @@ export function MerchantApp() {
               >
                 View program <ExternalLink size={12} />
               </a>
-              <KeyboardShortcuts dashboard />
+              <KeyboardShortcuts dashboard payments={page === "payments"} />
             </div>
           </footer>
         </main>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
 
@@ -436,10 +533,24 @@ function MerchantWorkspace({
 
   return (
     <>
-      <div className="reserve-heading">
-        <span className="merchant-eyebrow">RESERVE POSITION</span>
-        <button
-          className="text-button"
+      <div
+        className={
+          "reserve-heading flex items-center justify-between mb-[13px] [&_.text-button]:text-[11px]"
+        }
+      >
+        <span
+          className={
+            "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+          }
+        >
+          RESERVE POSITION
+        </span>
+        <Button
+          variant="unstyled"
+          size="unstyled"
+          className={
+            "text-button inline-flex items-center gap-[9px] text-[13px] font-[500] [background:none] [border:0] p-0 cursor-pointer [transition:color_180ms_ease,_background-color_180ms_ease,_border-color_180ms_ease,_box-shadow_180ms_ease,_transform_220ms_var(--ease-settle)] [&:hover]:text-primary [&>svg]:[transition:transform_280ms_var(--ease-settle)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:not(:disabled):hover>svg:last-child:not(.left-hint)]:[transform:translateX(3px)] motion-reduce:[&>svg]:[transform:none]!"
+          }
           onClick={() => void refresh(true)}
           data-shortcut="refresh"
           aria-keyshortcuts="Alt+Shift+R"
@@ -448,13 +559,19 @@ function MerchantWorkspace({
         >
           <RefreshCw
             size={13}
-            className={refreshing ? "pending-spinner" : ""}
+            className={
+              refreshing
+                ? "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                : ""
+            }
           />
           {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
+        </Button>
       </div>
       <div
-        className="reserve-stats"
+        className={
+          "reserve-stats grid grid-cols-[repeat(3,_minmax(0,_1fr))] gap-[14px] mb-[24px] max-[640px]:gap-[8px] max-[640px]:grid-cols-[1fr]"
+        }
         aria-busy={loading}
         aria-label="Reserve balances"
       >
@@ -484,33 +601,72 @@ function MerchantWorkspace({
         />
       </div>
       {readError && (
-        <div className="merchant-alert" role="alert">
+        <div
+          className={
+            "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
+          }
+          role="alert"
+        >
           {readError} Displayed balances may be out of date; transfers are
           paused.
         </div>
       )}
       {journalError && (
-        <div className="merchant-alert" role="alert">
+        <div
+          className={
+            "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
+          }
+          role="alert"
+        >
           {journalError}
         </div>
       )}
       {active && state && !state.ready && (
-        <div className="merchant-alert" role="status">
+        <div
+          className={
+            "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
+          }
+          role="status"
+        >
           The devnet program is awaiting deployment or initialization. Wallet
           balances are live; merchant transactions will unlock when it is ready.
         </div>
       )}
       {active && !active.wallet.signTransaction && (
-        <div className="merchant-alert" role="alert">
+        <div
+          className={
+            "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
+          }
+          role="alert"
+        >
           This wallet does not support the required transaction signing. Connect
           a compatible Solana wallet such as Phantom.
         </div>
       )}
-      <div className="merchant-content-grid">
-        <section className="reserve-card">
-          <div className="reserve-card-heading">
+      <div
+        className={
+          "merchant-content-grid grid grid-cols-[minmax(0,_1.45fr)_minmax(290px,_1fr)] gap-[20px] mb-[20px] max-[1100px]:grid-cols-[minmax(0,_1.2fr)_minmax(270px,_1fr)] max-[1100px]:gap-[14px] max-[640px]:grid-cols-[1fr] max-[640px]:gap-[16px] max-[640px]:mb-[16px]"
+        }
+      >
+        <Card
+          as="section"
+          className={
+            "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card p-[25px] [&_h2]:text-[18px] [&_h2]:tracking-[-0.4px] [&_h2]:leading-[1.5] [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px]"
+          }
+        >
+          <CardHeader
+            className={
+              "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+            }
+          >
             <div>
-              <span className="merchant-eyebrow">GETTING STARTED</span>
+              <span
+                className={
+                  "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+                }
+              >
+                GETTING STARTED
+              </span>
               <h2>
                 {loading
                   ? "Loading your reserve…"
@@ -520,8 +676,8 @@ function MerchantWorkspace({
               </h2>
             </div>
             <ShieldCheck size={23} />
-          </div>
-          <div className="onboarding-steps">
+          </CardHeader>
+          <div className={"onboarding-steps [margin:25px_0_22px]"}>
             <SetupStep
               number="01"
               done={Boolean(active)}
@@ -549,28 +705,50 @@ function MerchantWorkspace({
             />
           </div>
           {walletLoading ? (
-            <div className="setup-footer" role="status">
+            <div
+              className={
+                "setup-footer [border-top:1px_solid_var(--line)] pt-[18px] flex items-center gap-[10px] flex-wrap text-primary [&>span]:text-[10px] [&>span]:text-muted-foreground [&_.button]:text-[11px] [&_.button]:min-h-[40px] max-[640px]:gap-[12px]"
+              }
+              role="status"
+            >
               <LoaderCircle
                 size={16}
-                className="pending-spinner"
+                className={
+                  "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                }
                 aria-hidden="true"
               />
               <span>Checking your wallet connection…</span>
             </div>
           ) : !active ? (
-            <div className="setup-footer">
+            <div
+              className={
+                "setup-footer [border-top:1px_solid_var(--line)] pt-[18px] flex items-center gap-[10px] flex-wrap text-primary [&>span]:text-[10px] [&>span]:text-muted-foreground [&_.button]:text-[11px] [&_.button]:min-h-[40px] max-[640px]:gap-[12px]"
+              }
+            >
               <Wallet size={16} />
               <span>Connect your wallet in the top right to begin.</span>
             </div>
           ) : !state?.registered ? (
-            <div className="setup-footer">
-              <button
-                className="button button-green"
+            <div
+              className={
+                "setup-footer [border-top:1px_solid_var(--line)] pt-[18px] flex items-center gap-[10px] flex-wrap text-primary [&>span]:text-[10px] [&>span]:text-muted-foreground [&_.button]:text-[11px] [&_.button]:min-h-[40px] max-[640px]:gap-[12px]"
+              }
+            >
+              <Button
+                variant="brand"
+                size="unstyled"
+                className={"button button-green"}
                 disabled={!enabled || !state}
                 onClick={() => void submit("register")}
               >
                 {busy || pending || loading ? (
-                  <LoaderCircle size={15} className="pending-spinner" />
+                  <LoaderCircle
+                    size={15}
+                    className={
+                      "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                    }
+                  />
                 ) : (
                   <ArrowUpRight size={15} />
                 )}
@@ -580,11 +758,15 @@ function MerchantWorkspace({
                     : loading
                       ? "Loading merchant…"
                       : "Register merchant")}
-              </button>
+              </Button>
               <span>One-time setup · Devnet SOL rent applies</span>
             </div>
           ) : (
-            <div className="setup-footer">
+            <div
+              className={
+                "setup-footer [border-top:1px_solid_var(--line)] pt-[18px] flex items-center gap-[10px] flex-wrap text-primary [&>span]:text-[10px] [&>span]:text-muted-foreground [&_.button]:text-[11px] [&_.button]:min-h-[40px] max-[640px]:gap-[12px]"
+              }
+            >
               <CheckCheck size={17} />
               <span>
                 Merchant registered. Your wallet authorizes every reserve
@@ -592,21 +774,40 @@ function MerchantWorkspace({
               </span>
             </div>
           )}
-        </section>
-        <section className="reserve-card transfer-card">
-          <div className="reserve-card-heading">
+        </Card>
+        <Card
+          as="section"
+          className={
+            "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card p-[25px] [&_h2]:text-[18px] [&_h2]:tracking-[-0.4px] [&_h2]:leading-[1.5] [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] transfer-card [&_label]:flex [&_label]:justify-between [&_label]:items-center [&_label]:text-[11px] [&_label_span]:[font:8px_var(--mono)] [&_label_span]:text-muted-foreground"
+          }
+        >
+          <CardHeader
+            className={
+              "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+            }
+          >
             <div>
-              <span className="merchant-eyebrow">MOVE COLLATERAL</span>
+              <span
+                className={
+                  "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+                }
+              >
+                MOVE COLLATERAL
+              </span>
               <h2>Manage your reserve</h2>
             </div>
             <ArrowDownLeft size={21} />
-          </div>
+          </CardHeader>
           <div
-            className="transfer-tabs"
+            className={
+              'transfer-tabs flex bg-[#f0f2eb] p-[4px] rounded-[4px] my-[21px] mx-0 gap-[4px] [&_button]:flex-[1] [&_button]:[border:1px_solid_transparent] [&_button]:bg-transparent [&_button]:text-[11px] [&_button]:p-[8px] [&_button]:rounded-[3px] [&_button]:text-muted-foreground [&_button]:[transition:background_0.2s,_box-shadow_0.2s] [&_button[aria-pressed="true"]]:bg-card [&_button[aria-pressed="true"]]:border-[#dce2d3] [&_button[aria-pressed="true"]]:shadow-[0_1px_3px_#24282008] [&_button[aria-pressed="true"]]:text-foreground'
+            }
             role="group"
             aria-label="Reserve action"
           >
-            <button
+            <Button
+              variant="unstyled"
+              size="unstyled"
               aria-pressed={action === "fund"}
               onClick={() => {
                 setAction("fund");
@@ -615,8 +816,10 @@ function MerchantWorkspace({
               disabled={Boolean(busy || pending)}
             >
               Add funds
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="unstyled"
+              size="unstyled"
               aria-pressed={action === "withdraw"}
               onClick={() => {
                 setAction("withdraw");
@@ -625,7 +828,7 @@ function MerchantWorkspace({
               disabled={Boolean(busy || pending)}
             >
               Withdraw
-            </button>
+            </Button>
           </div>
           <form
             aria-busy={Boolean(busy || pending)}
@@ -637,8 +840,12 @@ function MerchantWorkspace({
             <label htmlFor="reserve-amount">
               Amount <span>DEVNET USDC</span>
             </label>
-            <div className="reserve-amount">
-              <input
+            <div
+              className={
+                'reserve-amount [border:1px_solid_#d4dccb] flex items-center py-[15px] px-[13px] [margin:9px_0_12px] rounded-[3px] [&:focus-within]:border-[var(--green)] [&:focus-within]:shadow-[0_0_0_2px_#426b3610] [&_input]:[border:0] [&_input]:bg-transparent [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:[font:24px_var(--mono)] [&_input]:text-foreground [&_input]:[outline:0] [&_input::placeholder]:text-[#b9c1b1] [&_button]:bg-[#eef3e7] [&_button]:[border:1px_solid_#dce5d2] [&_button]:rounded-[3px] [&_button]:[font:9px_var(--mono)] [&_button]:py-[5px] [&_button]:px-[7px] [&_button]:text-primary [&_input[aria-invalid="true"]]:[color:var(--danger)] [&:has(input[aria-invalid="true"])]:border-[var(--danger)]'
+              }
+            >
+              <Input
                 id="reserve-amount"
                 inputMode="decimal"
                 autoComplete="off"
@@ -650,7 +857,9 @@ function MerchantWorkspace({
                 aria-invalid={Boolean(amount && !amountValid)}
                 aria-keyshortcuts="Alt+Shift+A"
               />
-              <button
+              <Button
+                variant="unstyled"
+                size="unstyled"
                 type="button"
                 onClick={() => setAmount(exactAmount(maxAmount))}
                 disabled={
@@ -660,9 +869,13 @@ function MerchantWorkspace({
                 }
               >
                 Max
-              </button>
+              </Button>
             </div>
-            <div className="amount-balance">
+            <div
+              className={
+                "amount-balance flex gap-[10px] justify-between text-[10px] text-muted-foreground [&_strong]:font-[500] [&_strong]:[overflow-wrap:anywhere] [&_strong]:text-right"
+              }
+            >
               <span>
                 {action === "fund" ? "In your wallet" : "Available to withdraw"}
               </span>
@@ -672,7 +885,7 @@ function MerchantWorkspace({
             </div>
             <p
               id="amount-help"
-              className={`transfer-help ${amount && !amountValid ? "amount-error" : ""}`}
+              className={`transfer-help text-[10px] text-muted-foreground mt-[17px] min-h-[36px] [&.amount-error]:text-[#a04531] max-[640px]:min-h-[0] ${amount && !amountValid ? "amount-error" : ""}`}
             >
               {amount && !amountValid
                 ? parsed > maxAmount
@@ -682,12 +895,21 @@ function MerchantWorkspace({
                   ? "Funds go directly into your merchant’s reserve vault."
                   : "Funds return to this wallet. Collateral backing open orders stays locked."}
             </p>
-            <button
-              className="button button-dark transfer-submit"
+            <Button
+              variant="ink"
+              size="unstyled"
+              className={
+                "button button-dark transfer-submit w-[100%] mt-[15px] text-[12px] min-h-[43px]"
+              }
               disabled={!enabled || !state?.registered || !amountValid}
             >
               {busy || pending ? (
-                <LoaderCircle size={15} className="pending-spinner" />
+                <LoaderCircle
+                  size={15}
+                  className={
+                    "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                  }
+                />
               ) : action === "fund" ? (
                 <ArrowDownLeft size={15} />
               ) : (
@@ -696,20 +918,29 @@ function MerchantWorkspace({
               {busy ||
                 (pending ? "Confirming transaction…" : undefined) ||
                 (action === "fund" ? "Add to reserve" : "Withdraw to wallet")}
-            </button>
+            </Button>
           </form>
-          <div className="transfer-security">
+          <div
+            className={
+              "transfer-security flex justify-center gap-[6px] items-center text-[9px] mt-[13px] text-muted-foreground"
+            }
+          >
             <LockKeyhole size={12} /> Approved by you. Enforced on-chain.
           </div>
-        </section>
+        </Card>
       </div>
       {(pending || message) && (
         <div
-          className={`transaction-notice ${receipt?.result === "confirmed" ? "transaction-confirmed" : ""}`}
+          className={`transaction-notice flex justify-between gap-[14px] flex-wrap [border:1px_solid_#d9dfcf] bg-[#eef2e7] py-[16px] px-[20px] [margin:0_0_20px] rounded-[3px] text-[11px] [&>div]:flex [&>div]:gap-[10px] [&>div]:items-center [&>div]:flex-[1] [&>div]:min-w-[220px] [&_svg]:flex-[0_0_auto] [&_p]:[overflow-wrap:anywhere] [&_a]:flex [&_a]:items-center [&_a]:gap-[6px] [&_a]:text-primary ${receipt?.result === "confirmed" ? "transaction-confirmed border-[#c9dcb9] bg-[#edf6e7]" : ""}`}
         >
           <div>
             {pending ? (
-              <LoaderCircle size={17} className="pending-spinner" />
+              <LoaderCircle
+                size={17}
+                className={
+                  "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                }
+              />
             ) : receipt?.result === "confirmed" ? (
               <Check size={17} />
             ) : (
@@ -732,28 +963,45 @@ function MerchantWorkspace({
           )}
         </div>
       )}
-      <PaymentLinks
-        active={active}
-        registered={Boolean(state?.registered)}
-        locked={Boolean(busy || pending)}
-        setLocked={setLocked}
-        isCurrent={isCurrent}
-        onPaid={() => void refresh()}
-      />
-      <div className="merchant-bottom-grid">
-        <section className="reserve-card reserve-breakdown">
-          <div className="reserve-card-heading">
+      <div
+        className={
+          "merchant-bottom-grid grid grid-cols-[minmax(0,_1.45fr)_minmax(290px,_1fr)] gap-[20px] mb-[20px] max-[1100px]:grid-cols-[minmax(0,_1.2fr)_minmax(270px,_1fr)] max-[1100px]:gap-[14px] max-[640px]:grid-cols-[1fr] max-[640px]:gap-[16px] max-[640px]:mb-[16px]"
+        }
+      >
+        <Card
+          as="section"
+          className={
+            "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card p-[25px] [&_h2]:tracking-[-0.4px] [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] reserve-breakdown [&_h2]:text-[17px] [&:hover_.reserve-allocation]:animate-[reserve-drift_4s_linear_infinite] [&>p]:mt-[18px] [&>p]:text-[11px] [&>p]:text-muted-foreground motion-reduce:[&:hover_.reserve-allocation]:animate-[none]"
+          }
+        >
+          <CardHeader
+            className={
+              "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+            }
+          >
             <div>
-              <span className="merchant-eyebrow">HOW YOUR RESERVE WORKS</span>
+              <span
+                className={
+                  "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+                }
+              >
+                HOW YOUR RESERVE WORKS
+              </span>
               <h2>Room for peace of mind.</h2>
             </div>
-            <span className="rate-badge">
+            <span
+              className={
+                "rate-badge [font:9px_var(--mono)] py-[6px] px-[8px] bg-[#eff4e9] text-primary [border:1px_solid_#dbe5d1] rounded-[3px] whitespace-nowrap max-[1100px]:text-[8px] max-[1100px]:p-[5px]"
+              }
+            >
               {state ? `${state.reserveBps / 100}%` : "5%"} reserve rate
             </span>
-          </div>
+          </CardHeader>
           <div
             role="img"
-            className="reserve-allocation"
+            className={
+              "reserve-allocation h-[25px] [border:1px_solid_#d3dec7] [background:repeating-linear-gradient(_125deg,_#e8f0df_0,_#e8f0df_6px,_#f4f7ee_6px,_#f4f7ee_9px_)] bg-size-[33px_42px] rounded-[3px] [margin:23px_0_12px] overflow-hidden [&>span]:block [&>span]:h-[100%] [&>span]:[transition:width_0.6s_ease] [&>span]:bg-[#a7884c] motion-reduce:[&>span]:transition-[none]"
+            }
             aria-label={
               state
                 ? `${exactAmount(state.locked)} USDC locked, ${exactAmount(position!.available)} USDC available`
@@ -766,7 +1014,11 @@ function MerchantWorkspace({
               }}
             />
           </div>
-          <div className="allocation-legend">
+          <div
+            className={
+              "allocation-legend flex justify-between gap-[10px] text-[9px] text-muted-foreground [&_span]:flex [&_span]:items-center [&_span]:gap-[6px] [&_i]:bg-[#76945f] [&_i]:w-[7px] [&_i]:h-[7px] [&_i]:rounded-[2px] [&_span:last-child_i]:bg-[#e8f0df] [&_span:last-child_i]:[border:1px_solid_#c6d4b8] [&_span:first-child_i]:bg-[#a7884c]"
+            }
+          >
             <span>
               <i /> Backing open orders
             </span>
@@ -780,7 +1032,11 @@ function MerchantWorkspace({
               : "Your reserve covers open orders in full. Connect and register to see your own allocation here."}
           </p>
           {state?.registered && (
-            <div className="merchant-chain-links">
+            <div
+              className={
+                "merchant-chain-links flex flex-wrap gap-[17px] mt-[16px] [&_a]:flex [&_a]:items-center [&_a]:gap-[6px] [&_a]:text-[10px] [&_a]:text-primary"
+              }
+            >
               <a
                 href={explorer(state.merchant)}
                 target="_blank"
@@ -793,9 +1049,20 @@ function MerchantWorkspace({
               </a>
             </div>
           )}
-        </section>
-        <section className="reserve-card faucet-card">
-          <span className="merchant-eyebrow">A LITTLE TEST FUEL</span>
+        </Card>
+        <Card
+          as="section"
+          className={
+            "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] p-[25px] [&_h2]:tracking-[-0.4px] [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] faucet-card bg-[#f0f3e9] [&_h2]:mt-[8px] [&_h2]:text-[18px] [&_p]:text-[11px] [&_p]:text-muted-foreground [&_p]:[margin:9px_0_17px] [&>a]:flex [&>a]:items-center [&>a]:justify-between [&>a]:py-[10px] [&>a]:px-0 [&>a]:[border-top:1px_solid_#dae2d0] [&>a]:text-[11px] [&>a:hover]:text-primary [&>a_svg]:[transition:transform_0.2s] [&>a:hover_svg]:[transform:translate(2px,_-2px)] motion-reduce:[&>a_svg]:transition-[none]"
+          }
+        >
+          <span
+            className={
+              "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+            }
+          >
+            A LITTLE TEST FUEL
+          </span>
           <h2>Ready to try it?</h2>
           <p>
             Switch your wallet to devnet. Get test SOL for fees and test USDC
@@ -807,7 +1074,11 @@ function MerchantWorkspace({
           <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">
             Get test USDC <ArrowUpRight size={15} />
           </a>
-          <div className="faucet-token">
+          <div
+            className={
+              "faucet-token flex flex-wrap gap-[8px] justify-between text-[9px] mt-[12px] text-muted-foreground [&>a]:inline-flex [&>a]:items-center [&>a]:gap-[5px] [&>a]:whitespace-nowrap [&>a]:min-h-[24px]"
+            }
+          >
             <a
               href={explorer(DEVNET_USDC.toBase58())}
               target="_blank"
@@ -819,10 +1090,14 @@ function MerchantWorkspace({
               <span>Wallet: {(state.lamports / 1e9).toFixed(4)} SOL</span>
             )}
           </div>
-        </section>
+        </Card>
       </div>
       {state && (
-        <p className="balance-timestamp">
+        <p
+          className={
+            "balance-timestamp [font:9px_var(--mono)] text-right text-muted-foreground [padding:4px_0_15px] max-[640px]:text-[8px] max-[640px]:text-left max-[640px]:leading-[1.6]"
+          }
+        >
           Confirmed at slot {state.slot.toLocaleString("en-US")} · Balances
           refresh every 20 seconds
         </p>
@@ -849,8 +1124,9 @@ function Stat({
   tone?: "info" | "warning";
 }) {
   return (
-    <section
-      className={`reserve-stat ${accent ? "reserve-stat-accent" : ""} ${tone ? `reserve-stat-${tone}` : ""}`}
+    <Card
+      as="section"
+      className={`reserve-stat [border:1px_solid_var(--line)] bg-card py-[21px] px-[22px] rounded-[4px] [transition:border-color_0.2s,_transform_0.2s] [&:hover]:border-[#b4c5a4] [&:hover]:[transform:translateY(-2px)] [&>div]:flex [&>div]:justify-between [&>div]:gap-[8px] [&>div]:text-muted-foreground [&>div]:text-[11px] [&>div_svg]:text-[#7d8d70] [&>strong]:flex [&>strong]:gap-[9px] [&>strong]:items-baseline [&>strong]:[font:30px_var(--mono)] [&>strong]:tracking-[-1px] [&>strong]:[margin:22px_0_9px] [&>strong]:[overflow-wrap:anywhere] [&_strong_small]:[font:10px_var(--mono)] [&_strong_small]:tracking-[0] [&_strong_small]:text-muted-foreground [&_p]:text-[10px] [&_p]:text-muted-foreground max-[1100px]:py-[18px] max-[1100px]:px-[15px] max-[1100px]:[&>strong]:text-[25px] max-[640px]:p-[18px] max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:[gap:5px_15px] max-[640px]:[&>div]:justify-start max-[640px]:[&>div]:flex-row max-[640px]:[&>div]:[grid-column:1] max-[640px]:[&>div]:items-center max-[640px]:[&>div]:text-[11px] max-[640px]:[&>strong]:[grid-column:2] max-[640px]:[&>strong]:[grid-row:1_/_3] max-[640px]:[&>strong]:self-center max-[640px]:[&>strong]:m-0 max-[640px]:[&>strong]:text-[25px] max-[640px]:[&>strong_small]:text-[8px] max-[640px]:[&>div_svg]:order-[-1] max-[640px]:[&_p]:pl-[25px] max-[640px]:[&_p]:text-[9px] max-[370px]:[&>strong]:text-[20px] max-[370px]:[&>div]:text-[10px] motion-reduce:transition-[none] ${accent ? "reserve-stat-accent bg-[#edf2e5] border-[#d5dfc9] [&>strong]:text-primary" : ""}  ${tone ? `reserve-stat-${tone}` : ""}`}
     >
       <div>
         <span>{label}</span>
@@ -861,8 +1137,19 @@ function Stat({
       >
         {loading ? (
           <>
-            <span className="balance-skeleton" aria-hidden="true" />
-            <span className="sr-only">Loading balance</span>
+            <span
+              className={
+                "balance-skeleton inline-block w-[86px] h-[30px] rounded-[3px] [background:linear-gradient(_100deg,_#dce2d580_25%,_#f4f6ee_50%,_#dce2d580_75%_)] bg-size-[200%_100%] animate-[balance-shimmer_1.8s_ease-in-out_infinite] motion-reduce:animate-[none]"
+              }
+              aria-hidden="true"
+            />
+            <span
+              className={
+                "sr-only absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip-path:inset(50%)] whitespace-nowrap [border:0]"
+              }
+            >
+              Loading balance
+            </span>
           </>
         ) : amount === undefined ? (
           "—"
@@ -872,7 +1159,7 @@ function Stat({
         <small>USDC</small>
       </strong>
       <p>{note}</p>
-    </section>
+    </Card>
   );
 }
 
@@ -891,14 +1178,28 @@ function SetupStep({
 }) {
   return (
     <div
-      className={`setup-step ${done ? "step-done" : active ? "step-active" : ""}`}
+      className={`setup-step flex gap-[15px] relative [padding:0_0_27px] items-start [&:last-child]:pb-0 [&:not(:last-child)::after]:[content:""] [&:not(:last-child)::after]:absolute [&:not(:last-child)::after]:w-[1px] [&:not(:last-child)::after]:h-[calc(100%_-_37px)] [&:not(:last-child)::after]:top-[33px] [&:not(:last-child)::after]:left-[15px] [&:not(:last-child)::after]:bg-border [&_h3]:text-[13px] [&_h3]:[margin:3px_0_5px] [&_p]:text-[11px] [&_p]:text-muted-foreground [&_p]:leading-[1.6] ${done ? "step-done [&_.step-number]:text-primary [&_.step-number]:bg-[#e4eedb] [&_.step-number]:border-[#ceddc0]" : active ? "step-active [&_.step-number]:text-primary [&_.step-number]:border-[#a9bf94] [&_.step-number]:shadow-[0_0_0_4px_#f1f5ed]" : ""}`}
     >
-      <span className="step-number">{done ? <Check size={15} /> : number}</span>
+      <span
+        className={
+          "step-number w-[31px] h-[31px] grid place-items-center flex-[0_0_auto] [border:1px_solid_var(--line)] bg-background rounded-[50%] [font:10px_var(--mono)] text-muted-foreground [transition:background_0.3s]"
+        }
+      >
+        {done ? <Check size={15} /> : number}
+      </span>
       <div>
         <h3>{title}</h3>
         <p>{description}</p>
       </div>
-      {done && <span className="step-status">DONE</span>}
+      {done && (
+        <span
+          className={
+            "step-status [font:8px_var(--mono)] text-primary [margin:10px_0_0_auto]"
+          }
+        >
+          DONE
+        </span>
+      )}
     </div>
   );
 }

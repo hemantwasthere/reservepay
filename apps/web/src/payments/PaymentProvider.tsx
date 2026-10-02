@@ -37,7 +37,12 @@ export class PaymentBoundary extends Component<
   }
   render() {
     return this.state.failed ? (
-      <div className="payment-error" role="alert">
+      <div
+        className={
+          "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+        }
+        role="alert"
+      >
         Payment data could not load. Please reload the page to reconnect. Check
         your wallet activity before retrying a payment.
       </div>

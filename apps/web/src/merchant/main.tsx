@@ -9,7 +9,13 @@ const app = (
   <StrictMode>
     <ToastProvider>
       <PaymentProvider>
-        <MerchantApp />
+        <MerchantApp
+          page={
+            document.getElementById("root")?.dataset.page === "payments"
+              ? "payments"
+              : "overview"
+          }
+        />
       </PaymentProvider>
     </ToastProvider>
   </StrictMode>

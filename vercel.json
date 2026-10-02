@@ -24,6 +24,14 @@
     {
       "source": "/pay",
       "destination": "/pay/index.html"
+    },
+    {
+      "source": "/app/payments",
+      "destination": "/app/payments/index.html"
+    },
+    {
+      "source": "/app/payments/",
+      "destination": "/app/payments/index.html"
     }
   ],
   "headers": [

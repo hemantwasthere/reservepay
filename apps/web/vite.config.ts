@@ -13,6 +13,9 @@ const routeDashboard: Connect.NextHandleFunction = (
   if (path === "/app" || path === "/app/") {
     request.url = `/app/index.html${query.length ? `?${query.join("?")}` : ""}`;
   }
+  if (path === "/app/payments" || path === "/app/payments/") {
+    request.url = `/app/payments/index.html${query.length ? `?${query.join("?")}` : ""}`;
+  }
   if (/^\/pay(?:\/[^/]+)?\/?$/.test(path)) {
     request.url = `/pay/index.html${query.length ? `?${query.join("?")}` : ""}`;
   }
@@ -26,7 +29,10 @@ export default defineConfig({
     "node_modules/.vite",
     `dev-${process.pid}`,
   ),
-  resolve: { dedupe: ["react", "react-dom"] },
+  resolve: {
+    alias: { "@": resolve(import.meta.dirname, "src") },
+    dedupe: ["react", "react-dom"],
+  },
   optimizeDeps: {
     include: [
       "react",
@@ -63,20 +69,24 @@ export default defineConfig({
         if (!context.server) return html;
         const { render, renderMerchant, renderCheckout } =
           await context.server.ssrLoadModule("/src/entry-server.tsx");
-        const content = context.filename.endsWith("/app/index.html")
-          ? renderMerchant()
-          : context.filename.endsWith("/pay/index.html")
-            ? renderCheckout()
-            : render();
+        const content = context.filename.endsWith("/app/payments/index.html")
+          ? renderMerchant("payments")
+          : context.filename.endsWith("/app/index.html")
+            ? renderMerchant()
+            : context.filename.endsWith("/pay/index.html")
+              ? renderCheckout()
+              : render();
         return html.replace(
-          '<div id="root"></div>',
-          () => `<div id="root">${content}</div>`,
+          /<div id="root"(?: data-page="payments")?><\/div>/,
+          () =>
+            `<div id="root"${context.filename.endsWith("/app/payments/index.html") ? ' data-page="payments"' : ""}>${content}</div>`,
         );
       },
     },
     {
       name: "reservepay-seo",
       transformIndexHtml: (_, context) =>
+        context.filename.endsWith("/app/payments/index.html") ||
         context.filename.endsWith("/app/index.html") ||
         context.filename.endsWith("/pay/index.html")
           ? []
@@ -131,6 +141,7 @@ export default defineConfig({
       input: {
         landing: resolve(import.meta.dirname, "index.html"),
         app: resolve(import.meta.dirname, "app/index.html"),
+        payments: resolve(import.meta.dirname, "app/payments/index.html"),
         pay: resolve(import.meta.dirname, "pay/index.html"),
       },
     },

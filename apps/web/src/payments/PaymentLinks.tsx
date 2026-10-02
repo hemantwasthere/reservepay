@@ -1,3 +1,10 @@
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { Input } from "@/components/ui/input";
+import { Card, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ConvexError } from "convex/values";
 import { useRef, useState } from "react";
 import { useAction, useQuery } from "convex/react";
@@ -31,32 +38,63 @@ export function PaymentLinks(props: {
 }) {
   const ready = usePaymentsReady();
   return (
-    <section
-      className="reserve-card payment-links"
+    <Card
+      as="section"
+      className={
+        "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card p-[25px] [&_h2]:text-[18px] [&_h2]:tracking-[-0.4px] [&_h2]:leading-[1.5] [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] payment-links my-[24px] [scroll-margin-top:24px]"
+      }
       id="payment-links"
       aria-labelledby="payment-links-title"
     >
-      <div className="reserve-card-heading">
+      <CardHeader
+        className={
+          "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+        }
+      >
         <div>
-          <span className="merchant-eyebrow">PAYMENTS / DEVNET</span>
+          <span
+            className={
+              "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+            }
+          >
+            PAYMENTS / DEVNET
+          </span>
           <h2 id="payment-links-title">A link. A protected payment.</h2>
         </div>
         <Link2 size={22} aria-hidden="true" />
-      </div>
-      <p className="payment-intro">
+      </CardHeader>
+      <p
+        className={
+          "payment-intro text-muted-foreground text-[12px] leading-[1.7] [margin:10px_0_24px]"
+        }
+      >
         Create a single-use checkout for test USDC. Share it with your buyer and
         follow the order here.
       </p>
       {!props.active ? (
-        <div className="payment-empty">
+        <div
+          className={
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+          }
+        >
           Connect your wallet to manage payment links.
         </div>
       ) : !props.registered ? (
-        <div className="payment-empty">
-          Register your merchant account above to start accepting payments.
+        <div
+          className={
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+          }
+        >
+          Register your merchant account in Overview to start accepting
+          payments.
         </div>
       ) : !ready ? (
-        <div className="payment-empty" role="status">
+        <div
+          className={
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+          }
+          role="status"
+        >
           {paymentsConfigured
             ? "Connecting to payment history…"
             : "Payment service is not configured for this deployment."}
@@ -66,7 +104,7 @@ export function PaymentLinks(props: {
           <LinkManager {...props} active={props.active} />
         </PaymentBoundary>
       )}
-    </section>
+    </Card>
   );
 }
 function LinkManager({
@@ -180,7 +218,9 @@ function LinkManager({
   return (
     <>
       <form
-        className="payment-link-form"
+        className={
+          "payment-link-form grid grid-cols-[minmax(160px,_1.5fr)_minmax(110px,_0.8fr)_minmax(_120px,_0.8fr_)] gap-[16px] [&_label]:flex [&_label]:flex-col [&_label]:gap-[9px] [&_label]:text-[12px] [&_label]:text-muted-foreground [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:min-h-[44px] [&_input]:py-[11px] [&_input]:px-[12px] [&_input]:[border:1px_solid_var(--line)] [&_input]:rounded-[4px] [&_input]:bg-card [&_input]:text-foreground [&_input]:[font:inherit] [&_select]:w-[100%] [&_select]:min-w-[0] [&_select]:min-h-[44px] [&_select]:py-[11px] [&_select]:px-[12px] [&_select]:[border:1px_solid_var(--line)] [&_select]:rounded-[4px] [&_select]:bg-card [&_select]:text-foreground [&_select]:[font:inherit] [&_input:focus]:[outline:2px_solid_#63834b] [&_input:focus]:outline-offset-[2px] [&_select:focus]:[outline:2px_solid_#63834b] [&_select:focus]:outline-offset-[2px] [&>button]:[grid-column:1_/_-1] [&>button]:justify-self-start max-[640px]:grid-cols-[1fr_1fr] max-[640px]:[&_label:first-child]:[grid-column:1_/_-1] max-[640px]:[&>button]:justify-self-stretch max-[640px]:[&>button]:justify-center"
+        }
         onSubmit={(event) => {
           event.preventDefault();
           void createLink();
@@ -189,7 +229,7 @@ function LinkManager({
       >
         <label>
           Payment for
-          <input
+          <Input
             required
             maxLength={100}
             value={title}
@@ -201,75 +241,121 @@ function LinkManager({
         </label>
         <label>
           Amount · USDC
-          <input
+          <Input
             required
             inputMode="decimal"
             value={amount}
             disabled={Boolean(busy)}
             onChange={(event) => setAmount(event.target.value)}
+            id="payment-link-amount"
             placeholder="10.00"
           />
         </label>
         <label>
           Protection period
-          <select
+          <NativeSelect
             value={protection}
             disabled={Boolean(busy)}
             onChange={(event) => setProtection(Number(event.target.value))}
           >
-            <option value={3600}>1 hour</option>
-            <option value={86400}>1 day</option>
-            <option value={604800}>7 days</option>
-          </select>
+            <NativeSelectOption value={3600}>1 hour</NativeSelectOption>
+            <NativeSelectOption value={86400}>1 day</NativeSelectOption>
+            <NativeSelectOption value={604800}>7 days</NativeSelectOption>
+          </NativeSelect>
         </label>
-        <button
-          className="button button-green"
+        <Button
+          variant="brand"
+          size="unstyled"
+          className={"button button-green"}
           disabled={locked || Boolean(busy) || !active.wallet.signMessage}
           type="submit"
         >
           {busy ? (
-            <LoaderCircle size={16} className="pending-spinner" />
+            <LoaderCircle
+              size={16}
+              className={
+                "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+              }
+            />
           ) : (
             <Link2 size={16} />
           )}
           {busy || "Create payment link"}
-        </button>
+        </Button>
       </form>
-      <p className="payment-fineprint">
+      <p
+        className={
+          "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
+        }
+      >
         Your wallet signs the link details. No funds move. Titles and on-chain
         receipts are public; keep personal information out.
       </p>
       {!active.wallet.signMessage && (
-        <p className="payment-error">
+        <p
+          className={
+            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+          }
+        >
           This wallet does not support message approval. Switch to a wallet such
           as Phantom to create links.
         </p>
       )}
       {error && (
-        <p role="alert" className="payment-error">
+        <p
+          role="alert"
+          className={
+            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+          }
+        >
           {error}
         </p>
       )}
-      <div className="payment-history-heading">
+      <div
+        className={
+          "payment-history-heading mt-[30px] [border-top:1px_solid_var(--line)] pt-[24px] flex items-center justify-between gap-[14px] [&_h3]:text-[14px] [&_h3]:font-[500] [&_h3_span]:text-muted-foreground [&_h3_span]:ml-[7px] [&_h3_span]:[font:11px_var(--mono)] max-[640px]:items-start"
+        }
+      >
         <h3>
           Recent payment links <span>{links?.length ?? ""}</span>
         </h3>
-        <button
-          className="payment-text-button"
+        <Button
+          variant="unstyled"
+          size="unstyled"
+          className={
+            "payment-text-button inline-flex items-center gap-[7px] text-muted-foreground bg-transparent [border:0] text-[11px] py-[10px] px-0"
+          }
           type="button"
+          data-shortcut="refresh-orders"
           disabled={!links || checking}
           onClick={() => void refresh()}
         >
-          <RefreshCw size={14} className={checking ? "pending-spinner" : ""} />
+          <RefreshCw
+            size={14}
+            className={
+              checking
+                ? "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                : ""
+            }
+          />
           {checking ? "Checking orders…" : "Refresh orders"}
-        </button>
+        </Button>
       </div>
       {links === undefined ? (
-        <div className="payment-empty" role="status">
+        <div
+          className={
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+          }
+          role="status"
+        >
           Loading payment links…
         </div>
       ) : links.length === 0 ? (
-        <div className="payment-empty">
+        <div
+          className={
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+          }
+        >
           <Link2 size={24} />
           <strong>Your first payment starts here.</strong>
           <span>
@@ -277,10 +363,18 @@ function LinkManager({
           </span>
         </div>
       ) : (
-        <ul className="payment-link-list">
+        <ul
+          className={
+            "payment-link-list [list-style:none] p-0 [margin:10px_0_0] [&_li]:flex [&_li]:items-center [&_li]:gap-[18px] [&_li]:py-[18px] [&_li]:px-[12px] [&_li]:rounded-[4px] [&_li]:[border-bottom:1px_solid_var(--line)] [&_li]:[transition:background-color_180ms_ease] [&_li:hover]:bg-[#f8f9f5] [&_li:last-child]:[border-bottom:0] max-[640px]:[&_li]:gap-[10px] max-[640px]:[&_li]:flex-wrap"
+          }
+        >
           {links.map((link) => (
             <li key={link._id}>
-              <div className="payment-link-details">
+              <div
+                className={
+                  "payment-link-details min-w-[0] flex-[1] flex flex-col gap-[7px] [&>a]:inline-flex [&>a]:items-center [&>a]:gap-[6px] [&>a]:text-[13px] [&>a]:[overflow-wrap:anywhere] [&>span]:text-muted-foreground [&>span]:text-[10px] [&>.payment-order-link]:inline-flex [&>.payment-order-link]:gap-[5px] [&>.payment-order-link]:items-center [&>.payment-order-link]:text-[#476238] [&>.payment-order-link]:text-[11px] max-[640px]:[flex-basis:calc(100%_-_48px)]"
+                }
+              >
                 <a href={`/pay/${link._id}`}>
                   {link.title}
                   <ArrowUpRight size={14} />
@@ -291,7 +385,9 @@ function LinkManager({
                 </span>
                 {link.receipt && (
                   <a
-                    className="payment-order-link"
+                    className={
+                      "payment-order-link inline-flex gap-[5px] items-center text-[#476238] text-[11px]"
+                    }
                     href={explorer(link.receipt.order)}
                     target="_blank"
                     rel="noreferrer"
@@ -300,12 +396,16 @@ function LinkManager({
                   </a>
                 )}
               </div>
-              <div className="payment-link-summary">
+              <div
+                className={
+                  "payment-link-summary flex flex-col items-end gap-[8px] [&_strong]:text-[14px] [&_strong]:font-[500] [&_small]:text-muted-foreground [&_small]:[font:9px_var(--mono)] max-[640px]:order-[3] max-[640px]:flex-row max-[640px]:justify-between max-[640px]:items-center max-[640px]:w-[100%]"
+                }
+              >
                 <strong>
                   {exactAmount(BigInt(link.amount))} <small>USDC</small>
                 </strong>
                 <span
-                  className={`link-payment-status ${link.receipt ? "link-payment-status-paid" : ""}`}
+                  className={`link-payment-status text-[#805e2e] bg-[#f8f0df] py-[5px] px-[7px] rounded-[3px] [font:9px_var(--mono)] whitespace-nowrap ${link.receipt ? "link-payment-status-paid text-[#476238] bg-[#eaf0e2]" : ""}`}
                 >
                   {link.receipt?.status === "paid"
                     ? link.receipt.expiresAt > Date.now()
@@ -314,8 +414,12 @@ function LinkManager({
                     : (link.receipt?.status ?? "Awaiting payment")}
                 </span>
               </div>
-              <button
-                className="payment-copy"
+              <Button
+                variant="unstyled"
+                size="unstyled"
+                className={
+                  "payment-copy w-[38px] h-[38px] grid place-items-center [border:1px_solid_var(--line)] bg-card rounded-[4px] text-muted-foreground shrink-[0] [transition:background-color_180ms_ease] [&:hover]:bg-[#eaf0e2] [&:hover]:text-[#476238]"
+                }
                 aria-label={`Copy payment link for ${link.title}`}
                 title="Copy payment link"
                 onClick={async () => {
@@ -340,13 +444,19 @@ function LinkManager({
                 }}
               >
                 {copied === link._id ? <Check size={16} /> : <Copy size={16} />}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
       )}
       {links?.length === 50 && (
-        <p className="payment-fineprint">Showing your 50 most recent links.</p>
+        <p
+          className={
+            "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
+          }
+        >
+          Showing your 50 most recent links.
+        </p>
       )}
     </>
   );

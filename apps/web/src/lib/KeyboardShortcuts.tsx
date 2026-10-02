@@ -1,15 +1,25 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { Keyboard, X } from "lucide-react";
-
+import { useEffect, useState } from "react";
+import { Keyboard } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 export function KeyboardShortcuts({
   dashboard = false,
+  payments = false,
 }: {
   dashboard?: boolean;
+  payments?: boolean;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const backdropPressed = useRef(false);
-  const title = useId();
-  const [enabled, setEnabled] = useState(true);
+  const [open, setOpen] = useState(false),
+    [enabled, setEnabled] = useState(true);
   useEffect(() => {
     try {
       setEnabled(localStorage.getItem("reservepay.shortcuts") !== "off");
@@ -31,156 +41,120 @@ export function KeyboardShortcuts({
       if (
         event.target instanceof Element &&
         event.target.closest(
-          "input, textarea, select, [contenteditable=true], [role=textbox]",
+          "input,textarea,select,[contenteditable=true],[role=textbox]",
         )
       )
         return;
       if (event.code === "KeyK") {
         event.preventDefault();
-        if (!dialog.current?.open) dialog.current?.showModal();
+        setOpen(true);
         return;
       }
-      if (document.querySelector("dialog[open]")) return;
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return;
       const selector =
         event.code === "KeyW"
           ? ".wallet-button"
           : event.code === "KeyR"
-            ? "[data-shortcut=refresh]"
+            ? payments
+              ? "[data-shortcut=refresh-orders]"
+              : "[data-shortcut=refresh]"
             : event.code === "KeyA"
-              ? "#reserve-amount"
+              ? payments
+                ? "#payment-link-amount"
+                : "#reserve-amount"
               : undefined;
-      const element = selector
+      const el = selector
         ? document.querySelector<HTMLButtonElement | HTMLInputElement>(selector)
         : null;
-      if (!element || element.disabled) return;
+      if (!el || el.disabled) return;
       event.preventDefault();
-      element.focus();
-      if (event.code !== "KeyA") element.click();
+      el.focus();
+      if (event.code !== "KeyA") el.click();
     };
     document.addEventListener("keydown", handle);
     return () => document.removeEventListener("keydown", handle);
-  }, [enabled]);
+  }, [enabled, payments]);
+  const shortcuts = [
+    ...[{ label: "Show shortcuts", keys: ["Alt", "Shift", "K"] }],
+    ...(dashboard
+      ? [
+          { label: "Open wallet options", keys: ["Alt", "Shift", "W"] },
+          {
+            label: payments ? "Refresh orders" : "Refresh balances",
+            keys: ["Alt", "Shift", "R"],
+          },
+          { label: "Focus amount", keys: ["Alt", "Shift", "A"] },
+          { label: "Toggle sidebar", keys: ["Alt", "Shift", "B"] },
+        ]
+      : []),
+    { label: "Close a panel", keys: ["Esc"] },
+  ];
   return (
-    <>
-      <button
-        className="shortcuts-trigger"
-        aria-haspopup="dialog"
-        aria-keyshortcuts="Alt+Shift+K"
-        onClick={() => dialog.current?.showModal()}
-      >
-        <Keyboard size={14} aria-hidden="true" /> Shortcuts
-      </button>
-      <dialog
-        ref={dialog}
-        className="shortcuts-dialog"
-        aria-labelledby={title}
-        onPointerDown={(event) => {
-          const bounds = event.currentTarget.getBoundingClientRect();
-          backdropPressed.current =
-            event.target === event.currentTarget &&
-            (event.clientX < bounds.left ||
-              event.clientX > bounds.right ||
-              event.clientY < bounds.top ||
-              event.clientY > bounds.bottom);
-        }}
-        onClick={(event) => {
-          const bounds = event.currentTarget.getBoundingClientRect();
-          if (
-            backdropPressed.current &&
-            event.target === event.currentTarget &&
-            (event.clientX < bounds.left ||
-              event.clientX > bounds.right ||
-              event.clientY < bounds.top ||
-              event.clientY > bounds.bottom)
-          )
-            event.currentTarget.close();
-          backdropPressed.current = false;
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== "Tab") return;
-          const controls =
-            event.currentTarget.querySelectorAll<HTMLElement>("button, input");
-          const first = controls[0];
-          const last = controls[controls.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last?.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first?.focus();
-          }
-        }}
-      >
-        <div className="shortcuts-heading">
-          <h2 id={title}>A few helpful shortcuts</h2>
-          <button
-            aria-label="Close keyboard shortcuts"
-            onClick={() => dialog.current?.close()}
-            autoFocus
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </div>
-        <p>
-          Use Alt (⌥ on Mac) + Shift with the keys below. Shortcuts pause while
-          you type.
-        </p>
-        <dl>
-          <div>
-            <dt>Show shortcuts</dt>
-            <dd>
-              <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>K</kbd>
-            </dd>
-          </div>
-          {dashboard && (
-            <>
-              <div>
-                <dt>Open wallet options</dt>
-                <dd>
-                  <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>W</kbd>
-                </dd>
-              </div>
-              <div>
-                <dt>Refresh balances</dt>
-                <dd>
-                  <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>
-                </dd>
-              </div>
-              <div>
-                <dt>Focus amount</dt>
-                <dd>
-                  <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>
-                </dd>
-              </div>
-            </>
-          )}
-          <div>
-            <dt>Close a panel</dt>
-            <dd>
-              <kbd>Esc</kbd>
-            </dd>
-          </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="shortcuts-trigger h-auto gap-2 p-0 text-[10px] text-muted-foreground"
+          aria-keyshortcuts="Alt+Shift+K"
+        >
+          <Keyboard className="size-[14px]" />
+          Shortcuts
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto max-w-[calc(100%-2rem)] rounded bg-card p-7 sm:max-w-[450px]">
+        <DialogHeader className="text-left">
+          <DialogTitle className="pr-6 text-lg font-medium tracking-[-.4px]">
+            A few helpful shortcuts
+          </DialogTitle>
+          <DialogDescription className="text-xs leading-relaxed">
+            Use Alt (⌥ on Mac) + Shift with the keys below. Shortcuts pause
+            while you type.
+          </DialogDescription>
+        </DialogHeader>
+        <dl className="divide-y divide-border">
+          {shortcuts.map((item) => (
+            <div
+              key={item.label}
+              className="flex items-center justify-between gap-4 py-3 text-xs"
+            >
+              <dt>{item.label}</dt>
+              <dd className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+                {item.keys.map((key, i) => (
+                  <span key={key}>
+                    {i > 0 && " + "}
+                    <kbd className="rounded border border-border bg-background px-1.5 py-1">
+                      {key}
+                    </kbd>
+                  </span>
+                ))}
+              </dd>
+            </div>
+          ))}
         </dl>
-        <label className="shortcuts-toggle">
-          <input
-            type="checkbox"
+        <div className="flex items-center gap-3 border-t border-border pt-4">
+          <Checkbox
+            id="enable-shortcuts"
             checked={enabled}
-            onChange={(event) => {
-              setEnabled(event.target.checked);
+            onCheckedChange={(value) => {
+              const next = value === true;
+              setEnabled(next);
               try {
                 localStorage.setItem(
                   "reservepay.shortcuts",
-                  event.target.checked ? "on" : "off",
+                  next ? "on" : "off",
                 );
               } catch {}
             }}
-          />{" "}
-          Enable keyboard shortcuts
-        </label>
-        <p className="shortcuts-note">
+          />
+          <Label htmlFor="enable-shortcuts" className="text-xs font-normal">
+            Enable keyboard shortcuts
+          </Label>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
           Transactions always require an explicit action and wallet approval.
         </p>
-      </dialog>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }

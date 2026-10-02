@@ -2,13 +2,11 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
-import { CheckCircle2, CircleAlert, Info, LoaderCircle, X } from "lucide-react";
-
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 type ToastInput = {
   id?: string;
   title: string;
@@ -16,109 +14,59 @@ type ToastInput = {
   tone?: "success" | "error" | "info" | "loading";
   href?: string;
 };
-type Notice = ToastInput & { id: string };
 const ToastContext = createContext<{
   notify: (notice: ToastInput) => string;
   dismiss: (id: string) => void;
 } | null>(null);
-
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const dismiss = useCallback(
-    (id: string) =>
-      setNotices((items) => items.filter((item) => item.id !== id)),
-    [],
-  );
+  const dismiss = useCallback((id: string) => {
+    toast.dismiss(id);
+  }, []);
   const notify = useCallback((notice: ToastInput) => {
     const id = notice.id ?? crypto.randomUUID();
-    setNotices((items) =>
-      [...items.filter((item) => item.id !== id), { ...notice, id }].slice(-4),
-    );
+    toast[notice.tone ?? "info"](notice.title, {
+      id,
+      description: notice.description,
+      duration:
+        notice.tone === "error" || notice.tone === "loading" ? Infinity : 8000,
+      action: notice.href
+        ? {
+            label: "View transaction ↗",
+            onClick: () =>
+              window.open(notice.href, "_blank", "noopener,noreferrer"),
+          }
+        : undefined,
+    });
     return id;
   }, []);
   const value = useMemo(() => ({ notify, dismiss }), [notify, dismiss]);
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <section
-        className="toast-viewport"
-        aria-label="Notifications"
-        tabIndex={-1}
-      >
-        {notices.map((notice) => (
-          <Toast key={notice.id} notice={notice} dismiss={dismiss} />
-        ))}
-      </section>
+      <Toaster
+        position="bottom-right"
+        closeButton
+        visibleToasts={4}
+        toastOptions={{
+          unstyled: true,
+          classNames: {
+            toast:
+              "pointer-events-auto flex w-full items-start gap-3 rounded border border-border bg-card p-4 font-sans text-foreground shadow-lg",
+            title: "text-[13px] font-medium",
+            description: "mt-1 text-xs leading-relaxed text-muted-foreground",
+            closeButton:
+              "absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground",
+            actionButton: "rounded bg-secondary px-2 py-1 text-xs text-primary",
+            success: "border-[#b9cdb0] [&_[data-icon]]:text-primary",
+            error: "border-[#e0b7a9] [&_[data-icon]]:text-destructive",
+            info: "border-[#c5d9e5] [&_[data-icon]]:text-[#406984]",
+            loading: "[&_[data-icon]]:text-primary",
+          },
+        }}
+      />
     </ToastContext.Provider>
   );
 }
-
-function Toast({
-  notice,
-  dismiss,
-}: {
-  notice: Notice;
-  dismiss: (id: string) => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const tone = notice.tone ?? "info";
-  useEffect(() => {
-    if (hovered || focused || tone === "loading" || tone === "error") return;
-    const timer = window.setTimeout(() => dismiss(notice.id), 8000);
-    return () => clearTimeout(timer);
-  }, [notice, dismiss, hovered, focused, tone]);
-  const Icon =
-    tone === "loading"
-      ? LoaderCircle
-      : tone === "success"
-        ? CheckCircle2
-        : tone === "error"
-          ? CircleAlert
-          : Info;
-  return (
-    <div
-      className={`toast toast-${tone}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocus={() => setFocused(true)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget))
-          setFocused(false);
-      }}
-    >
-      <Icon
-        size={19}
-        aria-hidden="true"
-        className={tone === "loading" ? "pending-spinner" : undefined}
-      />
-      <div>
-        <div role={tone === "error" ? "alert" : "status"} aria-atomic="true">
-          <strong>{notice.title}</strong>
-          {notice.description && <p>{notice.description}</p>}
-        </div>
-        {notice.href && (
-          <a href={notice.href} target="_blank" rel="noreferrer">
-            View transaction ↗
-          </a>
-        )}
-      </div>
-      <button
-        className="toast-dismiss"
-        aria-label={`Dismiss ${notice.title}`}
-        onClick={(event) => {
-          const region =
-            event.currentTarget.closest<HTMLElement>(".toast-viewport");
-          if (document.activeElement === event.currentTarget) region?.focus();
-          dismiss(notice.id);
-        }}
-      >
-        <X size={15} aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
 export function useToast() {
   const context = useContext(ToastContext);
   if (!context) throw new Error("ToastProvider is required.");

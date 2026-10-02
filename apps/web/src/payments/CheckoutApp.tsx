@@ -1,3 +1,5 @@
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { PublicKey } from "@solana/web3.js";
@@ -48,36 +50,88 @@ export function CheckoutApp() {
     setId(location.pathname.split("/")[2] ?? "");
   }, []);
   return (
-    <div className="merchant-shell checkout-shell">
-      <a className="skip-link" href="#checkout-main">
+    <div
+      className={
+        "merchant-shell min-h-[100vh] m-auto [border-inline:1px_solid_var(--line)] checkout-shell max-w-[none] max-[640px]:[&_.merchant-header]:gap-[14px] max-[640px]:[&_.merchant-header]:py-[18px] max-[640px]:[&_.merchant-header]:px-[16px] max-[640px]:[&_.merchant-header]:flex-wrap max-[640px]:[&_.merchant-header-actions]:gap-[12px] max-[640px]:[&_.merchant-header_.brand]:text-[20px] max-[640px]:[&_.merchant-footer]:gap-[18px]"
+      }
+    >
+      <a
+        className={
+          "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-white p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
+        }
+        href="#checkout-main"
+      >
         Skip to payment
       </a>
-      <header className="merchant-header">
-        <a className="brand" href="/" aria-label="ReservePay home">
-          <span className="brand-mark" aria-hidden="true">
+      <header
+        className={
+          "merchant-header min-h-[88px] flex items-center gap-[34px] py-[20px] px-[34px] [border-bottom:1px_solid_var(--line)] bg-card max-[860px]:min-h-[78px] max-[860px]:py-[16px] max-[860px]:px-[24px] max-[640px]:p-[16px] max-[640px]:gap-[8px] max-[640px]:flex-wrap max-[640px]:[&_.brand]:text-[17px] max-[640px]:[&_.brand-mark]:w-[24px] max-[640px]:[&_.brand-mark]:h-[24px] max-[640px]:[&_.wallet-button]:min-h-[37px] max-[640px]:[&_.wallet-button]:text-[10px] max-[640px]:[&_.wallet-button]:gap-[6px] max-[640px]:[&_.wallet-button]:py-0 max-[640px]:[&_.wallet-button]:px-[10px]"
+        }
+      >
+        <a
+          className={
+            "brand inline-flex items-center text-[22px] tracking-[-1px] font-[650] whitespace-nowrap max-[900px]:text-[20px] max-[700px]:text-[20px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:[transform:skewY(-12deg)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:rounded-[1.5px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:first-child]:[transform:skewY(-12deg)_translateY(-1px)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:last-child]:[transform:skewY(-12deg)_translateY(1px)_scaleX(0.94)] motion-reduce:[&:hover_.brand-mark_span]:[transform:skewY(-24deg)]"
+          }
+          href="/"
+          aria-label="ReservePay home"
+        >
+          <span
+            className={
+              "brand-mark relative w-[25px] h-[28px] block mr-[10px] [&_span]:absolute [&_span]:left-[1px] [&_span]:w-[22px] [&_span]:h-[6px] [&_span]:bg-primary [&_span]:[transform:skewY(-24deg)] [&_span]:rounded-[1px] [&_span]:[transition:transform_420ms_var(--ease-settle),_border-radius_420ms_ease] [&_span:nth-child(1)]:top-[4px] [&_span:nth-child(2)]:top-[12px] [&_span:nth-child(3)]:top-[20px] max-[700px]:w-[22px] max-[700px]:mr-[7px] max-[700px]:[&_span]:w-[20px]"
+            }
+            aria-hidden="true"
+          >
             <span />
             <span />
             <span />
           </span>
-          ReservePay<span className="brand-period">.</span>
+          ReservePay<span className={"brand-period text-primary"}>.</span>
         </a>
-        <div className="merchant-header-actions">
-          <span className="network-badge">
+        <div
+          className={
+            "merchant-header-actions ml-auto flex items-center gap-[23px] max-[640px]:gap-[10px]"
+          }
+        >
+          <span
+            className={
+              "network-badge inline-flex gap-[7px] items-center [font:11px_var(--mono)] [color:var(--info)] [&>span]:w-[6px] [&>span]:h-[6px] [&>span]:rounded-[50%] [&>span]:bg-[#709155] [&>span]:[background:var(--info)] [&>span]:shadow-[0_0_0_3px_var(--info-soft)] max-[640px]:text-[9px] max-[640px]:gap-[4px] max-[370px]:hidden"
+            }
+          >
             <span />
             Devnet
           </span>
           <WalletControl onChange={onChange} locked={locked} />
         </div>
       </header>
-      <main id="checkout-main" className="checkout-main" tabIndex={-1}>
-        <div className="checkout-heading">
-          <span className="merchant-eyebrow">RESERVEPAY / CHECKOUT</span>
+      <main
+        id="checkout-main"
+        className={
+          "checkout-main max-w-[620px] my-0 mx-auto [padding:52px_24px_24px] max-[640px]:[padding:32px_16px_16px]"
+        }
+        tabIndex={-1}
+      >
+        <div
+          className={
+            "checkout-heading mb-[24px] [&_h1]:text-[clamp(28px,_5vw,_38px)] [&_h1]:tracking-[-1.5px] [&_h1]:font-[500] [&_h1]:leading-[1.18] [&_h1]:my-[14px] [&_h1]:mx-0 [&_h1_em]:not-italic [&_h1_em]:text-[#6d8254] [&_p]:text-muted-foreground [&_p]:text-[13px] [&_p]:leading-[1.6]"
+          }
+        >
+          <span
+            className={
+              "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+            }
+          >
+            RESERVEPAY / CHECKOUT
+          </span>
           <h1>
             A little more <em>peace of mind.</em>
           </h1>
           <p>A direct payment, backed by the merchant’s reserve.</p>
         </div>
-        <div className="devnet-notice">
+        <div
+          className={
+            "devnet-notice flex gap-[10px] py-[13px] px-[16px] [border:1px_solid_#dce5d3] bg-[#edf2e7] rounded-[3px] mb-[29px] [background:var(--info-soft)] border-[#d5e0e7] [&_p]:text-[11px] [&_p]:text-[#626e57] [&_p]:leading-[1.6] [&_p]:[color:var(--info)] [&_strong]:font-[500] [&_strong]:text-[#3e5133] [&_strong]:[color:var(--info)] max-[640px]:p-[12px] max-[640px]:mb-[22px] max-[640px]:items-start"
+          }
+        >
           <ShieldCheck size={18} />
           <p>
             <strong>Devnet test payment.</strong> Use test USDC and a little
@@ -93,21 +147,40 @@ export function CheckoutApp() {
               isCurrent={isCurrent}
             />
           ) : (
-            <section className="reserve-card checkout-card" role="status">
+            <Card
+              as="section"
+              className={
+                "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] checkout-card p-[32px] mt-[20px] [&_h2]:text-[24px] [&_h2]:font-[500] [&_h2]:my-[12px] [&_h2]:mx-0 [&_h2]:[overflow-wrap:anywhere] [&_h2]:tracking-[-0.6px] [&>p]:leading-[1.7] [&>p]:text-muted-foreground max-[640px]:py-[24px] max-[640px]:px-[20px]"
+              }
+              role="status"
+            >
               {paymentsConfigured ? (
                 <>
-                  <LoaderCircle size={24} className="pending-spinner" /> Loading
-                  payment details…
+                  <LoaderCircle
+                    size={24}
+                    className={
+                      "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                    }
+                  />{" "}
+                  Loading payment details…
                 </>
               ) : (
                 "Payment service is not configured for this deployment."
               )}
-            </section>
+            </Card>
           )}
         </PaymentBoundary>
-        <footer className="merchant-footer">
+        <footer
+          className={
+            "merchant-footer flex justify-between gap-[14px] py-[23px] px-0 [border-top:1px_solid_var(--line)] mt-[29px] [font:9px_var(--mono)] text-muted-foreground items-center flex-wrap [&_span]:inline-flex [&_span]:gap-[7px] [&_span]:items-center [&_a]:inline-flex [&_a]:gap-[7px] [&_a]:items-center max-[640px]:text-[8px] max-[640px]:gap-[8px]"
+          }
+        >
           <span>
-            <span className="status-dot" />
+            <span
+              className={
+                'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+              }
+            />
             On-chain payments · Solana devnet
           </span>
           <a href="/app">
@@ -318,28 +391,59 @@ function Checkout({
   };
   if (link === undefined)
     return (
-      <section className="reserve-card checkout-card" role="status">
+      <Card
+        as="section"
+        className={
+          "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] checkout-card p-[32px] mt-[20px] [&_h2]:text-[24px] [&_h2]:font-[500] [&_h2]:my-[12px] [&_h2]:mx-0 [&_h2]:[overflow-wrap:anywhere] [&_h2]:tracking-[-0.6px] [&>p]:leading-[1.7] [&>p]:text-muted-foreground max-[640px]:py-[24px] max-[640px]:px-[20px]"
+        }
+        role="status"
+      >
         Loading payment details…
-      </section>
+      </Card>
     );
   if (!link)
     return (
-      <section className="reserve-card checkout-card">
+      <Card
+        as="section"
+        className={
+          "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] checkout-card p-[32px] mt-[20px] [&_h2]:text-[24px] [&_h2]:font-[500] [&_h2]:my-[12px] [&_h2]:mx-0 [&_h2]:[overflow-wrap:anywhere] [&_h2]:tracking-[-0.6px] [&>p]:leading-[1.7] [&>p]:text-muted-foreground max-[640px]:py-[24px] max-[640px]:px-[20px]"
+        }
+      >
         <h2>Payment link not found.</h2>
         <p>Check the URL or ask the merchant for their payment link.</p>
-      </section>
+      </Card>
     );
   if (link.receipt)
     return <Receipt link={link} buyer={active?.account.address} />;
   return (
-    <section className="reserve-card checkout-card" aria-busy={Boolean(busy)}>
-      <span className="merchant-eyebrow">PAYMENT FOR</span>
+    <Card
+      as="section"
+      className={
+        "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] checkout-card p-[32px] mt-[20px] [&_h2]:text-[24px] [&_h2]:font-[500] [&_h2]:my-[12px] [&_h2]:mx-0 [&_h2]:[overflow-wrap:anywhere] [&_h2]:tracking-[-0.6px] [&>p]:leading-[1.7] [&>p]:text-muted-foreground max-[640px]:py-[24px] max-[640px]:px-[20px]"
+      }
+      aria-busy={Boolean(busy)}
+    >
+      <span
+        className={
+          "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+        }
+      >
+        PAYMENT FOR
+      </span>
       <h2>{link.title}</h2>
-      <div className="checkout-amount">
+      <div
+        className={
+          "checkout-amount text-[clamp(32px,_7vw,_46px)] tracking-[-1.8px] font-[500] my-[24px] mx-0 [overflow-wrap:anywhere] [&>span]:[font:12px_var(--mono)] [&>span]:text-muted-foreground [&>span]:ml-[10px] [&>span]:tracking-[0]"
+        }
+      >
         {exactAmount(BigInt(link.amount))}
         <span>USDC</span>
       </div>
-      <dl className="checkout-details">
+      <dl
+        className={
+          "checkout-details [border-block:1px_solid_var(--line)] py-[10px] px-0 [margin:0_0_22px] [&>div]:flex [&>div]:justify-between [&>div]:items-baseline [&>div]:gap-[24px] [&>div]:py-[10px] [&>div]:px-0 [&>div]:text-[12px] [&_dt]:text-muted-foreground [&_dt]:shrink-[0] [&_dd]:m-0 [&_dd]:text-right [&_dd]:min-w-[0] [&_dd]:leading-[1.6] max-[640px]:[&>div]:gap-[12px]"
+        }
+      >
         <div>
           <dt>Network</dt>
           <dd>Solana devnet</dd>
@@ -352,7 +456,9 @@ function Checkout({
           <dt>Merchant wallet</dt>
           <dd>
             <a
-              className="payment-address"
+              className={
+                "payment-address [font:10px_var(--mono)] [overflow-wrap:anywhere] [&_svg]:inline [&_svg]:[vertical-align:middle] [&_svg]:ml-[4px]"
+              }
               href={explorer(link.merchant)}
               target="_blank"
               rel="noreferrer"
@@ -363,7 +469,11 @@ function Checkout({
           </dd>
         </div>
       </dl>
-      <div className="checkout-protection">
+      <div
+        className={
+          "checkout-protection flex gap-[12px] p-[16px] bg-[#edf1e7] text-[#4b653c] rounded-[4px] mb-[24px] [&_svg]:shrink-[0] [&_svg]:mt-[2px] [&_p]:text-[11px] [&_p]:leading-[1.8] [&_p]:m-0"
+        }
+      >
         <ShieldCheck size={20} />
         <p>
           The merchant’s reserve backs the full payment during your protection
@@ -372,22 +482,38 @@ function Checkout({
         </p>
       </div>
       {!active && (
-        <p className="payment-empty">Connect your wallet above to continue.</p>
+        <p
+          className={
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+          }
+        >
+          Connect your wallet above to continue.
+        </p>
       )}
       {active && !active.wallet.signTransaction && (
-        <p className="payment-error">
+        <p
+          className={
+            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+          }
+        >
           This wallet does not support devnet transaction signing. Switch
           wallets to continue.
         </p>
       )}
       {active?.account.address === link.merchant && (
-        <p className="payment-fineprint">
+        <p
+          className={
+            "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
+          }
+        >
           You’re viewing your own link. Share it with a buyer using another
           wallet.
         </p>
       )}
-      <button
-        className="button button-green checkout-pay"
+      <Button
+        variant="brand"
+        size="unstyled"
+        className={"button button-green checkout-pay w-[100%] mt-[12px]"}
         disabled={
           !active?.wallet.signTransaction ||
           active?.account.address === link.merchant ||
@@ -397,7 +523,12 @@ function Checkout({
         onClick={() => void pay()}
       >
         {busy || pending ? (
-          <LoaderCircle size={17} className="pending-spinner" />
+          <LoaderCircle
+            size={17}
+            className={
+              "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+            }
+          />
         ) : (
           <LockKeyhole size={16} />
         )}
@@ -405,24 +536,40 @@ function Checkout({
           (pending
             ? "Payment in progress…"
             : `Pay ${exactAmount(BigInt(link.amount))} USDC`)}
-      </button>
-      <p className="payment-fineprint">
+      </Button>
+      <p
+        className={
+          "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
+        }
+      >
         A network fee and account rent in devnet SOL are shown in your wallet.
         Each link accepts one payment.
       </p>
       {(error || journalError) && (
-        <p role="alert" className="payment-error">
+        <p
+          role="alert"
+          className={
+            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+          }
+        >
           {error || journalError}
         </p>
       )}
       {message && (
-        <p className="payment-fineprint" role="status">
+        <p
+          className={
+            "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
+          }
+          role="status"
+        >
           {message}
         </p>
       )}
       {pending && (
         <a
-          className="payment-order-link"
+          className={
+            "payment-order-link inline-flex gap-[5px] items-center text-[#476238] text-[11px]"
+          }
           href={explorer(pending.signature, "tx")}
           target="_blank"
           rel="noreferrer"
@@ -430,7 +577,7 @@ function Checkout({
           View pending transaction <ArrowUpRight size={13} />
         </a>
       )}
-    </section>
+    </Card>
   );
 }
 function Receipt({
@@ -442,27 +589,54 @@ function Receipt({
 }) {
   const receipt = link.receipt!;
   return (
-    <section className="reserve-card checkout-card checkout-receipt">
-      <span className="receipt-check">
+    <Card
+      as="section"
+      className={
+        "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] checkout-card p-[32px] mt-[20px] [&_h2]:text-[24px] [&_h2]:font-[500] [&_h2]:my-[12px] [&_h2]:mx-0 [&_h2]:[overflow-wrap:anywhere] [&_h2]:tracking-[-0.6px] [&>p]:leading-[1.7] [&>p]:text-muted-foreground max-[640px]:py-[24px] max-[640px]:px-[20px] checkout-receipt [&>.merchant-eyebrow]:block [&>.merchant-eyebrow]:mt-[18px]"
+      }
+    >
+      <span
+        className={
+          "receipt-check grid place-items-center w-[54px] h-[54px] bg-[#eaf0e2] text-[#476238] rounded-[50%]"
+        }
+      >
         <Check size={28} />
       </span>
-      <span className="merchant-eyebrow">VERIFIED ON SOLANA DEVNET</span>
+      <span
+        className={
+          "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+        }
+      >
+        VERIFIED ON SOLANA DEVNET
+      </span>
       <h2>
         {receipt.status === "refunded"
           ? "Payment refunded."
           : "Payment received."}
       </h2>
       <p>{link.title}</p>
-      <div className="checkout-amount">
+      <div
+        className={
+          "checkout-amount text-[clamp(32px,_7vw,_46px)] tracking-[-1.8px] font-[500] my-[24px] mx-0 [overflow-wrap:anywhere] [&>span]:[font:12px_var(--mono)] [&>span]:text-muted-foreground [&>span]:ml-[10px] [&>span]:tracking-[0]"
+        }
+      >
         {exactAmount(BigInt(link.amount))}
         <span>USDC</span>
       </div>
       {buyer && buyer !== receipt.buyer && (
-        <p className="payment-fineprint">
+        <p
+          className={
+            "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
+          }
+        >
           This link was paid by a different wallet.
         </p>
       )}
-      <dl className="checkout-details">
+      <dl
+        className={
+          "checkout-details [border-block:1px_solid_var(--line)] py-[10px] px-0 [margin:0_0_22px] [&>div]:flex [&>div]:justify-between [&>div]:items-baseline [&>div]:gap-[24px] [&>div]:py-[10px] [&>div]:px-0 [&>div]:text-[12px] [&_dt]:text-muted-foreground [&_dt]:shrink-[0] [&_dd]:m-0 [&_dd]:text-right [&_dd]:min-w-[0] [&_dd]:leading-[1.6] max-[640px]:[&>div]:gap-[12px]"
+        }
+      >
         <div>
           <dt>Status</dt>
           <dd>{receipt.status === "paid" ? "Paid" : receipt.status}</dd>
@@ -484,21 +658,33 @@ function Receipt({
         </div>
         <div>
           <dt>Buyer wallet</dt>
-          <dd className="payment-address">{receipt.buyer}</dd>
+          <dd
+            className={
+              "payment-address [font:10px_var(--mono)] [overflow-wrap:anywhere] [&_svg]:inline [&_svg]:[vertical-align:middle] [&_svg]:ml-[4px]"
+            }
+          >
+            {receipt.buyer}
+          </dd>
         </div>
       </dl>
-      <a
-        className="button button-green checkout-pay"
-        href={explorer(receipt.order)}
-        target="_blank"
-        rel="noreferrer"
+      <Button asChild variant="brand" size="unstyled">
+        <a
+          className={"button button-green checkout-pay w-[100%] mt-[12px]"}
+          href={explorer(receipt.order)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          View on-chain order <ArrowUpRight size={16} />
+        </a>
+      </Button>
+      <p
+        className={
+          "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
+        }
       >
-        View on-chain order <ArrowUpRight size={16} />
-      </a>
-      <p className="payment-fineprint">
         Keep this URL as your receipt. The merchant can see the same confirmed
         order in their dashboard.
       </p>
-    </section>
+    </Card>
   );
 }

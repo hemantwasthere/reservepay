@@ -1,3 +1,9 @@
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import { useEffect, useId, useRef, useState } from "react";
 import { getWallets } from "@wallet-standard/app";
 import {
@@ -206,25 +212,6 @@ export function WalletControl({
     return () => window.removeEventListener("storage", sync);
   }, []);
 
-  useEffect(() => {
-    if (!panel) return;
-    wrap.current
-      ?.querySelector<HTMLElement>(
-        ".wallet-panel button:not(:disabled), .wallet-panel a",
-      )
-      ?.focus();
-    const dismiss = (event: Event) => {
-      if (event.target instanceof Node && !wrap.current?.contains(event.target))
-        setPanel(null);
-    };
-    document.addEventListener("pointerdown", dismiss);
-    document.addEventListener("focusin", dismiss);
-    return () => {
-      document.removeEventListener("pointerdown", dismiss);
-      document.removeEventListener("focusin", dismiss);
-    };
-  }, [panel]);
-
   const connect = async (wallet: WalletOption) => {
     if (pending.current || locked) return;
     pending.current = true;
@@ -293,184 +280,266 @@ export function WalletControl({
   };
 
   return (
-    <div
-      className="wallet-wrap"
-      ref={wrap}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.stopPropagation();
-          close();
-          setMessage("");
-        }
-      }}
+    <Popover
+      open={Boolean(panel)}
+      onOpenChange={(open) =>
+        setPanel(open ? (active ? "manage" : "choose") : null)
+      }
     >
-      <button
-        ref={trigger}
-        className="button button-dark wallet-button"
-        aria-label={
-          active
-            ? `Wallet options for ${active.wallet.name}, ${shorten(active.account.address)}`
-            : undefined
-        }
-        aria-keyshortcuts="Alt+Shift+W"
-        aria-busy={Boolean(busy) || initializing}
-        aria-expanded={Boolean(panel)}
-        aria-controls={panelId}
-        disabled={Boolean(busy) || initializing || locked}
-        onClick={() => {
-          dismiss("wallet-message");
-          setPanel(panel ? null : active ? "manage" : "choose");
+      <div
+        className={"wallet-wrap relative"}
+        ref={wrap}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            close();
+            setMessage("");
+          }
         }}
       >
-        {busy || initializing ? (
-          <LoaderCircle size={15} className="pending-spinner" />
-        ) : active ? (
-          <Check size={15} />
-        ) : (
-          <Wallet size={15} />
-        )}
-        {busy ||
-          (initializing
-            ? "Loading wallet…"
-            : active
-              ? shorten(active.account.address)
-              : "Connect wallet")}
-        {active && !busy && (
-          <ChevronDown size={12} className="wallet-chevron" />
-        )}
-      </button>
-      {panel && (
-        <div
-          className="wallet-panel"
-          id={panelId}
-          role="region"
-          aria-label="Wallet options"
-        >
-          {panel === "manage" && active ? (
-            <>
-              <div className="wallet-panel-heading">
-                <span>{active.wallet.name}</span>
-                <span className="status-dot">CONNECTED</span>
-              </div>
-              <p className="wallet-address">{active.account.address}</p>
-              <button
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(active.account.address);
-                    dismiss("wallet-copy");
-                    setCopiedAddress(active.account.address);
-                  } catch {
-                    notify({
-                      id: "wallet-copy",
-                      title: "Could not copy address",
-                      description:
-                        "Select the address above and copy it manually.",
-                      tone: "error",
-                    });
-                  }
-                }}
-              >
-                {copiedAddress === active.account.address ? (
-                  <Check size={14} aria-hidden="true" />
-                ) : (
-                  <Copy size={14} aria-hidden="true" />
-                )}
-                <span aria-live="polite">
-                  {copiedAddress === active.account.address
-                    ? "Copied"
-                    : "Copy address"}
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  setMessage("");
-                  setPanel("choose");
-                }}
-                disabled={Boolean(busy) || locked}
-              >
-                <ArrowLeftRight size={14} /> Switch wallet
-              </button>
-              <button onClick={disconnect} disabled={Boolean(busy) || locked}>
-                <LogOut size={14} /> Disconnect
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="wallet-panel-heading">
-                {active ? (
-                  <button
-                    className="wallet-back"
-                    aria-label="Back to wallet options"
-                    onClick={() => setPanel("manage")}
-                  >
-                    <ArrowLeft size={13} />
-                  </button>
-                ) : (
-                  <Wallet size={13} />
-                )}
-                <span>{active ? "SWITCH WALLET" : "CHOOSE WALLET"}</span>
-              </div>
-              {active &&
-                accounts.length > 1 &&
-                accounts.map((account) => (
-                  <button
-                    key={account.address}
-                    disabled={Boolean(busy) || locked}
-                    onClick={() => {
-                      updateActive({ wallet: active.wallet, account });
-                      close();
-                    }}
-                  >
-                    <span>{account.label ?? shorten(account.address)}</span>
-                    {account.address === active.account.address && (
-                      <Check size={13} />
-                    )}
-                  </button>
-                ))}
-              {options.map((wallet, index) => (
-                <button
-                  key={`${wallet.name}-${index}`}
-                  onClick={() => connect(wallet)}
-                  disabled={
-                    Boolean(busy) ||
-                    locked ||
-                    wallet.identity === active?.wallet.identity
+        <PopoverTrigger asChild>
+          <Button
+            variant="ink"
+            size="unstyled"
+            ref={trigger}
+            className={
+              'button button-dark wallet-button min-h-[37px] text-[11px] px-[14px] gap-[8px] max-[700px]:text-[10px] max-[700px]:min-h-[34px] max-[700px]:py-0 max-[700px]:px-[10px] max-[700px]:[&_svg]:w-[13px] [&[aria-expanded="true"]_.wallet-chevron]:[transform:rotate(180deg)]'
+            }
+            aria-label={
+              active
+                ? `Wallet options for ${active.wallet.name}, ${shorten(active.account.address)}`
+                : undefined
+            }
+            aria-keyshortcuts="Alt+Shift+W"
+            aria-busy={Boolean(busy) || initializing}
+            aria-expanded={Boolean(panel)}
+            aria-controls={panelId}
+            disabled={Boolean(busy) || initializing || locked}
+            onClick={() => {
+              dismiss("wallet-message");
+            }}
+          >
+            {busy || initializing ? (
+              <LoaderCircle
+                size={15}
+                className={
+                  "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                }
+              />
+            ) : active ? (
+              <Check size={15} />
+            ) : (
+              <Wallet size={15} />
+            )}
+            {busy ||
+              (initializing
+                ? "Loading wallet…"
+                : active
+                  ? shorten(active.account.address)
+                  : "Connect wallet")}
+            {active && !busy && (
+              <ChevronDown
+                size={12}
+                className={"wallet-chevron [transition:transform_180ms_ease]"}
+              />
+            )}
+          </Button>
+        </PopoverTrigger>
+        {panel && (
+          <PopoverContent
+            align="end"
+            sideOffset={10}
+            className={
+              "wallet-panel p-[10px] z-[30] bg-background [border:1px_solid_var(--line)] shadow-[0_12px_30px_#24282012] rounded-[6px] animate-[feedback-in_180ms_var(--ease-settle)_both] [&_button]:flex [&_button]:items-center [&_button]:gap-[10px] [&_button]:w-[100%] [&_button]:p-[8px] [&_button]:[border:0] [&_button]:bg-transparent [&_button]:text-foreground [&_button]:[font:12px_var(--font-sans)] [&_button]:text-left [&_button]:[transition:background-color_180ms_ease] [&_button]:min-h-[42px] [&_button]:rounded-[3px] [&_button:not(:disabled):hover]:bg-[#e8eddf] [&_button:disabled]:opacity-[0.5] [&_button:disabled]:cursor-default [&_button>span+svg]:ml-auto [&_.wallet-back]:w-[24px] [&_.wallet-back]:min-h-[24px] [&_.wallet-back]:p-0 [&_.wallet-message]:static [&_.wallet-message]:w-[auto] [&_.wallet-message]:mt-[8px] [&_.wallet-message]:py-[10px] [&_.wallet-message]:px-[8px] [&_.wallet-message]:[border:0] [&_.wallet-message]:[border-top:1px_solid_var(--line)] [&_.wallet-message]:shadow-[none] [&_.wallet-message]:bg-transparent [&_.wallet-message]:text-[11px] [&_.wallet-message_button]:w-[auto] [&_.wallet-message_button]:min-h-[auto] [&_.wallet-message_button]:p-0 [&_button:has(.lucide-log-out)]:[color:var(--danger)] max-[640px]:max-w-[calc(100vw_-_34px)] relative top-auto right-auto w-[min(340px,calc(100vw-32px))]"
+            }
+            id={panelId}
+            aria-label="Wallet options"
+          >
+            {panel === "manage" && active ? (
+              <>
+                <div
+                  className={
+                    "wallet-panel-heading flex items-center gap-[8px] py-[9px] px-[8px] text-muted-foreground [font:9px_var(--mono)] tracking-[0.5px] [&_.status-dot]:ml-auto [&_.status-dot]:text-[7px]"
                   }
                 >
-                  <Wallet size={14} />
-                  <span>{wallet.name}</span>
-                  {wallet.identity === active?.wallet.identity ? (
-                    <Check size={13} />
-                  ) : (
-                    <span className="wallet-detected">DETECTED</span>
-                  )}
-                </button>
-              ))}
-              {!options.length && (
-                <p className="wallet-hint">
-                  No Solana wallet detected. Open this page in your wallet’s
-                  browser, or install{" "}
-                  <a
-                    href="https://phantom.com/"
-                    target="_blank"
-                    rel="noreferrer"
+                  <span>{active.wallet.name}</span>
+                  <span
+                    className={
+                      'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+                    }
                   >
-                    Phantom
-                  </a>
-                  .
+                    CONNECTED
+                  </span>
+                </div>
+                <p
+                  className={
+                    "wallet-address [margin:0_8px_10px] pb-[14px] [border-bottom:1px_solid_var(--line)] [font:10px/1.7_var(--mono)] [overflow-wrap:anywhere] text-muted-foreground"
+                  }
+                >
+                  {active.account.address}
                 </p>
-              )}
-              {active && (
-                <p className="wallet-hint">
-                  For another account in {active.wallet.name}, switch inside
-                  your wallet. Your address updates here automatically.
-                </p>
-              )}
-            </>
-          )}
-          {hint && <p className="wallet-hint">{hint}</p>}
-        </div>
-      )}
-    </div>
+                <Button
+                  variant="unstyled"
+                  size="unstyled"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        active.account.address,
+                      );
+                      dismiss("wallet-copy");
+                      setCopiedAddress(active.account.address);
+                    } catch {
+                      notify({
+                        id: "wallet-copy",
+                        title: "Could not copy address",
+                        description:
+                          "Select the address above and copy it manually.",
+                        tone: "error",
+                      });
+                    }
+                  }}
+                >
+                  {copiedAddress === active.account.address ? (
+                    <Check size={14} aria-hidden="true" />
+                  ) : (
+                    <Copy size={14} aria-hidden="true" />
+                  )}
+                  <span aria-live="polite">
+                    {copiedAddress === active.account.address
+                      ? "Copied"
+                      : "Copy address"}
+                  </span>
+                </Button>
+                <Button
+                  variant="unstyled"
+                  size="unstyled"
+                  onClick={() => {
+                    setMessage("");
+                    setPanel("choose");
+                  }}
+                  disabled={Boolean(busy) || locked}
+                >
+                  <ArrowLeftRight size={14} /> Switch wallet
+                </Button>
+                <Button
+                  variant="unstyled"
+                  size="unstyled"
+                  onClick={disconnect}
+                  disabled={Boolean(busy) || locked}
+                >
+                  <LogOut size={14} /> Disconnect
+                </Button>
+              </>
+            ) : (
+              <>
+                <div
+                  className={
+                    "wallet-panel-heading flex items-center gap-[8px] py-[9px] px-[8px] text-muted-foreground [font:9px_var(--mono)] tracking-[0.5px] [&_.status-dot]:ml-auto [&_.status-dot]:text-[7px]"
+                  }
+                >
+                  {active ? (
+                    <Button
+                      variant="unstyled"
+                      size="unstyled"
+                      className={"wallet-back"}
+                      aria-label="Back to wallet options"
+                      onClick={() => setPanel("manage")}
+                    >
+                      <ArrowLeft size={13} />
+                    </Button>
+                  ) : (
+                    <Wallet size={13} />
+                  )}
+                  <span>{active ? "SWITCH WALLET" : "CHOOSE WALLET"}</span>
+                </div>
+                {active &&
+                  accounts.length > 1 &&
+                  accounts.map((account) => (
+                    <Button
+                      variant="unstyled"
+                      size="unstyled"
+                      key={account.address}
+                      disabled={Boolean(busy) || locked}
+                      onClick={() => {
+                        updateActive({ wallet: active.wallet, account });
+                        close();
+                      }}
+                    >
+                      <span>{account.label ?? shorten(account.address)}</span>
+                      {account.address === active.account.address && (
+                        <Check size={13} />
+                      )}
+                    </Button>
+                  ))}
+                {options.map((wallet, index) => (
+                  <Button
+                    variant="unstyled"
+                    size="unstyled"
+                    key={`${wallet.name}-${index}`}
+                    onClick={() => connect(wallet)}
+                    disabled={
+                      Boolean(busy) ||
+                      locked ||
+                      wallet.identity === active?.wallet.identity
+                    }
+                  >
+                    <Wallet size={14} />
+                    <span>{wallet.name}</span>
+                    {wallet.identity === active?.wallet.identity ? (
+                      <Check size={13} />
+                    ) : (
+                      <span
+                        className={
+                          "wallet-detected ml-auto [font:7px_var(--mono)] text-muted-foreground"
+                        }
+                      >
+                        DETECTED
+                      </span>
+                    )}
+                  </Button>
+                ))}
+                {!options.length && (
+                  <p
+                    className={
+                      "wallet-hint [margin:10px_8px_5px] text-[11px] leading-[1.6] text-muted-foreground [&_a]:underline [&_a]:text-primary"
+                    }
+                  >
+                    No Solana wallet detected. Open this page in your wallet’s
+                    browser, or install{" "}
+                    <a
+                      href="https://phantom.com/"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Phantom
+                    </a>
+                    .
+                  </p>
+                )}
+                {active && (
+                  <p
+                    className={
+                      "wallet-hint [margin:10px_8px_5px] text-[11px] leading-[1.6] text-muted-foreground [&_a]:underline [&_a]:text-primary"
+                    }
+                  >
+                    For another account in {active.wallet.name}, switch inside
+                    your wallet. Your address updates here automatically.
+                  </p>
+                )}
+              </>
+            )}
+            {hint && (
+              <p
+                className={
+                  "wallet-hint [margin:10px_8px_5px] text-[11px] leading-[1.6] text-muted-foreground [&_a]:underline [&_a]:text-primary"
+                }
+              >
+                {hint}
+              </p>
+            )}
+          </PopoverContent>
+        )}
+      </div>
+    </Popover>
   );
 }

@@ -2,10 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Protected checkout | ReservePay</title>
+    <title>Payment links | ReservePay</title>
     <meta
       name="description"
-      content="Pay a merchant with protected test USDC on Solana devnet."
+      content="Create and track protected ReservePay payment links on Solana devnet."
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f6f7f2" />
@@ -29,7 +29,7 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/payments/main.tsx"></script>
+    <div id="root" data-page="payments"></div>
+    <script type="module" src="/src/merchant/main.tsx"></script>
   </body>
 </html>

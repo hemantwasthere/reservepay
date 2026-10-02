@@ -19,12 +19,12 @@ export function render() {
   );
 }
 
-export function renderMerchant() {
+export function renderMerchant(page: "overview" | "payments" = "overview") {
   return renderToString(
     <StrictMode>
       <ToastProvider>
         <PaymentProvider>
-          <MerchantApp />
+          <MerchantApp page={page} />
         </PaymentProvider>
       </ToastProvider>
     </StrictMode>,

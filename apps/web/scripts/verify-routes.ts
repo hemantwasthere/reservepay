@@ -16,6 +16,10 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     "/app/index.html",
     "/app?source=header",
     "/app/?source=header",
+    "/app/payments",
+    "/app/payments/",
+    "/app/payments?source=sidebar",
+    "/app/payments/index.html",
     "/pay/test-link",
     "/pay/test-link/",
     "/pay/test-link?source=merchant",
@@ -27,6 +31,7 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     const html = await response.text();
     const dashboard = path.startsWith("/app");
     const checkout = path.startsWith("/pay");
+    const payments = path.startsWith("/app/payments");
     assert.ok(
       html.includes(
         dashboard
@@ -47,10 +52,30 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     );
     assert.ok(
       html.includes(
-        `<title>${dashboard ? "Merchant dashboard | ReservePay" : checkout ? "Protected checkout | ReservePay" : site.title}</title>`,
+        `<title>${payments ? "Payment links | ReservePay" : dashboard ? "Merchant dashboard | ReservePay" : checkout ? "Protected checkout | ReservePay" : site.title}</title>`,
       ),
       `${name}: wrong page at ${path}`,
     );
+    if (dashboard) {
+      assert.equal(
+        html.includes("Your next payment,"),
+        payments,
+        `${name}: payment links must have their own page`,
+      );
+      assert.equal(
+        html.includes("Your reserve,"),
+        !payments,
+        `${name}: overview must not appear on payment links`,
+      );
+      assert.ok(
+        html.includes(
+          payments
+            ? 'href="/app/payments" aria-label="Payment links" aria-current="page"'
+            : 'href="/app" aria-label="Overview" aria-current="page"',
+        ),
+        `${name}: active workspace navigation`,
+      );
+    }
     assert.equal(
       html.includes('name="robots" content="noindex, nofollow"'),
       dashboard || checkout,
