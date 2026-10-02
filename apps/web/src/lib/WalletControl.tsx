@@ -41,10 +41,12 @@ export type WalletConnection = {
 export function WalletControl({
   onChange,
   onLoadingChange,
+  onSignOut,
   locked = false,
 }: {
   onChange?: (connection: WalletConnection | null) => void;
   onLoadingChange?: (loading: boolean) => void;
+  onSignOut?: () => void;
   locked?: boolean;
 }) {
   const [options, setOptions] = useState<WalletOption[]>([]);
@@ -267,6 +269,9 @@ export function WalletControl({
       updateActive(null);
       setAccounts([]);
       close();
+      try {
+        onSignOut?.();
+      } catch {}
     } catch {
       setMessage(
         "Could not disconnect. Please try again or disconnect in your wallet.",

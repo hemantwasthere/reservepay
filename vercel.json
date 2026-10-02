@@ -32,6 +32,14 @@
     {
       "source": "/app/payments/",
       "destination": "/app/payments/index.html"
+    },
+    {
+      "source": "/app/profile",
+      "destination": "/app/profile/index.html"
+    },
+    {
+      "source": "/app/profile/",
+      "destination": "/app/profile/index.html"
     }
   ],
   "headers": [

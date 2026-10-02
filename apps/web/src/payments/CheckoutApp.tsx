@@ -203,6 +203,10 @@ function Checkout({
   isCurrent: (value: WalletConnection) => boolean;
 }) {
   const link = useQuery(api.payments.get, { id });
+  const merchantProfile = useQuery(
+    api.merchants.publicProfile,
+    link ? { wallet: link.merchant } : "skip",
+  );
   const sync = useAction(api.paymentActions.sync);
   const [pending, setPending] = useState<PendingPayment | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -431,6 +435,23 @@ function Checkout({
         PAYMENT FOR
       </span>
       <h2>{link.title}</h2>
+      {merchantProfile && (
+        <p
+          className={
+            "checkout-merchant text-[13px] text-muted-foreground [margin:0_0_4px] [&_strong]:text-foreground [&_strong]:font-[500] [&_a]:text-primary"
+          }
+        >
+          Pay <strong>{merchantProfile.displayName}</strong>
+          {merchantProfile.website && (
+            <>
+              {" · "}
+              <a href={merchantProfile.website} target="_blank" rel="noreferrer">
+                {merchantProfile.website.replace(/^https:\/\//, "")}
+              </a>
+            </>
+          )}
+        </p>
+      )}
       <div
         className={
           "checkout-amount text-[clamp(32px,_7vw,_46px)] tracking-[-1.8px] font-[500] my-[24px] mx-0 [overflow-wrap:anywhere] [&>span]:[font:12px_var(--mono)] [&>span]:text-muted-foreground [&>span]:ml-[10px] [&>span]:tracking-[0]"

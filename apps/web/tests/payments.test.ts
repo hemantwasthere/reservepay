@@ -11,6 +11,7 @@ import {
   validateTerms,
   type PaymentTerms,
 } from "../src/payments/terms";
+import { signIn } from "./session";
 const { read, readOrder } = vi.hoisted(() => ({
   read: vi.fn(),
   readOrder: vi.fn(),
@@ -43,10 +44,22 @@ describe("merchant-approved payment links", () => {
       request = approved(terms());
     const id = await t.action(api.paymentActions.create, request);
     expect(await t.action(api.paymentActions.create, request)).toBe(id);
-    expect(
-      await t.query(api.payments.list, { merchant: request.terms.merchant }),
-    ).toHaveLength(1);
+    const { token } = await signIn(t, seller);
+    expect(await t.query(api.payments.list, { session: token })).toHaveLength(1);
     expect((await t.query(api.payments.get, { id }))?.receipt).toBeUndefined();
+  });
+  it("only lists links for the signed-in wallet", async () => {
+    read.mockResolvedValue({ ready: true, registered: true });
+    const t = convexTest(schema, modules);
+    await t.action(api.paymentActions.create, approved(terms()));
+    const stranger = Keypair.generate();
+    const { token } = await signIn(t, stranger);
+    expect(await t.query(api.payments.list, { session: token })).toHaveLength(0);
+    await expect(
+      t.query(api.payments.list, { session: "ff".repeat(32) }),
+    ).rejects.toThrow("Sign in again.");
+    const { token: own } = await signIn(t, seller);
+    expect(await t.query(api.payments.list, { session: own })).toHaveLength(1);
   });
   it("rejects forged approvals, changed terms, and expired approvals", async () => {
     const t = convexTest(schema, modules),

@@ -20,6 +20,9 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     "/app/payments/",
     "/app/payments?source=sidebar",
     "/app/payments/index.html",
+    "/app/profile",
+    "/app/profile/",
+    "/app/profile/index.html",
     "/pay/test-link",
     "/pay/test-link/",
     "/pay/test-link?source=merchant",
@@ -32,6 +35,7 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     const dashboard = path.startsWith("/app");
     const checkout = path.startsWith("/pay");
     const payments = path.startsWith("/app/payments");
+    const profile = path.startsWith("/app/profile");
     assert.ok(
       html.includes(
         dashboard
@@ -52,26 +56,36 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     );
     assert.ok(
       html.includes(
-        `<title>${payments ? "Payment links | ReservePay" : dashboard ? "Merchant dashboard | ReservePay" : checkout ? "Protected checkout | ReservePay" : site.title}</title>`,
+        `<title>${payments ? "Payment links | ReservePay" : profile ? "Profile | ReservePay" : dashboard ? "Merchant dashboard | ReservePay" : checkout ? "Protected checkout | ReservePay" : site.title}</title>`,
       ),
       `${name}: wrong page at ${path}`,
     );
     if (dashboard) {
-      assert.equal(
-        html.includes("Your next payment,"),
-        payments,
-        `${name}: payment links must have their own page`,
+      const marker = payments
+        ? "Your next payment,"
+        : profile
+          ? "Your name,"
+          : "Your reserve,";
+      assert.ok(
+        html.includes(marker),
+        `${name}: ${path} is missing its own page heading`,
       );
-      assert.equal(
-        html.includes("Your reserve,"),
-        !payments,
-        `${name}: overview must not appear on payment links`,
-      );
+      for (const other of [
+        "Your next payment,",
+        "Your name,",
+        "Your reserve,",
+      ].filter((heading) => heading !== marker))
+        assert.ok(
+          !html.includes(other),
+          `${name}: another page's heading appears at ${path}`,
+        );
       assert.ok(
         html.includes(
           payments
             ? 'href="/app/payments" aria-label="Payment links" aria-current="page"'
-            : 'href="/app" aria-label="Overview" aria-current="page"',
+            : profile
+              ? 'href="/app/profile" aria-label="Profile" aria-current="page"'
+              : 'href="/app" aria-label="Overview" aria-current="page"',
         ),
         `${name}: active workspace navigation`,
       );

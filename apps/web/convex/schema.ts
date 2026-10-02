@@ -9,6 +9,32 @@ export default defineSchema({
   })
     .index("by_merchant", ["merchant"])
     .index("by_reference", ["merchant", "reference"]),
+  authNonces: defineTable({
+    wallet: v.string(),
+    nonce: v.string(),
+    issuedAt: v.number(),
+    expiresAt: v.number(),
+    used: v.boolean(),
+  })
+    .index("by_nonce", ["nonce"])
+    .index("by_wallet", ["wallet"]),
+  sessions: defineTable({
+    wallet: v.string(),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_token", ["tokenHash"])
+    .index("by_wallet", ["wallet"]),
+  merchants: defineTable({
+    wallet: v.string(),
+    displayName: v.string(),
+    website: v.optional(v.string()),
+    contactEmail: v.optional(v.string()),
+    description: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_wallet", ["wallet"]),
   demoOrders: defineTable({
     sessionKey: v.string(),
     requestId: v.string(),

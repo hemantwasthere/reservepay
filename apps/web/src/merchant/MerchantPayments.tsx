@@ -4,16 +4,20 @@ import { LoaderCircle, ArrowUpRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PaymentLinks } from "../payments/PaymentLinks";
+import { SignInCard } from "./SignInCard";
 import type { WalletConnection } from "../lib/WalletControl";
+import type { MerchantSession } from "../lib/useMerchantSession";
 import { client, type MerchantState } from "./client";
 export function MerchantPayments({
   active,
+  session,
   walletLoading,
   locked,
   setLocked,
   isCurrent,
 }: {
   active: WalletConnection | null;
+  session: MerchantSession;
   walletLoading: boolean;
   locked: boolean;
   setLocked: (value: boolean) => void;
@@ -66,14 +70,19 @@ export function MerchantPayments({
     );
   return (
     <>
-      <PaymentLinks
-        active={active}
-        registered={Boolean(state?.registered && state.ready)}
-        locked={locked}
-        setLocked={setLocked}
-        isCurrent={isCurrent}
-        onPaid={() => void refresh()}
-      />
+      {active && session.status !== "signed-in" ? (
+        <SignInCard active={active} session={session} />
+      ) : (
+        <PaymentLinks
+          active={active}
+          session={session.token}
+          registered={Boolean(state?.registered && state.ready)}
+          locked={locked}
+          setLocked={setLocked}
+          isCurrent={isCurrent}
+          onPaid={() => void refresh()}
+        />
+      )}
       {active && !state?.registered && (
         <Button asChild variant="outline" className={"mt-4"}>
           <a href="/app">

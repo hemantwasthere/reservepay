@@ -3,15 +3,22 @@ import {
   ComputeBudgetProgram,
   Connection,
   Keypair,
+  PublicKey,
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
+import { Program } from "@coral-xyz/anchor";
+import BN from "bn.js";
 import {
   exactAmount,
   merchantClient,
   parseAmount,
+  PROGRAM_ID,
   type ReserveAction,
 } from "../src/merchant/client";
+import type { Reservepay } from "../src/merchant/reservepay";
+import idl from "../src/merchant/reservepay.json";
+import { orderStatus } from "../src/payments/order-status";
 import {
   transactionResult,
   validateSignedTransaction,
@@ -216,5 +223,104 @@ describe("transaction recovery", () => {
     await expect(transactionResult(broken, pending)).rejects.toThrow(
       "RPC unavailable",
     );
+  });
+});
+
+describe("on-chain order status", () => {
+  it("maps the chain variants to merchant-facing statuses", () => {
+    expect(orderStatus({ open: {} })).toBe("paid");
+    expect(orderStatus({ completed: {} })).toBe("completed");
+    expect(orderStatus({ refunded: {} })).toBe("refunded");
+  });
+});
+
+describe("merchant order reads", () => {
+  const authority = Keypair.generate().publicKey;
+  const buyer = Keypair.generate().publicKey;
+  const orderAccount = (overrides: {
+    reference: number[];
+    amount: number;
+    reserveAmount: number;
+    createdAt: number;
+    expiresAt: number;
+    status: { open: object } | { completed: object } | { refunded: object };
+  }) => ({
+    merchant: PublicKey.default,
+    buyer,
+    buyerTokenAccount: Keypair.generate().publicKey,
+    bump: 255,
+    ...overrides,
+    amount: new BN(overrides.amount),
+    reserveAmount: new BN(overrides.reserveAmount),
+    createdAt: new BN(overrides.createdAt),
+    expiresAt: new BN(overrides.expiresAt),
+  });
+  const clientWithOrders = async (
+    orders: ReturnType<typeof orderAccount>[],
+  ) => {
+    const connection = {
+      getProgramAccounts: vi.fn(async () => []),
+    } as unknown as Connection;
+    const program = new Program<Reservepay>(idl as Reservepay, { connection });
+    const encoded = await Promise.all(
+      orders.map(async (order) => ({
+        pubkey: Keypair.generate().publicKey,
+        account: {
+          data: await program.coder.accounts.encode("order", order),
+          executable: false,
+          lamports: 1_000_000,
+          owner: PROGRAM_ID,
+          rentEpoch: 0,
+        },
+      })),
+    );
+    vi.mocked(connection.getProgramAccounts).mockResolvedValue(encoded);
+    return merchantClient(connection);
+  };
+  const base = {
+    reference: Array(16).fill(0xab),
+    amount: 1_000_000,
+    reserveAmount: 50_000,
+    createdAt: 1_000,
+    expiresAt: 87_400,
+    status: { open: {} },
+  };
+
+  it("decodes orders with open ones first by expiry and maps statuses", async () => {
+    const client = await clientWithOrders([
+      orderAccount({ ...base, status: { completed: {} } }),
+      orderAccount({ ...base, expiresAt: 90_000 }),
+      orderAccount(base),
+      orderAccount({ ...base, status: { refunded: {} } }),
+    ]);
+    const { orders, mismatch } = await client.readOrders(authority, 2_000_000n);
+    expect(orders.map((order) => order.status)).toEqual([
+      "paid",
+      "paid",
+      "completed",
+      "refunded",
+    ]);
+    expect(orders[0].expiresAt).toBe(87_400_000);
+    expect(orders[1].expiresAt).toBe(90_000_000);
+    expect(orders[0].reference).toBe("ab".repeat(16));
+    expect(orders[0].buyer).toBe(buyer.toBase58());
+    expect(orders[0].amount).toBe(1_000_000n);
+    expect(orders[0].reserveAmount).toBe(50_000n);
+    expect(mismatch).toBe(false);
+  });
+  it("flags a mismatch when open orders do not cover the locked reserve", async () => {
+    const client = await clientWithOrders([orderAccount(base)]);
+    expect((await client.readOrders(authority, 1_000_000n)).mismatch).toBe(
+      false,
+    );
+    expect((await client.readOrders(authority, 500_000n)).mismatch).toBe(true);
+    expect((await client.readOrders(authority)).mismatch).toBe(false);
+  });
+  it("reads an empty order book", async () => {
+    const client = await clientWithOrders([]);
+    expect(await client.readOrders(authority, 0n)).toEqual({
+      orders: [],
+      mismatch: false,
+    });
   });
 });

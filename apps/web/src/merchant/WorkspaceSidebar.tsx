@@ -1,6 +1,7 @@
 import {
   ChartNoAxesCombined,
   Link2,
+  Store,
   ShieldCheck,
   CircleHelp,
   ArrowUpRight,
@@ -25,7 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export type WorkspacePage = "overview" | "payments";
+export type WorkspacePage = "overview" | "payments" | "profile";
 
 // Keep labels at their expanded width so they fade without wrapping as the rail narrows.
 const labelClasses =
@@ -72,6 +73,12 @@ export function WorkspaceSidebar({ page }: { page: WorkspacePage }) {
                 href: "/app/payments",
                 label: "Payment links",
                 icon: Link2,
+              },
+              {
+                page: "profile",
+                href: "/app/profile",
+                label: "Profile",
+                icon: Store,
               },
             ].map((item) => (
               <SidebarMenuItem key={item.page}>

@@ -8,8 +8,15 @@ import {
   type WorkspacePage,
 } from "./WorkspaceSidebar";
 import { MerchantPayments } from "./MerchantPayments";
+import { MerchantProfile } from "./MerchantProfile";
+import { ProtectedOrders } from "./ProtectedOrders";
+import { SignInCard } from "./SignInCard";
 import { KeyboardShortcuts } from "../lib/KeyboardShortcuts";
 import { useToast } from "../lib/Toast";
+import {
+  MerchantSessionGate,
+  type MerchantSession,
+} from "../lib/useMerchantSession";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
@@ -26,6 +33,9 @@ import {
   Wallet,
 } from "lucide-react";
 import { PublicKey } from "@solana/web3.js";
+import { useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
+import { api } from "../../convex/_generated/api";
 import { formatUsdc, reservePosition } from "@reservepay/core/settlement";
 import { WalletControl, type WalletConnection } from "../lib/WalletControl";
 import {
@@ -36,6 +46,7 @@ import {
   explorer,
   parseAmount,
   PROGRAM_ID,
+  type MerchantOrder,
   type MerchantState,
   type ReserveAction,
 } from "./client";
@@ -76,6 +87,8 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
     [],
   );
   return (
+    <MerchantSessionGate active={active}>
+      {(session) => (
     <SidebarProvider
       className="min-h-screen flex-col"
       style={
@@ -142,6 +155,7 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
           <WalletControl
             onChange={onChange}
             onLoadingChange={setWalletLoading}
+            onSignOut={() => void session.signOut()}
             locked={locked}
           />
         </div>
@@ -168,12 +182,18 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
               >
                 {page === "payments"
                   ? "PAYMENTS / PAYMENT LINKS"
-                  : "RESERVE / OVERVIEW"}
+                  : page === "profile"
+                    ? "MERCHANT / PROFILE"
+                    : "RESERVE / OVERVIEW"}
               </div>
               <h1>
                 {page === "payments" ? (
                   <>
                     Your next payment, <em>one link away.</em>
+                  </>
+                ) : page === "profile" ? (
+                  <>
+                    Your name, <em>on every checkout.</em>
                   </>
                 ) : (
                   <>
@@ -184,7 +204,9 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
               <p>
                 {page === "payments"
                   ? "Create a checkout, share it, and follow every protected payment."
-                  : "The foundation for protected payments. Yours to manage."}
+                  : page === "profile"
+                    ? "Tell buyers who they are paying. Only your name and website are public."
+                    : "The foundation for protected payments. Yours to manage."}
               </p>
             </div>
             <span
@@ -217,15 +239,24 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
             <MerchantPayments
               key={active?.account.address ?? "disconnected"}
               active={active}
+              session={session}
               walletLoading={walletLoading}
               locked={locked}
               isCurrent={isCurrent}
               setLocked={setLocked}
             />
+          ) : page === "profile" ? (
+            <MerchantProfile
+              key={active?.account.address ?? "disconnected"}
+              active={active}
+              session={session}
+              walletLoading={walletLoading}
+            />
           ) : (
             <MerchantWorkspace
               key={active?.account.address ?? "disconnected"}
               active={active}
+              session={session}
               walletLoading={walletLoading}
               isCurrent={isCurrent}
               setLocked={setLocked}
@@ -262,22 +293,30 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
         </main>
       </div>
     </SidebarProvider>
+      )}
+    </MerchantSessionGate>
   );
 }
 
 function MerchantWorkspace({
   active,
+  session,
   walletLoading,
   isCurrent,
   setLocked,
 }: {
   active: WalletConnection | null;
+  session: MerchantSession;
   walletLoading: boolean;
   isCurrent: (value: WalletConnection) => boolean;
   setLocked: (locked: boolean) => void;
 }) {
   const { notify, dismiss } = useToast();
   const [state, setState] = useState<MerchantState | null>(null);
+  const [orderBook, setOrderBook] = useState<{
+    orders: MerchantOrder[];
+    mismatch: boolean;
+  } | null>(null);
   const [readError, setReadError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [action, setAction] = useState<"fund" | "withdraw">("fund");
@@ -303,9 +342,15 @@ function MerchantWorkspace({
       setRefreshing(true);
       if (manual) dismiss("balance-refresh");
       try {
-        const next = await client.read(new PublicKey(active.account.address));
+        const authority = new PublicKey(active.account.address);
+        const next = await client.read(authority);
+        let book: { orders: MerchantOrder[]; mismatch: boolean } | null = null;
+        try {
+          book = await client.readOrders(authority, next.locked);
+        } catch {}
         if (mounted.current && isCurrent(active)) {
           setState(next);
+          if (book) setOrderBook(book);
           setReadError("");
           dismiss("balance-refresh");
         }
@@ -534,6 +579,12 @@ function MerchantWorkspace({
   };
 
   return (
+    <SessionData token={session.token}>
+      {({ profile, links }) => {
+        const titles = Object.fromEntries(
+          (links ?? []).map((link) => [link.reference, link.title]),
+        );
+        return (
     <>
       <div
         className={
@@ -602,6 +653,9 @@ function MerchantWorkspace({
           accent
         />
       </div>
+      {active && session.status !== "signed-in" && (
+        <SignInCard active={active} session={session} />
+      )}
       {readError && (
         <div
           className={
@@ -644,6 +698,14 @@ function MerchantWorkspace({
           This wallet does not support the required transaction signing. Connect
           a compatible Solana wallet such as Phantom.
         </div>
+      )}
+      {active && (
+        <ProtectedOrders
+          orders={orderBook?.orders ?? null}
+          mismatch={Boolean(orderBook?.mismatch)}
+          loading={loading}
+          titles={titles}
+        />
       )}
       <div
         className={
@@ -693,13 +755,28 @@ function MerchantWorkspace({
             />
             <SetupStep
               number="02"
+              done={Boolean(profile)}
+              active={Boolean(active && !profile)}
+              title="Create your profile"
+              description={
+                <>
+                  Add your business name on the{" "}
+                  <a className={"text-primary underline"} href="/app/profile">
+                    Profile page
+                  </a>{" "}
+                  so buyers recognize you. Sign in first.
+                </>
+              }
+            />
+            <SetupStep
+              number="03"
               done={Boolean(state?.registered)}
               active={Boolean(active && !state?.registered)}
               title="Register your merchant"
               description="Create your merchant account and its reserve vault on Solana."
             />
             <SetupStep
-              number="03"
+              number="04"
               done={Boolean(state && state.reserve > 0n)}
               active={Boolean(state?.registered && state.reserve === 0n)}
               title="Add your first collateral"
@@ -1106,7 +1183,43 @@ function MerchantWorkspace({
         </p>
       )}
     </>
+        );
+      }}
+    </SessionData>
   );
+}
+
+type SessionData = {
+  profile: FunctionReturnType<typeof api.merchants.me> | undefined;
+  links: FunctionReturnType<typeof api.payments.list> | undefined;
+};
+
+// Convex hooks need the provider from PaymentProvider, which only exists when
+// a session is possible. Without a token nothing is queried.
+function SessionData({
+  token,
+  children,
+}: {
+  token: string | null;
+  children: (data: SessionData) => React.ReactNode;
+}) {
+  return token ? (
+    <SessionQueries token={token}>{children}</SessionQueries>
+  ) : (
+    children({ profile: null, links: undefined })
+  );
+}
+
+function SessionQueries({
+  token,
+  children,
+}: {
+  token: string;
+  children: (data: SessionData) => React.ReactNode;
+}) {
+  const profile = useQuery(api.merchants.me, { session: token });
+  const links = useQuery(api.payments.list, { session: token });
+  return children({ profile, links });
 }
 
 function Stat({
@@ -1177,7 +1290,7 @@ function SetupStep({
   done: boolean;
   active: boolean;
   title: string;
-  description: string;
+  description: React.ReactNode;
 }) {
   return (
     <div

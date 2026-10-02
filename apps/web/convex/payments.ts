@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { query, internalMutation, internalQuery } from "./_generated/server";
 import { validateTerms } from "../src/payments/terms";
+import { requireMerchant } from "./session";
 
 import { termsFields, receiptFields } from "./paymentValidators";
 
@@ -13,13 +14,15 @@ export const get = query({
   },
 });
 export const list = query({
-  args: { merchant: v.string() },
-  handler: (ctx, { merchant }) =>
-    ctx.db
+  args: { session: v.string() },
+  handler: async (ctx, { session }) => {
+    const merchant = await requireMerchant(ctx, session);
+    return ctx.db
       .query("paymentLinks")
       .withIndex("by_merchant", (q) => q.eq("merchant", merchant))
       .order("desc")
-      .take(50),
+      .take(50);
+  },
 });
 export const findReference = internalQuery({
   args: { merchant: v.string(), reference: v.string() },
