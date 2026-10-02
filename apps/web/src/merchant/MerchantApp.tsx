@@ -18,7 +18,7 @@ import {
   SessionErrorBoundary,
   type MerchantSession,
 } from "../lib/useMerchantSession";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -318,6 +318,21 @@ function MerchantWorkspace({
     orders: MerchantOrder[];
     mismatch: boolean;
   } | null>(null);
+  const [sessionData, setSessionData] = useState<SessionData>({
+    profile: null,
+    links: undefined,
+  });
+  useEffect(() => {
+    if (!session.token) setSessionData({ profile: null, links: undefined });
+  }, [session.token]);
+  const titles = useMemo(
+    () =>
+      Object.fromEntries(
+        (sessionData.links ?? []).map((link) => [link.reference, link.title]),
+      ),
+    [sessionData.links],
+  );
+  const profile = sessionData.profile;
   const [readError, setReadError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [action, setAction] = useState<"fund" | "withdraw">("fund");
@@ -580,13 +595,28 @@ function MerchantWorkspace({
   };
 
   return (
-    <SessionData token={session.token} onExpire={session.expire}>
-      {({ profile, links }) => {
-        const titles = Object.fromEntries(
-          (links ?? []).map((link) => [link.reference, link.title]),
-        );
-        return (
     <>
+      {session.token && (
+        <SessionErrorBoundary
+          resetKey={session.token}
+          onExpire={session.expire}
+          fallback={(error, retry) => (
+            <div
+              className={
+                "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere] [&_button]:underline [&_button]:[font:inherit]"
+              }
+              role="alert"
+            >
+              Your profile and payment links could not load. {error.message}{" "}
+              <button type="button" onClick={retry}>
+                Try again
+              </button>
+            </div>
+          )}
+        >
+          <SessionQueries token={session.token} onData={setSessionData} />
+        </SessionErrorBoundary>
+      )}
       <div
         className={
           "reserve-heading flex items-center justify-between mb-[13px] [&_.text-button]:text-[11px]"
@@ -1190,9 +1220,6 @@ function MerchantWorkspace({
         </p>
       )}
     </>
-        );
-      }}
-    </SessionData>
   );
 }
 
@@ -1201,55 +1228,21 @@ type SessionData = {
   links: FunctionReturnType<typeof api.payments.list> | undefined;
 };
 
-// Convex hooks need the provider from PaymentProvider, which only exists when
-// a session is possible. Without a token nothing is queried.
-function SessionData({
-  token,
-  onExpire,
-  children,
-}: {
-  token: string | null;
-  onExpire: () => void;
-  children: (data: SessionData) => React.ReactNode;
-}) {
-  return token ? (
-    <SessionErrorBoundary
-      resetKey={token}
-      onExpire={onExpire}
-      fallback={(error, retry) => (
-        <>
-          <div
-            className={
-              "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere] [&_button]:underline [&_button]:[font:inherit]"
-            }
-            role="alert"
-          >
-            Your profile and payment links could not load. {error.message}{" "}
-            <button type="button" onClick={retry}>
-              Try again
-            </button>
-          </div>
-          {children({ profile: undefined, links: undefined })}
-        </>
-      )}
-    >
-      <SessionQueries token={token}>{children}</SessionQueries>
-    </SessionErrorBoundary>
-  ) : (
-    children({ profile: null, links: undefined })
-  );
-}
-
+// Runs the session-gated queries as a leaf component so the error boundary
+// only ever catches these queries, and lifts the results up to the workspace.
 function SessionQueries({
   token,
-  children,
+  onData,
 }: {
   token: string;
-  children: (data: SessionData) => React.ReactNode;
+  onData: (data: SessionData) => void;
 }) {
   const profile = useQuery(api.merchants.me, { session: token });
   const links = useQuery(api.payments.list, { session: token });
-  return children({ profile, links });
+  useEffect(() => {
+    onData({ profile, links });
+  }, [profile, links, onData]);
+  return null;
 }
 
 function Stat({
