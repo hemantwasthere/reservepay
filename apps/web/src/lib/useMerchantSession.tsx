@@ -13,9 +13,30 @@ import bs58 from "bs58";
 import { api } from "../../convex/_generated/api";
 import type { WalletConnection } from "./WalletControl";
 import { readSession, rememberSession } from "./merchant-session";
-import { signInMessage } from "./sign-in";
+import { signInMessage, type SignInChallenge } from "./sign-in";
 import { useToast } from "./Toast";
-import { paymentsConfigured } from "../payments/PaymentProvider";
+import { paymentsConfigured, convexSiteUrl } from "../payments/PaymentProvider";
+
+const requestNonce = async (
+  wallet: string,
+): Promise<Pick<SignInChallenge, "nonce" | "issuedAt" | "expiresAt">> => {
+  const response = await fetch(`${convexSiteUrl}/sign-in/nonce`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wallet }),
+  });
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok)
+    throw new Error(
+      body &&
+        typeof body === "object" &&
+        "error" in body &&
+        typeof body.error === "string"
+        ? body.error
+        : "Could not start sign-in.",
+    );
+  return body as Pick<SignInChallenge, "nonce" | "issuedAt" | "expiresAt">;
+};
 
 export type MerchantSessionStatus = "signed-out" | "checking" | "signed-in";
 export type MerchantSession = {
@@ -79,7 +100,6 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
   } | null>(null);
   const [busyAddress, setBusyAddress] = useState<string | null>(null);
   const { notify } = useToast();
-  const requestNonce = useMutation(api.auth.requestNonce);
   const signInAction = useAction(api.authActions.signIn);
   const signOutMutation = useMutation(api.auth.signOut);
 
@@ -121,7 +141,7 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
     setBusyAddress(address);
     const stillConnected = () => addressRef.current === address;
     try {
-      const challenge = await requestNonce({ wallet: address });
+      const challenge = await requestNonce(address);
       const message = signInMessage({
         ...challenge,
         wallet: address,
@@ -167,7 +187,7 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
     } finally {
       setBusyAddress((current) => (current === address ? null : current));
     }
-  }, [active, address, busyAddress, requestNonce, signInAction, notify]);
+  }, [active, address, busyAddress, signInAction, notify]);
 
   const expire = useCallback(() => {
     if (!address) return;

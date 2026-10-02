@@ -5,15 +5,7 @@ import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { signInMessage } from "../src/lib/sign-in";
-
-const allowedDomain = (domain: string): boolean => {
-  const configured = process.env.SITE_ORIGIN?.replace(/^https?:\/\//, "");
-  if (configured) return domain === configured;
-  if (domain === "reservepayyy.vercel.app") return true;
-  // Local development servers.
-  return /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(domain);
-};
+import { allowedDomain, signInMessage } from "../src/lib/sign-in";
 
 export const signIn = action({
   args: {

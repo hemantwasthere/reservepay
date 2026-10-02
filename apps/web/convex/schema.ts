@@ -18,11 +18,14 @@ export default defineSchema({
     .index("by_reference", ["merchant", "reference"]),
   authNonces: defineTable({
     wallet: v.string(),
+    requester: v.string(),
     nonce: v.string(),
     issuedAt: v.number(),
     expiresAt: v.number(),
     used: v.boolean(),
-  }).index("by_nonce", ["nonce"]),
+  })
+    .index("by_nonce", ["nonce"])
+    .index("by_requester", ["requester"]),
   sessions: defineTable({
     wallet: v.string(),
     tokenHash: v.string(),

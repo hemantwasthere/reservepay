@@ -11,24 +11,26 @@ const randomHex = (bytes: number) =>
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 
-export const requestNonce = mutation({
-  args: { wallet: v.string() },
-  handler: async (ctx, { wallet }) => {
+export const requestNonce = internalMutation({
+  args: { wallet: v.string(), requester: v.string() },
+  handler: async (ctx, { wallet, requester }) => {
     validateWallet(wallet);
-    // The requester is anonymous, so a per-wallet limit would let anyone lock
-    // a merchant out of sign-in. A global cap bounds table growth instead;
-    // the cleanup cron below keeps this scan small.
-    const recent = await ctx.db.query("authNonces").order("desc").take(60);
-    if (
-      recent.length >= 60 &&
-      recent[recent.length - 1]._creationTime > Date.now() - 60_000
-    )
-      throw new ConvexError("Sign-in is busy. Try again in a minute.");
+    // Limited per requester (the client IP seen by the HTTP endpoint), never
+    // per wallet or globally, so no one can lock out a merchant or the site.
+    const recent = await ctx.db
+      .query("authNonces")
+      .withIndex("by_requester", (q) =>
+        q.eq("requester", requester).gte("_creationTime", Date.now() - 60_000),
+      )
+      .take(10);
+    if (recent.length >= 10)
+      throw new ConvexError("Too many sign-in attempts. Please wait a minute.");
     const issuedAt = Date.now();
     const expiresAt = issuedAt + NONCE_TTL;
     const nonce = randomHex(16);
     await ctx.db.insert("authNonces", {
       wallet,
+      requester,
       nonce,
       issuedAt,
       expiresAt,
@@ -39,26 +41,36 @@ export const requestNonce = mutation({
 });
 
 // Cron entry point: delete nonces that are used or expired, and sessions that
-// expired, so sign-in tables stay bounded.
+// expired, so sign-in tables stay bounded. Loops until drained (bounded per
+// run) so cleanup keeps up with the request rate.
 export const cleanup = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const staleNonces = await ctx.db
-      .query("authNonces")
-      .filter((q) =>
-        q.or(
-          q.eq(q.field("used"), true),
-          q.lte(q.field("expiresAt"), Date.now()),
-        ),
-      )
-      .take(250);
-    for (const row of staleNonces) await ctx.db.delete(row._id);
-    const staleSessions = await ctx.db
-      .query("sessions")
-      .filter((q) => q.lte(q.field("expiresAt"), Date.now()))
-      .take(250);
-    for (const row of staleSessions) await ctx.db.delete(row._id);
-    return staleNonces.length + staleSessions.length;
+    let removed = 0;
+    for (;;) {
+      const batch = await ctx.db
+        .query("authNonces")
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("used"), true),
+            q.lte(q.field("expiresAt"), Date.now()),
+          ),
+        )
+        .take(250);
+      for (const row of batch) await ctx.db.delete(row._id);
+      removed += batch.length;
+      if (batch.length < 250 || removed >= 5_000) break;
+    }
+    for (;;) {
+      const batch = await ctx.db
+        .query("sessions")
+        .filter((q) => q.lte(q.field("expiresAt"), Date.now()))
+        .take(250);
+      for (const row of batch) await ctx.db.delete(row._id);
+      removed += batch.length;
+      if (batch.length < 250 || removed >= 10_000) break;
+    }
+    return removed;
   },
 });
 

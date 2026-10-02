@@ -42,3 +42,13 @@ export function signInMessage(challenge: SignInChallenge): Uint8Array {
     ].join("\n"),
   );
 }
+
+// Shared by the sign-in action (message domain check) and the HTTP nonce
+// endpoint (CORS origin check). Only runs server-side.
+export const allowedDomain = (domain: string): boolean => {
+  const configured = process.env.SITE_ORIGIN?.replace(/^https?:\/\//, "");
+  if (configured) return domain === configured;
+  if (domain === "reservepayyy.vercel.app") return true;
+  // Local development servers.
+  return /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(domain);
+};

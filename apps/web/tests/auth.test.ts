@@ -24,7 +24,10 @@ describe("wallet sign-in", () => {
   it("accepts a nonce only once", async () => {
     const t = convexTest(schema, modules);
     const wallet = seller.publicKey.toBase58();
-    const challenge = await t.mutation(api.auth.requestNonce, { wallet });
+    const challenge = await t.mutation(internal.auth.requestNonce, {
+      wallet,
+      requester: "test-requester",
+    });
     const signature = bs58.encode(
       nacl.sign.detached(
         signInMessage({ ...challenge, wallet, domain: TEST_DOMAIN }),
@@ -44,7 +47,14 @@ describe("wallet sign-in", () => {
     const issuedAt = Date.now() - 600_000;
     const expiresAt = Date.now() - 1;
     await t.run((ctx) =>
-      ctx.db.insert("authNonces", { wallet, nonce, issuedAt, expiresAt, used: false }),
+      ctx.db.insert("authNonces", {
+        wallet,
+        requester: "test-requester",
+        nonce,
+        issuedAt,
+        expiresAt,
+        used: false,
+      }),
     );
     const signature = bs58.encode(
       nacl.sign.detached(
@@ -66,7 +76,10 @@ describe("wallet sign-in", () => {
   it("rejects a signature from the wrong wallet", async () => {
     const t = convexTest(schema, modules);
     const wallet = seller.publicKey.toBase58();
-    const challenge = await t.mutation(api.auth.requestNonce, { wallet });
+    const challenge = await t.mutation(internal.auth.requestNonce, {
+      wallet,
+      requester: "test-requester",
+    });
     const signature = bs58.encode(
       nacl.sign.detached(
         signInMessage({ ...challenge, wallet, domain: TEST_DOMAIN }),
@@ -85,7 +98,10 @@ describe("wallet sign-in", () => {
   it("rejects a domain mismatch, including against SITE_ORIGIN", async () => {
     const t = convexTest(schema, modules);
     const wallet = seller.publicKey.toBase58();
-    const challenge = await t.mutation(api.auth.requestNonce, { wallet });
+    const challenge = await t.mutation(internal.auth.requestNonce, {
+      wallet,
+      requester: "test-requester",
+    });
     const sign = (domain: string) =>
       bs58.encode(
         nacl.sign.detached(
@@ -150,22 +166,35 @@ describe("wallet sign-in", () => {
     const t = convexTest(schema, modules);
     const wallet = other.publicKey.toBase58();
     for (let i = 0; i < 10; i++) {
-      const challenge = await t.mutation(api.auth.requestNonce, { wallet });
+      const challenge = await t.mutation(internal.auth.requestNonce, {
+      wallet,
+      requester: "test-requester",
+    });
       expect(challenge.nonce).toMatch(/^[a-f0-9]{32}$/);
       expect(challenge.expiresAt).toBeGreaterThan(challenge.issuedAt);
     }
   });
-  it("bounds nonce creation globally per minute", async () => {
+  it("bounds nonce creation per requester, never per wallet or site-wide", async () => {
     const t = convexTest(schema, modules);
-    for (let i = 0; i < 60; i++)
-      await t.mutation(api.auth.requestNonce, {
-        wallet: i % 2 ? seller.publicKey.toBase58() : other.publicKey.toBase58(),
+    const wallet = other.publicKey.toBase58();
+    for (let i = 0; i < 10; i++)
+      await t.mutation(internal.auth.requestNonce, {
+        wallet,
+        requester: "attacker-ip",
       });
+    // The attacker's own requests are capped...
     await expect(
-      t.mutation(api.auth.requestNonce, {
-        wallet: seller.publicKey.toBase58(),
+      t.mutation(internal.auth.requestNonce, {
+        wallet,
+        requester: "attacker-ip",
       }),
-    ).rejects.toThrow("busy");
+    ).rejects.toThrow("Too many");
+    // ...but the same wallet signs in fine from anywhere else.
+    const challenge = await t.mutation(internal.auth.requestNonce, {
+      wallet,
+      requester: "merchant-ip",
+    });
+    expect(challenge.nonce).toMatch(/^[a-f0-9]{32}$/);
   });
   it("cleans up used and expired sign-in data", async () => {
     const t = convexTest(schema, modules);
@@ -173,6 +202,7 @@ describe("wallet sign-in", () => {
     await t.run(async (ctx) => {
       await ctx.db.insert("authNonces", {
         wallet,
+        requester: "test-requester",
         nonce: "cd".repeat(16),
         issuedAt: Date.now() - 600_000,
         expiresAt: Date.now() - 1,
@@ -180,6 +210,7 @@ describe("wallet sign-in", () => {
       });
       await ctx.db.insert("authNonces", {
         wallet,
+        requester: "test-requester",
         nonce: "ef".repeat(16),
         issuedAt: Date.now(),
         expiresAt: Date.now() + 300_000,

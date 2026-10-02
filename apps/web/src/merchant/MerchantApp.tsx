@@ -319,11 +319,15 @@ function MerchantWorkspace({
     mismatch: boolean;
   } | null>(null);
   const [sessionData, setSessionData] = useState<SessionData>({
-    profile: null,
+    profile: session.token ? undefined : null,
     links: undefined,
   });
+  // A token without delivered data means "still loading", never "no profile".
   useEffect(() => {
-    if (!session.token) setSessionData({ profile: null, links: undefined });
+    setSessionData({
+      profile: session.token ? undefined : null,
+      links: undefined,
+    });
   }, [session.token]);
   const titles = useMemo(
     () =>
@@ -374,6 +378,8 @@ function MerchantWorkspace({
         }
       } catch (error) {
         if (mounted.current && isCurrent(active)) {
+          // Stale orders may already be resolved; drop them with the balances.
+          setOrderBook(null);
           setReadError(`Could not refresh balances. ${errorMessage(error)}`);
           if (manual)
             notify({
@@ -794,7 +800,11 @@ function MerchantWorkspace({
               description={
                 profile ? (
                   <>{profile.displayName} · Shown to buyers on checkout</>
-                ) : session.status === "signed-in" ? (
+                ) : session.status !== "signed-in" ? (
+                  "Sign in, then add your business name on the Profile page so buyers recognize you."
+                ) : profile === undefined ? (
+                  "Checking your profile…"
+                ) : (
                   <>
                     Add your business name on the{" "}
                     <a className={"text-primary underline"} href="/app/profile">
@@ -802,8 +812,6 @@ function MerchantWorkspace({
                     </a>{" "}
                     so buyers recognize you.
                   </>
-                ) : (
-                  "Sign in, then add your business name on the Profile page so buyers recognize you."
                 )
               }
             />
