@@ -77,7 +77,7 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
     address: string;
     token: string;
   } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busyAddress, setBusyAddress] = useState<string | null>(null);
   const { notify } = useToast();
   const requestNonce = useMutation(api.auth.requestNonce);
   const signInAction = useAction(api.authActions.signIn);
@@ -114,8 +114,12 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
     !address || !token ? "signed-out" : me ? "signed-in" : "checking";
 
   const signIn = useCallback(async () => {
-    if (!active || !address || !active.wallet.signMessage || busy) return;
-    setBusy(true);
+    // In-flight sign-ins are tracked per wallet, so switching wallets never
+    // blocks the newly connected wallet's own sign-in.
+    if (!active || !address || !active.wallet.signMessage) return;
+    if (busyAddress === address) return;
+    setBusyAddress(address);
+    const stillConnected = () => addressRef.current === address;
     try {
       const challenge = await requestNonce({ wallet: address });
       const message = signInMessage({
@@ -129,12 +133,13 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
           await active.wallet.signMessage(address, message),
         );
       } catch {
-        notify({
-          title: "Sign-in cancelled",
-          description:
-            "Approve the sign-in message in your wallet to continue.",
-          tone: "info",
-        });
+        if (stillConnected())
+          notify({
+            title: "Sign-in cancelled",
+            description:
+              "Approve the sign-in message in your wallet to continue.",
+            tone: "info",
+          });
         return;
       }
       const session = await signInAction({
@@ -146,23 +151,23 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
       // The session is stored under the signing wallet either way, but only
       // becomes active if that wallet is still connected.
       rememberSession(address, session);
-      if (addressRef.current === address)
-        setStored({ address, token: session.token });
+      if (stillConnected()) setStored({ address, token: session.token });
     } catch (error) {
-      notify({
-        title: "Could not sign in",
-        description:
-          error instanceof ConvexError && typeof error.data === "string"
-            ? error.data
-            : error instanceof Error
-              ? error.message
-              : "Try again in a moment.",
-        tone: "error",
-      });
+      if (stillConnected())
+        notify({
+          title: "Could not sign in",
+          description:
+            error instanceof ConvexError && typeof error.data === "string"
+              ? error.data
+              : error instanceof Error
+                ? error.message
+                : "Try again in a moment.",
+          tone: "error",
+        });
     } finally {
-      setBusy(false);
+      setBusyAddress((current) => (current === address ? null : current));
     }
-  }, [active, address, busy, requestNonce, signInAction, notify]);
+  }, [active, address, busyAddress, requestNonce, signInAction, notify]);
 
   const expire = useCallback(() => {
     if (!address) return;

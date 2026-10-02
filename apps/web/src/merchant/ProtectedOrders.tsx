@@ -100,7 +100,17 @@ export function ProtectedOrders({
           }
           role="status"
         >
-          {loading ? "Loading orders…" : "Orders could not be loaded yet."}
+          {loading ? (
+            "Loading orders…"
+          ) : (
+            <>
+              <strong>Orders could not be loaded.</strong>
+              <span>
+                Showing no orders is safer than showing stale ones. The list
+                retries with the next balance refresh.
+              </span>
+            </>
+          )}
         </div>
       ) : shown.length === 0 ? (
         <div

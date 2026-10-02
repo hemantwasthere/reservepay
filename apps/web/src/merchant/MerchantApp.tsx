@@ -360,13 +360,15 @@ function MerchantWorkspace({
       try {
         const authority = new PublicKey(active.account.address);
         const next = await client.read(authority);
+        // A failed orders read clears the list instead of leaving stale
+        // orders (and a stale mismatch check) on screen.
         let book: { orders: MerchantOrder[]; mismatch: boolean } | null = null;
         try {
           book = await client.readOrders(authority, next.locked);
         } catch {}
         if (mounted.current && isCurrent(active)) {
           setState(next);
-          if (book) setOrderBook(book);
+          setOrderBook(book);
           setReadError("");
           dismiss("balance-refresh");
         }
