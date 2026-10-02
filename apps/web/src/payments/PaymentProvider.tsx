@@ -10,9 +10,6 @@ import { ConvexProvider, ConvexReactClient } from "convex/react";
 const Ready = createContext(false);
 const deploymentUrl = import.meta.env.VITE_CONVEX_URL;
 export const paymentsConfigured = Boolean(deploymentUrl);
-// HTTP actions are served from the .convex.site domain.
-export const convexSiteUrl =
-  deploymentUrl?.replace(".convex.cloud", ".convex.site") ?? null;
 // The transport connects lazily. Keep this provider mounted through hydration
 // so enabling payment queries does not remount the wallet or dashboard.
 const client = deploymentUrl ? new ConvexReactClient(deploymentUrl) : null;

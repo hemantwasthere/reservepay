@@ -5,12 +5,30 @@ import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
+import { issueNonce, NONCE_TTL } from "../convex/signInNonce";
 import { signInMessage } from "../src/lib/sign-in";
 import { signIn, TEST_DOMAIN } from "./session";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 const seller = Keypair.generate();
 const other = Keypair.generate();
+
+type Challenge = { nonce: string; issuedAt: number; expiresAt: number };
+const signed = (
+  challenge: Challenge,
+  keypair: Keypair,
+  { wallet = seller.publicKey.toBase58(), domain = TEST_DOMAIN } = {},
+) => ({
+  ...challenge,
+  wallet,
+  domain,
+  signature: bs58.encode(
+    nacl.sign.detached(
+      signInMessage({ ...challenge, wallet, domain }),
+      keypair.secretKey,
+    ),
+  ),
+});
 
 describe("wallet sign-in", () => {
   it("issues a session for a valid signature and me returns the wallet", async () => {
@@ -24,120 +42,92 @@ describe("wallet sign-in", () => {
   it("accepts a nonce only once", async () => {
     const t = convexTest(schema, modules);
     const wallet = seller.publicKey.toBase58();
-    const challenge = await t.mutation(internal.auth.requestNonce, {
-      wallet,
-      requester: "test-requester",
-    });
-    const signature = bs58.encode(
-      nacl.sign.detached(
-        signInMessage({ ...challenge, wallet, domain: TEST_DOMAIN }),
-        seller.secretKey,
-      ),
-    );
-    const request = { ...challenge, wallet, domain: TEST_DOMAIN, signature };
+    const challenge = await t.action(api.authActions.requestNonce, { wallet });
+    const request = signed(challenge, seller);
     await t.action(api.authActions.signIn, request);
-    await expect(
-      t.action(api.authActions.signIn, request),
-    ).rejects.toThrow("expired");
+    await expect(t.action(api.authActions.signIn, request)).rejects.toThrow(
+      "expired",
+    );
   });
   it("rejects an expired nonce", async () => {
     const t = convexTest(schema, modules);
-    const wallet = seller.publicKey.toBase58();
-    const nonce = "ab".repeat(16);
-    const issuedAt = Date.now() - 600_000;
-    const expiresAt = Date.now() - 1;
-    await t.run((ctx) =>
-      ctx.db.insert("authNonces", {
-        wallet,
-        requester: "test-requester",
-        nonce,
-        issuedAt,
-        expiresAt,
-        used: false,
-      }),
-    );
-    const signature = bs58.encode(
-      nacl.sign.detached(
-        signInMessage({ wallet, nonce, issuedAt, expiresAt, domain: TEST_DOMAIN }),
-        seller.secretKey,
-      ),
+    const challenge = await issueNonce(
+      process.env.SIGN_IN_SECRET!,
+      seller.publicKey.toBase58(),
+      Date.now() - NONCE_TTL - 1,
     );
     await expect(
-      t.action(api.authActions.signIn, {
-        wallet,
-        nonce,
-        issuedAt,
-        expiresAt,
-        domain: TEST_DOMAIN,
-        signature,
-      }),
+      t.action(api.authActions.signIn, signed(challenge, seller)),
+    ).rejects.toThrow("expired");
+  });
+  it("rejects nonces it did not issue or whose terms were altered", async () => {
+    const t = convexTest(schema, modules);
+    const wallet = seller.publicKey.toBase58();
+    const challenge = await t.action(api.authActions.requestNonce, { wallet });
+    const forged = await issueNonce("another-secret-0123456789abcdef0123", wallet);
+    await expect(
+      t.action(api.authActions.signIn, signed(forged, seller)),
+    ).rejects.toThrow("expired");
+    await expect(
+      t.action(
+        api.authActions.signIn,
+        signed({ ...challenge, expiresAt: challenge.expiresAt + 1 }, seller),
+      ),
+    ).rejects.toThrow();
+    // A nonce issued for one wallet cannot sign in another.
+    await expect(
+      t.action(
+        api.authActions.signIn,
+        signed(challenge, other, { wallet: other.publicKey.toBase58() }),
+      ),
     ).rejects.toThrow("expired");
   });
   it("rejects a signature from the wrong wallet", async () => {
     const t = convexTest(schema, modules);
     const wallet = seller.publicKey.toBase58();
-    const challenge = await t.mutation(internal.auth.requestNonce, {
-      wallet,
-      requester: "test-requester",
-    });
-    const signature = bs58.encode(
-      nacl.sign.detached(
-        signInMessage({ ...challenge, wallet, domain: TEST_DOMAIN }),
-        other.secretKey,
-      ),
-    );
+    const challenge = await t.action(api.authActions.requestNonce, { wallet });
     await expect(
-      t.action(api.authActions.signIn, {
-        ...challenge,
-        wallet,
-        domain: TEST_DOMAIN,
-        signature,
-      }),
+      t.action(api.authActions.signIn, signed(challenge, other)),
     ).rejects.toThrow("did not approve");
   });
   it("rejects a domain mismatch, including against SITE_ORIGIN", async () => {
     const t = convexTest(schema, modules);
     const wallet = seller.publicKey.toBase58();
-    const challenge = await t.mutation(internal.auth.requestNonce, {
-      wallet,
-      requester: "test-requester",
-    });
-    const sign = (domain: string) =>
-      bs58.encode(
-        nacl.sign.detached(
-          signInMessage({ ...challenge, wallet, domain }),
-          seller.secretKey,
-        ),
-      );
+    const challenge = await t.action(api.authActions.requestNonce, { wallet });
     await expect(
-      t.action(api.authActions.signIn, {
-        ...challenge,
-        wallet,
-        domain: "evil.example.com",
-        signature: sign("evil.example.com"),
-      }),
+      t.action(
+        api.authActions.signIn,
+        signed(challenge, seller, { domain: "evil.example.com" }),
+      ),
     ).rejects.toThrow("another site");
     const previous = process.env.SITE_ORIGIN;
     process.env.SITE_ORIGIN = "https://reservepay.example.com";
     try {
       await expect(
-        t.action(api.authActions.signIn, {
-          ...challenge,
-          wallet,
-          domain: TEST_DOMAIN,
-          signature: sign(TEST_DOMAIN),
-        }),
+        t.action(api.authActions.signIn, signed(challenge, seller)),
       ).rejects.toThrow("another site");
-      const session = await t.action(api.authActions.signIn, {
-        ...challenge,
-        wallet,
-        domain: "reservepay.example.com",
-        signature: sign("reservepay.example.com"),
-      });
+      const session = await t.action(
+        api.authActions.signIn,
+        signed(challenge, seller, { domain: "reservepay.example.com" }),
+      );
       expect(session.token).toMatch(/^[a-f0-9]{64}$/);
     } finally {
       if (previous === undefined) delete process.env.SITE_ORIGIN;
       else process.env.SITE_ORIGIN = previous;
+    }
+  });
+  it("refuses to sign in when the secret is not configured", async () => {
+    const t = convexTest(schema, modules);
+    const previous = process.env.SIGN_IN_SECRET;
+    delete process.env.SIGN_IN_SECRET;
+    try {
+      await expect(
+        t.action(api.authActions.requestNonce, {
+          wallet: seller.publicKey.toBase58(),
+        }),
+      ).rejects.toThrow("not configured");
+    } finally {
+      process.env.SIGN_IN_SECRET = previous;
     }
   });
   it("rejects expired sessions and invalidates them on sign out", async () => {
@@ -162,59 +152,27 @@ describe("wallet sign-in", () => {
       t.query(api.payments.list, { session: fresh.token }),
     ).rejects.toThrow("Sign in again.");
   });
-  it("never locks a wallet out of sign-in, since requests are anonymous", async () => {
+  it("issues nonces without writing anything or locking anyone out", async () => {
     const t = convexTest(schema, modules);
     const wallet = other.publicKey.toBase58();
-    for (let i = 0; i < 10; i++) {
-      const challenge = await t.mutation(internal.auth.requestNonce, {
-      wallet,
-      requester: "test-requester",
-    });
-      expect(challenge.nonce).toMatch(/^[a-f0-9]{32}$/);
-      expect(challenge.expiresAt).toBeGreaterThan(challenge.issuedAt);
+    for (let i = 0; i < 50; i++) {
+      const challenge = await t.action(api.authActions.requestNonce, { wallet });
+      expect(challenge.nonce).toMatch(/^[a-f0-9]{96}$/);
+      expect(challenge.expiresAt - challenge.issuedAt).toBe(NONCE_TTL);
     }
+    expect(await t.run((ctx) => ctx.db.query("usedNonces").collect())).toEqual(
+      [],
+    );
+    expect(await t.run((ctx) => ctx.db.query("sessions").collect())).toEqual([]);
+    expect((await signIn(t, other)).token).toMatch(/^[a-f0-9]{64}$/);
   });
-  it("bounds nonce creation per requester, never per wallet or site-wide", async () => {
-    const t = convexTest(schema, modules);
-    const wallet = other.publicKey.toBase58();
-    for (let i = 0; i < 10; i++)
-      await t.mutation(internal.auth.requestNonce, {
-        wallet,
-        requester: "attacker-ip",
-      });
-    // The attacker's own requests are capped...
-    await expect(
-      t.mutation(internal.auth.requestNonce, {
-        wallet,
-        requester: "attacker-ip",
-      }),
-    ).rejects.toThrow("Too many");
-    // ...but the same wallet signs in fine from anywhere else.
-    const challenge = await t.mutation(internal.auth.requestNonce, {
-      wallet,
-      requester: "merchant-ip",
-    });
-    expect(challenge.nonce).toMatch(/^[a-f0-9]{32}$/);
-  });
-  it("cleans up used and expired sign-in data", async () => {
+  it("cleans up expired nonce records, sessions, and legacy rows", async () => {
     const t = convexTest(schema, modules);
     const wallet = seller.publicKey.toBase58();
     await t.run(async (ctx) => {
-      await ctx.db.insert("authNonces", {
-        wallet,
-        requester: "test-requester",
-        nonce: "cd".repeat(16),
-        issuedAt: Date.now() - 600_000,
+      await ctx.db.insert("usedNonces", {
+        nonce: "cd".repeat(48),
         expiresAt: Date.now() - 1,
-        used: false,
-      });
-      await ctx.db.insert("authNonces", {
-        wallet,
-        requester: "test-requester",
-        nonce: "ef".repeat(16),
-        issuedAt: Date.now(),
-        expiresAt: Date.now() + 300_000,
-        used: true,
       });
       await ctx.db.insert("sessions", {
         wallet,
@@ -222,13 +180,42 @@ describe("wallet sign-in", () => {
         createdAt: Date.now() - 8 * 24 * 60 * 60_000,
         expiresAt: Date.now() - 1,
       });
+      await ctx.db.insert("authNonces", {
+        wallet,
+        requester: "legacy",
+        nonce: "ef".repeat(16),
+        issuedAt: Date.now(),
+        expiresAt: Date.now() + 300_000,
+        used: false,
+      });
     });
     const { token } = await signIn(t, seller);
-    const removed = await t.mutation(internal.auth.cleanup, {});
-    expect(removed).toBe(4);
-    expect(await t.run((ctx) => ctx.db.query("authNonces").collect())).toHaveLength(0);
-    const sessions = await t.run((ctx) => ctx.db.query("sessions").collect());
-    expect(sessions).toHaveLength(1);
+    expect(await t.mutation(internal.auth.cleanup, {})).toBe(3);
+    expect(await t.run((ctx) => ctx.db.query("authNonces").collect())).toEqual(
+      [],
+    );
+    // The live session and its still-unexpired nonce record survive.
+    expect(
+      await t.run((ctx) => ctx.db.query("usedNonces").collect()),
+    ).toHaveLength(1);
+    expect(await t.run((ctx) => ctx.db.query("sessions").collect())).toHaveLength(
+      1,
+    );
     expect(await t.query(api.auth.me, { session: token })).not.toBeNull();
+  });
+  it("reschedules cleanup until a large backlog is drained", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 1_200; i++)
+        await ctx.db.insert("usedNonces", {
+          nonce: i.toString(16).padStart(96, "0"),
+          expiresAt: Date.now() - 1,
+        });
+    });
+    expect(await t.mutation(internal.auth.cleanup, {})).toBe(500);
+    await t.finishAllScheduledFunctions(() => {});
+    expect(await t.run((ctx) => ctx.db.query("usedNonces").collect())).toEqual(
+      [],
+    );
   });
 });

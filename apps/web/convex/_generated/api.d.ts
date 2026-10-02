@@ -17,6 +17,7 @@ import type * as paymentActions from "../paymentActions.js";
 import type * as paymentValidators from "../paymentValidators.js";
 import type * as payments from "../payments.js";
 import type * as session from "../session.js";
+import type * as signInNonce from "../signInNonce.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   paymentValidators: typeof paymentValidators;
   payments: typeof payments;
   session: typeof session;
+  signInNonce: typeof signInNonce;
 }>;
 
 /**

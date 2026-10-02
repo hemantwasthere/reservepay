@@ -1,100 +1,57 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
-import { validateWallet } from "../src/lib/sign-in";
+import { internal } from "./_generated/api";
 import { findSession, hashToken } from "./session";
 
-const NONCE_TTL = 5 * 60_000;
 const SESSION_TTL = 7 * 24 * 60 * 60_000;
+const CLEANUP_BATCH = 500;
 
-const randomHex = (bytes: number) =>
-  [...crypto.getRandomValues(new Uint8Array(bytes))]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-
-export const requestNonce = internalMutation({
-  args: { wallet: v.string(), requester: v.string() },
-  handler: async (ctx, { wallet, requester }) => {
-    validateWallet(wallet);
-    // Limited per requester (the client IP seen by the HTTP endpoint), never
-    // per wallet or globally, so no one can lock out a merchant or the site.
-    const recent = await ctx.db
-      .query("authNonces")
-      .withIndex("by_requester", (q) =>
-        q.eq("requester", requester).gte("_creationTime", Date.now() - 60_000),
-      )
-      .take(10);
-    if (recent.length >= 10)
-      throw new ConvexError("Too many sign-in attempts. Please wait a minute.");
-    const issuedAt = Date.now();
-    const expiresAt = issuedAt + NONCE_TTL;
-    const nonce = randomHex(16);
-    await ctx.db.insert("authNonces", {
-      wallet,
-      requester,
-      nonce,
-      issuedAt,
-      expiresAt,
-      used: false,
-    });
-    return { nonce, issuedAt, expiresAt };
+// Runs only after the sign-in action verified the nonce's HMAC and the wallet
+// signature, so anonymous callers can never reach these writes.
+export const createSession = internalMutation({
+  args: {
+    wallet: v.string(),
+    nonce: v.string(),
+    nonceExpiresAt: v.number(),
+    tokenHash: v.string(),
+  },
+  handler: async (ctx, { wallet, nonce, nonceExpiresAt, tokenHash }) => {
+    const used = await ctx.db
+      .query("usedNonces")
+      .withIndex("by_nonce", (q) => q.eq("nonce", nonce))
+      .first();
+    if (used) throw new ConvexError("This sign-in link expired. Try again.");
+    await ctx.db.insert("usedNonces", { nonce, expiresAt: nonceExpiresAt });
+    const createdAt = Date.now();
+    const expiresAt = createdAt + SESSION_TTL;
+    await ctx.db.insert("sessions", { wallet, tokenHash, createdAt, expiresAt });
+    return { expiresAt };
   },
 });
 
-// Cron entry point: delete nonces that are used or expired, and sessions that
-// expired, so sign-in tables stay bounded. Loops until drained (bounded per
-// run) so cleanup keeps up with the request rate.
+// Cron entry point. Deletes expired nonce records and sessions in bounded,
+// indexed batches, and reschedules itself until the backlog is drained.
 export const cleanup = internalMutation({
   args: {},
   handler: async (ctx) => {
-    let removed = 0;
-    for (;;) {
-      const batch = await ctx.db
-        .query("authNonces")
-        .filter((q) =>
-          q.or(
-            q.eq(q.field("used"), true),
-            q.lte(q.field("expiresAt"), Date.now()),
-          ),
-        )
-        .take(250);
-      for (const row of batch) await ctx.db.delete(row._id);
-      removed += batch.length;
-      if (batch.length < 250 || removed >= 5_000) break;
-    }
-    for (;;) {
-      const batch = await ctx.db
-        .query("sessions")
-        .filter((q) => q.lte(q.field("expiresAt"), Date.now()))
-        .take(250);
-      for (const row of batch) await ctx.db.delete(row._id);
-      removed += batch.length;
-      if (batch.length < 250 || removed >= 10_000) break;
-    }
-    return removed;
-  },
-});
-
-export const consumeNonce = internalMutation({
-  args: { wallet: v.string(), nonce: v.string() },
-  handler: async (ctx, { wallet, nonce }) => {
-    const row = await ctx.db
-      .query("authNonces")
-      .withIndex("by_nonce", (q) => q.eq("nonce", nonce))
-      .unique();
-    if (!row || row.used || row.wallet !== wallet || row.expiresAt <= Date.now())
-      throw new ConvexError("This sign-in link expired. Try again.");
-    await ctx.db.patch(row._id, { used: true });
-    const token = randomHex(32);
-    const createdAt = Date.now();
-    const expiresAt = createdAt + SESSION_TTL;
-    await ctx.db.insert("sessions", {
-      wallet,
-      tokenHash: await hashToken(token),
-      createdAt,
-      expiresAt,
-    });
-    // The raw token is returned once and never stored.
-    return { token, expiresAt };
+    const now = Date.now();
+    const nonces = await ctx.db
+      .query("usedNonces")
+      .withIndex("by_expires", (q) => q.lte("expiresAt", now))
+      .take(CLEANUP_BATCH);
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_expires", (q) => q.lte("expiresAt", now))
+      .take(CLEANUP_BATCH);
+    // Rows from the earlier stored-nonce design are no longer read.
+    const legacy = await ctx.db.query("authNonces").take(CLEANUP_BATCH);
+    for (const row of [...nonces, ...sessions, ...legacy])
+      await ctx.db.delete(row._id);
+    if (
+      [nonces, sessions, legacy].some((batch) => batch.length === CLEANUP_BATCH)
+    )
+      await ctx.scheduler.runAfter(0, internal.auth.cleanup, {});
+    return nonces.length + sessions.length + legacy.length;
   },
 });
 

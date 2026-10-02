@@ -12,7 +12,7 @@ export function validateWallet(address: string) {
 }
 export function validateChallenge(challenge: SignInChallenge) {
   validateWallet(challenge.wallet);
-  if (!/^[a-f0-9]{32}$/.test(challenge.nonce)) throw new Error("Invalid nonce.");
+  if (!/^[a-f0-9]{96}$/.test(challenge.nonce)) throw new Error("Invalid nonce.");
   if (
     !Number.isSafeInteger(challenge.issuedAt) ||
     !Number.isSafeInteger(challenge.expiresAt) ||
@@ -43,8 +43,7 @@ export function signInMessage(challenge: SignInChallenge): Uint8Array {
   );
 }
 
-// Shared by the sign-in action (message domain check) and the HTTP nonce
-// endpoint (CORS origin check). Only runs server-side.
+// Checks the domain in a signed sign-in message. Only runs server-side.
 export const allowedDomain = (domain: string): boolean => {
   const configured = process.env.SITE_ORIGIN?.replace(/^https?:\/\//, "");
   if (configured) return domain === configured;
