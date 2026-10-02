@@ -15,9 +15,7 @@ export default defineSchema({
     issuedAt: v.number(),
     expiresAt: v.number(),
     used: v.boolean(),
-  })
-    .index("by_nonce", ["nonce"])
-    .index("by_wallet", ["wallet"]),
+  }).index("by_nonce", ["nonce"]),
   sessions: defineTable({
     wallet: v.string(),
     tokenHash: v.string(),

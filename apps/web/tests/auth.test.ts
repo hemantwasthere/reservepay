@@ -146,13 +146,13 @@ describe("wallet sign-in", () => {
       t.query(api.payments.list, { session: fresh.token }),
     ).rejects.toThrow("Sign in again.");
   });
-  it("rate-limits nonce requests per wallet", async () => {
+  it("never locks a wallet out of sign-in, since requests are anonymous", async () => {
     const t = convexTest(schema, modules);
     const wallet = other.publicKey.toBase58();
-    for (let i = 0; i < 5; i++)
-      await t.mutation(api.auth.requestNonce, { wallet });
-    await expect(t.mutation(api.auth.requestNonce, { wallet })).rejects.toThrow(
-      "wait a minute",
-    );
+    for (let i = 0; i < 10; i++) {
+      const challenge = await t.mutation(api.auth.requestNonce, { wallet });
+      expect(challenge.nonce).toMatch(/^[a-f0-9]{32}$/);
+      expect(challenge.expiresAt).toBeGreaterThan(challenge.issuedAt);
+    }
   });
 });

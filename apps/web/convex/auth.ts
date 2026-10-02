@@ -15,14 +15,9 @@ export const requestNonce = mutation({
   args: { wallet: v.string() },
   handler: async (ctx, { wallet }) => {
     validateWallet(wallet);
-    const recent = await ctx.db
-      .query("authNonces")
-      .withIndex("by_wallet", (q) =>
-        q.eq("wallet", wallet).gte("_creationTime", Date.now() - 60_000),
-      )
-      .take(5);
-    if (recent.length >= 5)
-      throw new ConvexError("Please wait a minute before signing in again.");
+    // No per-wallet rate limit here: the requester is anonymous, so a limit
+    // keyed on the target wallet would let anyone lock a merchant out of
+    // sign-in. Nonces are single-use and expire after 5 minutes.
     const issuedAt = Date.now();
     const expiresAt = issuedAt + NONCE_TTL;
     const nonce = randomHex(16);
