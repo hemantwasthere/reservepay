@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { Keypair } from "@solana/web3.js";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
-import { api } from "../convex/_generated/api";
+import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
 import { signInMessage } from "../src/lib/sign-in";
 import { signIn, TEST_DOMAIN } from "./session";
@@ -154,5 +154,50 @@ describe("wallet sign-in", () => {
       expect(challenge.nonce).toMatch(/^[a-f0-9]{32}$/);
       expect(challenge.expiresAt).toBeGreaterThan(challenge.issuedAt);
     }
+  });
+  it("bounds nonce creation globally per minute", async () => {
+    const t = convexTest(schema, modules);
+    for (let i = 0; i < 60; i++)
+      await t.mutation(api.auth.requestNonce, {
+        wallet: i % 2 ? seller.publicKey.toBase58() : other.publicKey.toBase58(),
+      });
+    await expect(
+      t.mutation(api.auth.requestNonce, {
+        wallet: seller.publicKey.toBase58(),
+      }),
+    ).rejects.toThrow("busy");
+  });
+  it("cleans up used and expired sign-in data", async () => {
+    const t = convexTest(schema, modules);
+    const wallet = seller.publicKey.toBase58();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("authNonces", {
+        wallet,
+        nonce: "cd".repeat(16),
+        issuedAt: Date.now() - 600_000,
+        expiresAt: Date.now() - 1,
+        used: false,
+      });
+      await ctx.db.insert("authNonces", {
+        wallet,
+        nonce: "ef".repeat(16),
+        issuedAt: Date.now(),
+        expiresAt: Date.now() + 300_000,
+        used: true,
+      });
+      await ctx.db.insert("sessions", {
+        wallet,
+        tokenHash: "aa".repeat(32),
+        createdAt: Date.now() - 8 * 24 * 60 * 60_000,
+        expiresAt: Date.now() - 1,
+      });
+    });
+    const { token } = await signIn(t, seller);
+    const removed = await t.mutation(internal.auth.cleanup, {});
+    expect(removed).toBe(4);
+    expect(await t.run((ctx) => ctx.db.query("authNonces").collect())).toHaveLength(0);
+    const sessions = await t.run((ctx) => ctx.db.query("sessions").collect());
+    expect(sessions).toHaveLength(1);
+    expect(await t.query(api.auth.me, { session: token })).not.toBeNull();
   });
 });

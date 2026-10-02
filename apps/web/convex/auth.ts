@@ -15,9 +15,15 @@ export const requestNonce = mutation({
   args: { wallet: v.string() },
   handler: async (ctx, { wallet }) => {
     validateWallet(wallet);
-    // No per-wallet rate limit here: the requester is anonymous, so a limit
-    // keyed on the target wallet would let anyone lock a merchant out of
-    // sign-in. Nonces are single-use and expire after 5 minutes.
+    // The requester is anonymous, so a per-wallet limit would let anyone lock
+    // a merchant out of sign-in. A global cap bounds table growth instead;
+    // the cleanup cron below keeps this scan small.
+    const recent = await ctx.db.query("authNonces").order("desc").take(60);
+    if (
+      recent.length >= 60 &&
+      recent[recent.length - 1]._creationTime > Date.now() - 60_000
+    )
+      throw new ConvexError("Sign-in is busy. Try again in a minute.");
     const issuedAt = Date.now();
     const expiresAt = issuedAt + NONCE_TTL;
     const nonce = randomHex(16);
@@ -29,6 +35,30 @@ export const requestNonce = mutation({
       used: false,
     });
     return { nonce, issuedAt, expiresAt };
+  },
+});
+
+// Cron entry point: delete nonces that are used or expired, and sessions that
+// expired, so sign-in tables stay bounded.
+export const cleanup = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const staleNonces = await ctx.db
+      .query("authNonces")
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("used"), true),
+          q.lte(q.field("expiresAt"), Date.now()),
+        ),
+      )
+      .take(250);
+    for (const row of staleNonces) await ctx.db.delete(row._id);
+    const staleSessions = await ctx.db
+      .query("sessions")
+      .filter((q) => q.lte(q.field("expiresAt"), Date.now()))
+      .take(250);
+    for (const row of staleSessions) await ctx.db.delete(row._id);
+    return staleNonces.length + staleSessions.length;
   },
 });
 
