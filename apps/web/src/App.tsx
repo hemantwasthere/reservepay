@@ -1247,7 +1247,7 @@ export function App() {
             <Card
               as="div"
               className={
-                "merchant-dashboard self-center [border:1px_solid_#58624e] bg-[#333c2e] p-[24px] relative shadow-[9px_9px_0_#2c3526,_10px_10px_0_#48533f] max-[900px]:p-[19px] max-[700px]:p-[23px] max-[700px]:mr-[8px] max-[380px]:p-[17px] [&.is-revealed_.balance-chart_span]:[transform-origin:left] [&.is-revealed_.balance-chart_span]:animate-[reserve-fill_800ms_var(--ease-settle)_160ms_both] [&.is-revealed_.balance-chart_span:last-child]:animate-[reserve-fill_800ms_var(--ease-settle)_280ms_both,_reserve-shimmer_2400ms_linear_infinite]"
+                "merchant-dashboard text-[#edf1e7] self-center [border:1px_solid_#58624e] bg-[#333c2e] p-[24px] relative shadow-[9px_9px_0_#2c3526,_10px_10px_0_#48533f] max-[900px]:p-[19px] max-[700px]:p-[23px] max-[700px]:mr-[8px] max-[380px]:p-[17px] [&.is-revealed_.balance-chart_span]:[transform-origin:left] [&.is-revealed_.balance-chart_span]:animate-[reserve-fill_800ms_var(--ease-settle)_160ms_both] [&.is-revealed_.balance-chart_span:last-child]:animate-[reserve-fill_800ms_var(--ease-settle)_280ms_both,_reserve-shimmer_2400ms_linear_infinite]"
               }
               data-reveal
             >
@@ -1466,7 +1466,7 @@ export function App() {
             </Button>
             <span
               className={
-                "closing-note block [font:7px_var(--mono)] tracking-[0.8px] text-[#8c9681] mt-[19px] max-[700px]:text-[6px]"
+                "closing-note block [font:7px_var(--mono)] tracking-[0.8px] text-muted-foreground mt-[19px] max-[700px]:text-[6px]"
               }
             >
               NO REAL FUNDS. JUST A BETTER WAY TO PAY.
