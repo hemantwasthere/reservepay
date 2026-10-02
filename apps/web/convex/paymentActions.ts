@@ -5,10 +5,11 @@ import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import { termsFields } from "./paymentValidators";
+import { termsFields, refundReason } from "./paymentValidators";
 import { paymentApproval } from "../src/payments/terms";
 import { paymentClient } from "../src/payments/chain";
 import { merchantClient } from "../src/merchant/client";
+import { refundApproval } from "../src/payments/refunds";
 import type { Id } from "./_generated/dataModel";
 
 const rpc = new Connection("https://api.devnet.solana.com", {
@@ -66,5 +67,55 @@ export const sync = action({
     if (!receipt) return false;
     await ctx.runMutation(internal.payments.record, { id: link._id, receipt });
     return true;
+  },
+});
+
+export const requestRefund = action({
+  args: {
+    id: v.string(),
+    order: v.string(),
+    buyer: v.string(),
+    reason: refundReason,
+    issuedAt: v.number(),
+    signature: v.string(),
+  },
+  handler: async (ctx, { signature, ...request }): Promise<void> => {
+    try {
+      if (
+        signature.length > 88 ||
+        !nacl.sign.detached.verify(
+          refundApproval(request),
+          bs58.decode(signature),
+          new PublicKey(request.buyer).toBytes(),
+        )
+      )
+        throw new Error("The buyer did not approve this refund request.");
+      const link = await ctx.runQuery(api.payments.get, { id: request.id });
+      if (!link) throw new Error("Payment link not found.");
+      const receipt = await paymentClient(rpc).readOrder(link);
+      if (
+        !receipt ||
+        receipt.buyer !== request.buyer ||
+        receipt.order !== request.order
+      )
+        throw new Error(
+          "Only the verified buyer can request a refund for this order.",
+        );
+      if (
+        !link.refundRequest &&
+        (request.issuedAt < Date.now() - 600_000 ||
+          request.issuedAt > Date.now() + 30_000)
+      )
+        throw new Error("This approval expired. Request the refund again.");
+      await ctx.runMutation(internal.payments.requestRefund, {
+        id: link._id,
+        receipt,
+        reason: request.reason,
+      });
+    } catch (error) {
+      throw new ConvexError(
+        error instanceof Error ? error.message : "Could not request a refund.",
+      );
+    }
   },
 });

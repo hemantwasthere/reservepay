@@ -20,7 +20,7 @@ import bs58 from "bs58";
 import { api } from "../../convex/_generated/api";
 import { type WalletConnection } from "../lib/WalletControl";
 import { useToast } from "../lib/Toast";
-import { exactAmount, parseAmount, explorer } from "../merchant/client";
+import { exactAmount, parseAmount } from "../merchant/client";
 import { paymentApproval, protectionLabel, type PaymentTerms } from "./terms";
 import {
   PaymentBoundary,
@@ -385,15 +385,16 @@ function LinkManager({
                 </span>
                 {link.receipt && (
                   <a
-                    className={
-                      "payment-order-link inline-flex gap-[5px] items-center text-[#476238] text-[11px]"
-                    }
-                    href={explorer(link.receipt.order)}
-                    target="_blank"
-                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary underline-offset-4 hover:underline"
+                    href={`/pay/${link._id}`}
                   >
-                    View on-chain order <ArrowUpRight size={12} />
+                    Manage order <ArrowUpRight size={12} />
                   </a>
+                )}
+                {link.refundPending && (
+                  <span className="text-xs text-amber-800">
+                    Refund requested · awaiting resolver
+                  </span>
                 )}
               </div>
               <div

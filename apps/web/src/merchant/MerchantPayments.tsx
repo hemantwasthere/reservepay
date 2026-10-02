@@ -3,6 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import { LoaderCircle, ArrowUpRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { RefundQueue } from "../payments/RefundQueue";
 import { PaymentLinks } from "../payments/PaymentLinks";
 import type { WalletConnection } from "../lib/WalletControl";
 import { client, type MerchantState } from "./client";
@@ -66,6 +67,7 @@ export function MerchantPayments({
     );
   return (
     <>
+      <RefundQueue active={active} />
       <PaymentLinks
         active={active}
         registered={Boolean(state?.registered && state.ready)}
