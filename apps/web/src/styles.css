@@ -109,6 +109,12 @@
   body {
     @apply m-0 min-w-[320px];
   }
+  /* The root reserves the scrollbar gutter; Radix must not add a second gap. */
+  @supports (scrollbar-gutter: stable) {
+    body[data-scroll-locked] {
+      @apply mr-0!;
+    }
+  }
   button,
   input {
     @apply [font:inherit];

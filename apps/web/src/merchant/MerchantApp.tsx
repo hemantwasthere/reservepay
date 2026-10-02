@@ -98,26 +98,28 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
           "merchant-header min-h-[88px] flex items-center gap-[34px] py-[20px] px-[34px] [border-bottom:1px_solid_var(--line)] bg-card max-[860px]:min-h-[78px] max-[860px]:py-[16px] max-[860px]:px-[24px] max-[640px]:px-3 max-[640px]:py-4 max-[640px]:gap-[8px] max-[640px]:[&_.brand]:text-[17px] max-[380px]:[&_.brand]:text-[14px] max-[380px]:px-2 max-[380px]:[&_.wallet-button]:px-2 max-[640px]:[&_.brand-mark]:w-[24px] max-[640px]:[&_.brand-mark]:h-[24px] max-[640px]:[&_.wallet-button]:min-h-[37px] max-[640px]:[&_.wallet-button]:text-[10px] max-[640px]:[&_.wallet-button]:gap-[6px] max-[640px]:[&_.wallet-button]:py-0 max-[640px]:[&_.wallet-button]:px-[10px] sticky top-0 z-30 h-[88px] shrink-0"
         }
       >
-        <WorkspaceSidebarTrigger />
-        <a
-          className={
-            "brand inline-flex items-center text-[22px] tracking-[-1px] font-[650] whitespace-nowrap max-[900px]:text-[20px] max-[700px]:text-[20px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:[transform:skewY(-12deg)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:rounded-[1.5px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:first-child]:[transform:skewY(-12deg)_translateY(-1px)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:last-child]:[transform:skewY(-12deg)_translateY(1px)_scaleX(0.94)] motion-reduce:[&:hover_.brand-mark_span]:[transform:skewY(-24deg)]"
-          }
-          href="/"
-          aria-label="ReservePay home"
-        >
-          <span
+        <div className="flex shrink-0 items-center gap-4 max-[640px]:gap-2">
+          <a
             className={
-              "brand-mark relative w-[25px] h-[28px] block mr-[10px] [&_span]:absolute [&_span]:left-[1px] [&_span]:w-[22px] [&_span]:h-[6px] [&_span]:bg-primary [&_span]:[transform:skewY(-24deg)] [&_span]:rounded-[1px] [&_span]:[transition:transform_420ms_var(--ease-settle),_border-radius_420ms_ease] [&_span:nth-child(1)]:top-[4px] [&_span:nth-child(2)]:top-[12px] [&_span:nth-child(3)]:top-[20px] max-[700px]:w-[22px] max-[700px]:mr-[7px] max-[700px]:[&_span]:w-[20px]"
+              "brand inline-flex items-center text-[22px] tracking-[-1px] font-[650] whitespace-nowrap max-[900px]:text-[20px] max-[700px]:text-[20px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:[transform:skewY(-12deg)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:rounded-[1.5px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:first-child]:[transform:skewY(-12deg)_translateY(-1px)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:last-child]:[transform:skewY(-12deg)_translateY(1px)_scaleX(0.94)] motion-reduce:[&:hover_.brand-mark_span]:[transform:skewY(-24deg)]"
             }
-            aria-hidden="true"
+            href="/"
+            aria-label="ReservePay home"
           >
-            <span />
-            <span />
-            <span />
-          </span>
-          ReservePay<span className={"brand-period text-primary"}>.</span>
-        </a>
+            <span
+              className={
+                "brand-mark relative w-[25px] h-[28px] block mr-[10px] [&_span]:absolute [&_span]:left-[1px] [&_span]:w-[22px] [&_span]:h-[6px] [&_span]:bg-primary [&_span]:[transform:skewY(-24deg)] [&_span]:rounded-[1px] [&_span]:[transition:transform_420ms_var(--ease-settle),_border-radius_420ms_ease] [&_span:nth-child(1)]:top-[4px] [&_span:nth-child(2)]:top-[12px] [&_span:nth-child(3)]:top-[20px] max-[700px]:w-[22px] max-[700px]:mr-[7px] max-[700px]:[&_span]:w-[20px]"
+              }
+              aria-hidden="true"
+            >
+              <span />
+              <span />
+              <span />
+            </span>
+            ReservePay<span className={"brand-period text-primary"}>.</span>
+          </a>
+          <WorkspaceSidebarTrigger />
+        </div>
         <span
           className={
             "workspace-label [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground pl-[28px] [border-left:1px_solid_var(--line)] max-[1100px]:hidden"
@@ -842,10 +844,11 @@ function MerchantWorkspace({
             </label>
             <div
               className={
-                'reserve-amount [border:1px_solid_#d4dccb] flex items-center py-[15px] px-[13px] [margin:9px_0_12px] rounded-[3px] [&:focus-within]:border-[var(--green)] [&:focus-within]:shadow-[0_0_0_2px_#426b3610] [&_input]:[border:0] [&_input]:bg-transparent [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:[font:24px_var(--mono)] [&_input]:text-foreground [&_input]:[outline:0] [&_input::placeholder]:text-[#b9c1b1] [&_button]:bg-[#eef3e7] [&_button]:[border:1px_solid_#dce5d2] [&_button]:rounded-[3px] [&_button]:[font:9px_var(--mono)] [&_button]:py-[5px] [&_button]:px-[7px] [&_button]:text-primary [&_input[aria-invalid="true"]]:[color:var(--danger)] [&:has(input[aria-invalid="true"])]:border-[var(--danger)]'
+                'reserve-amount [border:1px_solid_#d4dccb] flex items-center py-[15px] px-[13px] [margin:9px_0_12px] rounded-[3px] [&:focus-within]:border-[var(--green)] [&_input]:[border:0] [&_input]:bg-transparent [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:[font:24px_var(--mono)] [&_input]:text-foreground [&_input]:[outline:0] [&_input::placeholder]:text-[#b9c1b1] [&_button]:bg-[#eef3e7] [&_button]:[border:1px_solid_#dce5d2] [&_button]:rounded-[3px] [&_button]:[font:9px_var(--mono)] [&_button]:py-[5px] [&_button]:px-[7px] [&_button]:text-primary [&_input[aria-invalid="true"]]:[color:var(--danger)] [&:has(input[aria-invalid="true"])]:border-[var(--danger)]'
               }
             >
               <Input
+                variant="embedded"
                 id="reserve-amount"
                 inputMode="decimal"
                 autoComplete="off"

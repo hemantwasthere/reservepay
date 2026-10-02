@@ -95,7 +95,7 @@ export function KeyboardShortcuts({
         <Button
           variant="ghost"
           size="sm"
-          className="shortcuts-trigger h-auto gap-2 p-0 text-[10px] text-muted-foreground"
+          className="shortcuts-trigger h-auto min-h-8 gap-2 px-2.5 py-1.5 text-[10px] text-muted-foreground"
           aria-keyshortcuts="Alt+Shift+K"
         >
           <Keyboard className="size-[14px]" />

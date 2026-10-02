@@ -585,10 +585,11 @@ function CheckoutDemo() {
               Order total <span>USDC ON SOLANA</span>
             </label>
             <div
-              className={`amount-input [&_input]:text-[34px] [&_input]:tracking-[-1.5px] [&_input]:font-[500] [&_input]:[background:none] [&_input]:[border:0] [&_input]:[outline:none] [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:text-foreground [&_input]:p-0 [&_input]:[appearance:textfield] [&_input]:[-moz-appearance:textfield] [&_input::-webkit-inner-spin-button]:[-webkit-appearance:none] [&_input::-webkit-inner-spin-button]:m-0 [&_input::-webkit-outer-spin-button]:[-webkit-appearance:none] [&_input::-webkit-outer-spin-button]:m-0 flex items-center gap-[7px] py-[13px] px-[15px] [border:1px_solid_#dce2d3] bg-[#f8faf4] [&>span]:text-[30px] [&>span]:text-[#a0aa95] [&>span]:font-[400] [&:focus-within]:border-[#64874d] [&:focus-within]:shadow-[0_0_0_2px_#64874d12] [&_svg]:text-[#668eaa] [&_svg]:shrink-[0] [&.has-error]:border-[#a55745] ${!valid ? "has-error" : ""}`}
+              className={`amount-input [&_input]:text-[34px] [&_input]:tracking-[-1.5px] [&_input]:font-[500] [&_input]:[background:none] [&_input]:[border:0] [&_input]:[outline:none] [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:text-foreground [&_input]:p-0 [&_input]:[appearance:textfield] [&_input]:[-moz-appearance:textfield] [&_input::-webkit-inner-spin-button]:[-webkit-appearance:none] [&_input::-webkit-inner-spin-button]:m-0 [&_input::-webkit-outer-spin-button]:[-webkit-appearance:none] [&_input::-webkit-outer-spin-button]:m-0 flex items-center gap-[7px] py-[13px] px-[15px] [border:1px_solid_#dce2d3] bg-[#f8faf4] [&>span]:text-[30px] [&>span]:text-[#a0aa95] [&>span]:font-[400] [&:focus-within]:border-[#64874d] [&_svg]:text-[#668eaa] [&_svg]:shrink-[0] [&.has-error]:border-[#a55745] ${!valid ? "has-error" : ""}`}
             >
               <span>$</span>
               <Input
+                variant="embedded"
                 id={inputId}
                 aria-label="Order amount"
                 aria-invalid={!valid}
@@ -1064,8 +1065,8 @@ export function App() {
                 }
               >
                 <Button asChild variant="ink" size="unstyled">
-                  <a className={"button button-dark"} href="#demo">
-                    Try the checkout <ArrowRight size={16} />
+                  <a className={"button button-dark"} href="/app">
+                    Open app <ArrowUpRight size={16} />
                   </a>
                 </Button>
                 <Button asChild variant="unstyled" size="unstyled">
@@ -1247,7 +1248,7 @@ export function App() {
             <Card
               as="div"
               className={
-                "merchant-dashboard text-[#edf1e7] self-center [border:1px_solid_#58624e] bg-[#333c2e] p-[24px] relative shadow-[9px_9px_0_#2c3526,_10px_10px_0_#48533f] max-[900px]:p-[19px] max-[700px]:p-[23px] max-[700px]:mr-[8px] max-[380px]:p-[17px] [&.is-revealed_.balance-chart_span]:[transform-origin:left] [&.is-revealed_.balance-chart_span]:animate-[reserve-fill_800ms_var(--ease-settle)_160ms_both] [&.is-revealed_.balance-chart_span:last-child]:animate-[reserve-fill_800ms_var(--ease-settle)_280ms_both,_reserve-shimmer_2400ms_linear_infinite]"
+                "merchant-dashboard text-[#edf1e7] self-center [border:1px_solid_#58624e] bg-[#333c2e] p-[24px] relative shadow-[9px_9px_0_#2c3526,_10px_10px_0_#48533f] max-[900px]:p-[19px] max-[700px]:p-[23px] max-[700px]:mr-[8px] max-[380px]:p-[17px] [&.is-revealed_.balance-chart_span]:[transform-origin:left] [&.is-revealed_.balance-chart_span]:animate-[reserve-fill_800ms_var(--ease-settle)_160ms_both] [&.is-revealed_.balance-chart_span:last-child]:animate-[reserve-fill_800ms_var(--ease-settle)_280ms_both,_reserve-shimmer_1200ms_linear_infinite]"
               }
               data-reveal
             >

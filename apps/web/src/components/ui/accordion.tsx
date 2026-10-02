@@ -47,18 +47,25 @@ function AccordionTrigger({
 function AccordionContent({
   className,
   children,
+  forceMount = true,
   ...props
 }: React.ComponentProps<typeof AccordionPrimitive.Content>) {
   return (
     <AccordionPrimitive.Content
       data-slot="accordion-content"
-      className={cn(
-        "overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down",
-        props.forceMount && "data-[state=closed]:hidden",
-      )}
+      forceMount={forceMount}
+      className="group/accordion-content"
       {...props}
     >
-      <div className={cn("pt-0 pb-4", className)}>{children}</div>
+      {/* Animate a child: Radix temporarily disables transitions on its measurement node. */}
+      <div
+        data-slot="accordion-motion"
+        className="grid grid-rows-[0fr] invisible opacity-0 transition-[grid-template-rows,opacity,visibility] duration-200 ease-out group-data-[state=open]/accordion-content:grid-rows-[1fr] group-data-[state=open]/accordion-content:visible group-data-[state=open]/accordion-content:opacity-100 motion-reduce:transition-none"
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className={cn("pt-0 pb-4", className)}>{children}</div>
+        </div>
+      </div>
     </AccordionPrimitive.Content>
   );
 }
