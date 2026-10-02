@@ -3,7 +3,7 @@ import { query, internalMutation, internalQuery } from "./_generated/server";
 import { validateTerms } from "../src/payments/terms";
 import { requireMerchant } from "./session";
 
-import { termsFields, receiptFields } from "./paymentValidators";
+import { termsFields, receiptFields, refundReason } from "./paymentValidators";
 
 // Link descriptions and on-chain receipts are public. Never put customer data here.
 export const get = query({
@@ -81,7 +81,50 @@ export const record = internalMutation({
       (link.receipt.status !== "paid" || link.receipt.status === receipt.status)
     )
       return link.receipt;
-    await ctx.db.patch(id, { receipt });
+    await ctx.db.patch(id, {
+      receipt,
+      ...(receipt.status !== "paid" ? { refundPending: false } : {}),
+    });
     return receipt;
+  },
+});
+
+// The queue contains public categories only, never customer contact details or evidence.
+export const refundQueue = query({
+  args: {},
+  handler: (ctx) =>
+    ctx.db
+      .query("paymentLinks")
+      .withIndex("by_refund", (q) => q.eq("refundPending", true))
+      .take(50),
+});
+export const requestRefund = internalMutation({
+  args: {
+    id: v.id("paymentLinks"),
+    receipt: v.object(receiptFields),
+    reason: refundReason,
+  },
+  handler: async (ctx, { id, receipt, reason }) => {
+    const link = await ctx.db.get(id);
+    if (!link) throw new ConvexError("Payment link not found.");
+    if (link.refundRequest) {
+      if (link.refundRequest.reason !== reason)
+        throw new ConvexError(
+          "A refund has already been requested for this order.",
+        );
+      return;
+    }
+    if (
+      receipt.status !== "paid" ||
+      (link.receipt && link.receipt.status !== "paid")
+    )
+      throw new ConvexError("This order is already resolved.");
+    if (receipt.expiresAt <= Date.now())
+      throw new ConvexError("The protection period has ended.");
+    await ctx.db.patch(id, {
+      receipt,
+      refundRequest: { reason, requestedAt: Date.now() },
+      refundPending: true,
+    });
   },
 });

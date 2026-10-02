@@ -3,6 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import { LoaderCircle, ArrowUpRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { RefundQueue } from "../payments/RefundQueue";
 import { PaymentLinks } from "../payments/PaymentLinks";
 import { SignInCard } from "./SignInCard";
 import type { WalletConnection } from "../lib/WalletControl";
@@ -70,6 +71,7 @@ export function MerchantPayments({
     );
   return (
     <>
+      <RefundQueue active={active} />
       {active && session.status !== "signed-in" ? (
         <SignInCard active={active} session={session} />
       ) : (

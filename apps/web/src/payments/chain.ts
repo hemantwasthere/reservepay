@@ -6,6 +6,7 @@ import {
   SystemProgram,
   Transaction,
   ComputeBudgetProgram,
+  SYSVAR_CLOCK_PUBKEY,
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -43,7 +44,7 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
   };
   return {
     addresses,
-    async readOrder(
+    async readState(
       terms: PaymentTerms,
       commitment: "confirmed" | "finalized" = "finalized",
     ) {
@@ -68,6 +69,15 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
         throw new Error(
           "The on-chain order does not match this payment link. Do not send another payment.",
         );
+      return state;
+    },
+    async readOrder(
+      terms: PaymentTerms,
+      commitment: "confirmed" | "finalized" = "finalized",
+    ) {
+      const state = await this.readState(terms, commitment);
+      if (!state) return null;
+      const { order } = addresses(terms);
       const status = orderStatus(state.status);
       return {
         order: order.toBase58(),
@@ -77,6 +87,124 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
         expiresAt: state.expiresAt.toNumber() * 1000,
         status,
       };
+    },
+    async readResolver() {
+      const account = await rpc.getAccountInfo(protocolAddress(), "confirmed");
+      if (!account || !account.owner.equals(PROGRAM_ID))
+        throw new Error("Could not verify the protocol resolver.");
+      return program.coder.accounts.decode<IdlAccounts<Reservepay>["protocol"]>(
+        "protocol",
+        account.data,
+      ).resolver;
+    },
+    async prepareResolution(
+      terms: PaymentTerms,
+      signer: PublicKey,
+      action: "refund" | "complete",
+    ) {
+      const { authority, merchant, order, reserveVault, merchantTokenAccount } =
+        addresses(terms);
+      const [state, resolver] = await Promise.all([
+        this.readState(terms, "confirmed"),
+        this.readResolver(),
+      ]);
+      if (!state || !("open" in state.status))
+        throw new Error("This order is already resolved or has not been paid.");
+      if (action === "refund" && !signer.equals(resolver))
+        throw new Error("Only the configured resolver can refund an order.");
+      if (action === "complete" && !signer.equals(resolver)) {
+        if (!signer.equals(authority))
+          throw new Error(
+            "Connect the merchant or resolver wallet to complete this order.",
+          );
+        const clock = await rpc.getAccountInfo(
+          SYSVAR_CLOCK_PUBKEY,
+          "confirmed",
+        );
+        if (
+          !clock ||
+          clock.data.readBigInt64LE(32) < BigInt(state.expiresAt.toString())
+        )
+          throw new Error(
+            "Protection has not ended. Only the resolver can complete this order early.",
+          );
+      }
+      const transaction = new Transaction().add(
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000 }),
+      );
+      if (action === "refund") {
+        if (
+          state.buyerTokenAccount.equals(
+            getAssociatedTokenAddressSync(mint, state.buyer),
+          )
+        )
+          transaction.add(
+            createAssociatedTokenAccountIdempotentInstruction(
+              signer,
+              state.buyerTokenAccount,
+              state.buyer,
+              mint,
+            ),
+          );
+        transaction.add(
+          await program.methods
+            .refundOrder()
+            .accountsStrict({
+              protocol: protocolAddress(),
+              merchant,
+              order,
+              reserveVault,
+              buyerTokenAccount: state.buyerTokenAccount,
+              resolver: signer,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .instruction(),
+        );
+      } else {
+        transaction.add(
+          createAssociatedTokenAccountIdempotentInstruction(
+            signer,
+            merchantTokenAccount,
+            authority,
+            mint,
+          ),
+        );
+        transaction.add(
+          await program.methods
+            .completeOrder()
+            .accountsStrict({
+              protocol: protocolAddress(),
+              merchant,
+              order,
+              reserveVault,
+              merchantTokenAccount,
+              caller: signer,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            })
+            .instruction(),
+        );
+      }
+      const lifetime = await rpc.getLatestBlockhash("confirmed");
+      transaction.feePayer = signer;
+      transaction.recentBlockhash = lifetime.blockhash;
+      const fee = await rpc.getFeeForMessage(
+        transaction.compileMessage(),
+        "confirmed",
+      );
+      const destination =
+        action === "complete" ? merchantTokenAccount : state.buyerTokenAccount;
+      const rent = !(await rpc.getAccountInfo(destination))
+        ? await rpc.getMinimumBalanceForRentExemption(165)
+        : 0;
+      if (
+        (await rpc.getBalance(signer, "confirmed")) <
+        rent + (fee.value ?? 5200)
+      )
+        throw new Error(
+          "Add devnet SOL to cover the network fee and any token account rent.",
+        );
+      return { transaction, ...lifetime };
     },
     async prepare(terms: PaymentTerms, buyer: PublicKey) {
       const { authority, merchant, order, reserveVault, merchantTokenAccount } =

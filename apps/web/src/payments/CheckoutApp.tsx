@@ -1,3 +1,4 @@
+import { OrderActions } from "./OrderActions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -418,7 +419,14 @@ function Checkout({
       </Card>
     );
   if (link.receipt)
-    return <Receipt link={link} buyer={active?.account.address} />;
+    return (
+      <Receipt
+        link={link}
+        active={active}
+        setLocked={setLocked}
+        isCurrent={isCurrent}
+      />
+    );
   return (
     <Card
       as="section"
@@ -498,8 +506,8 @@ function Checkout({
         <ShieldCheck size={20} />
         <p>
           The merchant’s reserve backs the full payment during your protection
-          period. Refunds require an authorized resolver; self-service refund
-          requests are not available yet.
+          period. Request a refund from your receipt before protection ends.
+          Refunds require an authorized resolver’s approval.
         </p>
       </div>
       {!active && (
@@ -603,12 +611,17 @@ function Checkout({
 }
 function Receipt({
   link,
-  buyer,
+  active,
+  setLocked,
+  isCurrent,
 }: {
   link: Doc<"paymentLinks">;
-  buyer?: string;
+  active: WalletConnection | null;
+  setLocked: (value: boolean) => void;
+  isCurrent: (value: WalletConnection) => boolean;
 }) {
   const receipt = link.receipt!;
+  const buyer = active?.account.address;
   return (
     <Card
       as="section"
@@ -633,7 +646,9 @@ function Receipt({
       <h2>
         {receipt.status === "refunded"
           ? "Payment refunded."
-          : "Payment received."}
+          : receipt.status === "completed"
+            ? "Order completed."
+            : "Payment received."}
       </h2>
       <p>{link.title}</p>
       <div
@@ -688,6 +703,12 @@ function Receipt({
           </dd>
         </div>
       </dl>
+      <OrderActions
+        link={link}
+        active={active}
+        setLocked={setLocked}
+        isCurrent={isCurrent}
+      />
       <Button asChild variant="brand" size="unstyled">
         <a
           className={"button button-green checkout-pay w-[100%] mt-[12px]"}

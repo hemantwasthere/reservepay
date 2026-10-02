@@ -389,4 +389,120 @@ describe("reservepay", () => {
         .locked,
     ).to.equal(after.locked);
   });
+  it("resolves browser orders with enforced authority and exact reserve accounting", async () => {
+    const client = paymentClient(provider.connection, mint);
+    const terms = {
+      merchant: buyer.publicKey.toBase58(),
+      reference: "ce".repeat(16),
+      title: "Checkout integration",
+      amount: "10000000",
+      protectionSeconds: 86400,
+      issuedAt: Date.now(),
+    };
+    const before = await merchantClient(provider.connection, mint).read(
+      buyer.publicKey,
+    );
+    const payerBefore = (
+      await getAccount(provider.connection, merchantTokenAccount)
+    ).amount;
+    // Even bypassing the UI, a merchant cannot refund or complete early.
+    const addresses = client.addresses(terms);
+    const protocol = PublicKey.findProgramAddressSync(
+      [Buffer.from("protocol")],
+      workspaceProgram.programId,
+    )[0];
+    for (const action of ["refund", "complete"] as const) {
+      let blocked = false;
+      try {
+        const method =
+          action === "refund"
+            ? workspaceProgram.methods.refundOrder().accountsStrict({
+                protocol,
+                merchant: addresses.merchant,
+                order: addresses.order,
+                reserveVault: addresses.reserveVault,
+                buyerTokenAccount: merchantTokenAccount,
+                resolver: buyer.publicKey,
+                tokenProgram: TOKEN_PROGRAM_ID,
+              })
+            : workspaceProgram.methods.completeOrder().accountsStrict({
+                protocol,
+                merchant: addresses.merchant,
+                order: addresses.order,
+                reserveVault: addresses.reserveVault,
+                merchantTokenAccount: addresses.merchantTokenAccount,
+                caller: buyer.publicKey,
+                tokenProgram: TOKEN_PROGRAM_ID,
+              });
+        await method.signers([buyer]).rpc();
+      } catch {
+        blocked = true;
+      }
+      expect(blocked).to.equal(true);
+    }
+    const transact = async (
+      prepared: Awaited<ReturnType<typeof client.prepareResolution>>,
+    ) => {
+      prepared.transaction.sign(payer);
+      const signature = await provider.connection.sendRawTransaction(
+        prepared.transaction.serialize(),
+      );
+      const result = await provider.connection.confirmTransaction(
+        {
+          signature,
+          blockhash: prepared.blockhash,
+          lastValidBlockHeight: prepared.lastValidBlockHeight,
+        },
+        "confirmed",
+      );
+      expect(result.value.err).to.equal(null);
+    };
+    await transact(
+      await client.prepareResolution(terms, payer.publicKey, "refund"),
+    );
+    const after = await merchantClient(provider.connection, mint).read(
+      buyer.publicKey,
+    );
+    expect(before.reserve - after.reserve).to.equal(10000000n);
+    expect(before.locked - after.locked).to.equal(10000000n);
+    expect(after.refundedOrders - before.refundedOrders).to.equal(1n);
+    expect(
+      (await getAccount(provider.connection, merchantTokenAccount)).amount -
+        payerBefore,
+    ).to.equal(10000000n);
+    expect((await client.readOrder(terms, "confirmed"))?.status).to.equal(
+      "refunded",
+    );
+    let duplicateBlocked = false;
+    try {
+      await client.prepareResolution(terms, payer.publicKey, "complete");
+    } catch {
+      duplicateBlocked = true;
+    }
+    expect(duplicateBlocked).to.equal(true);
+    // Remaining collateral covers a second, smaller order.
+    const clean = { ...terms, reference: "cf".repeat(16), amount: "1000000" };
+    await transact(await client.prepare(clean, payer.publicKey));
+    const beforeCompletion = await merchantClient(
+      provider.connection,
+      mint,
+    ).read(buyer.publicKey);
+    await transact(
+      await client.prepareResolution(clean, payer.publicKey, "complete"),
+    );
+    const completed = await merchantClient(provider.connection, mint).read(
+      buyer.publicKey,
+    );
+    expect(completed.walletBalance - beforeCompletion.walletBalance).to.equal(
+      50000n,
+    );
+    expect(beforeCompletion.reserve - completed.reserve).to.equal(50000n);
+    expect(beforeCompletion.locked - completed.locked).to.equal(1000000n);
+    expect(
+      completed.completedOrders - beforeCompletion.completedOrders,
+    ).to.equal(1n);
+    expect((await client.readOrder(clean, "confirmed"))?.status).to.equal(
+      "completed",
+    );
+  });
 });

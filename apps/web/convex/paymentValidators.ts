@@ -19,3 +19,13 @@ export const receiptFields = {
     v.literal("refunded"),
   ),
 };
+
+export const refundReason = v.union(
+  v.literal("not_received"),
+  v.literal("not_as_described"),
+  v.literal("cancellation"),
+);
+export const refundRequestFields = {
+  reason: refundReason,
+  requestedAt: v.number(),
+};
