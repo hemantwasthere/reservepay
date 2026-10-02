@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -95,6 +96,10 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
 
   const token = stored && stored.address === address ? stored.token : null;
 
+  // Track the connected wallet across in-flight sign-ins.
+  const addressRef = useRef(address);
+  addressRef.current = address;
+
   const me = useQuery(api.auth.me, token ? { session: token } : "skip");
 
   // The server rejected or expired the stored token.
@@ -138,8 +143,11 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
         domain: window.location.host,
         signature,
       });
+      // The session is stored under the signing wallet either way, but only
+      // becomes active if that wallet is still connected.
       rememberSession(address, session);
-      setStored({ address, token: session.token });
+      if (addressRef.current === address)
+        setStored({ address, token: session.token });
     } catch (error) {
       notify({
         title: "Could not sign in",
