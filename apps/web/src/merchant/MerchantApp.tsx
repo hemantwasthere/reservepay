@@ -1213,7 +1213,26 @@ function SessionData({
   children: (data: SessionData) => React.ReactNode;
 }) {
   return token ? (
-    <SessionErrorBoundary resetKey={token} onExpire={onExpire}>
+    <SessionErrorBoundary
+      resetKey={token}
+      onExpire={onExpire}
+      fallback={(error, retry) => (
+        <>
+          <div
+            className={
+              "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere] [&_button]:underline [&_button]:[font:inherit]"
+            }
+            role="alert"
+          >
+            Your profile and payment links could not load. {error.message}{" "}
+            <button type="button" onClick={retry}>
+              Try again
+            </button>
+          </div>
+          {children({ profile: undefined, links: undefined })}
+        </>
+      )}
+    >
       <SessionQueries token={token}>{children}</SessionQueries>
     </SessionErrorBoundary>
   ) : (

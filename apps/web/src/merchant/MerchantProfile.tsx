@@ -51,7 +51,20 @@ export function MerchantProfile({
   if (session.status !== "signed-in" || !session.token)
     return <SignInCard active={active} session={session} />;
   return (
-    <SessionErrorBoundary resetKey={session.token} onExpire={session.expire}>
+    <SessionErrorBoundary
+      resetKey={session.token}
+      onExpire={session.expire}
+      fallback={(error, retry) => (
+        <Card className={"p-6"}>
+          <p role="alert" className={"mb-4 text-sm text-destructive"}>
+            Your profile could not load. {error.message}
+          </p>
+          <Button variant="outline" onClick={retry}>
+            Try again
+          </Button>
+        </Card>
+      )}
+    >
       <ProfileForm token={session.token} onExpire={session.expire} />
     </SessionErrorBoundary>
   );

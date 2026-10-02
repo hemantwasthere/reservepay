@@ -184,28 +184,39 @@ export const isExpiredSessionError = (error: unknown) =>
   error instanceof Error && error.message.includes("Sign in again");
 
 // Session-gated queries throw when the session expires. Catch that, expire
-// the session, and let the parent render the signed-out UI instead of a
-// crashed page. Resets when the token changes.
+// the session, and let the parent render the signed-out UI. Any other error
+// goes to the fallback (or the next outer boundary) so a real failure never
+// renders as a silent blank page. Resets when the token changes.
 export class SessionErrorBoundary extends Component<
-  { resetKey: unknown; onExpire: () => void; children: ReactNode },
-  { failed: boolean; resetKey: unknown }
+  {
+    resetKey: unknown;
+    onExpire: () => void;
+    children: ReactNode;
+    fallback?: (error: Error, retry: () => void) => ReactNode;
+  },
+  { error: Error | null; resetKey: unknown }
 > {
-  state = { failed: false, resetKey: this.props.resetKey };
-  static getDerivedStateFromError() {
-    return { failed: true };
+  state = { error: null, resetKey: this.props.resetKey };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
   }
   static getDerivedStateFromProps(
     props: { resetKey: unknown },
     state: { resetKey: unknown },
   ) {
     return props.resetKey !== state.resetKey
-      ? { failed: false, resetKey: props.resetKey }
+      ? { error: null, resetKey: props.resetKey }
       : null;
   }
   componentDidCatch(error: unknown) {
     if (isExpiredSessionError(error)) this.props.onExpire();
   }
+  retry = () => this.setState({ error: null });
   render() {
-    return this.state.failed ? null : this.props.children;
+    const { error } = this.state;
+    if (!error) return this.props.children;
+    if (isExpiredSessionError(error)) return null;
+    if (this.props.fallback) return this.props.fallback(error, this.retry);
+    throw error;
   }
 }
