@@ -473,6 +473,11 @@ function Checkout({
       }
       aria-busy={phaseBusy(phase)}
     >
+      {/* Always mounted so the first phase change is announced too; the
+          visible notices are plain text so updates are read exactly once. */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {phaseNote(phase) ?? ""}
+      </span>
       <span
         className={
           "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
@@ -663,7 +668,6 @@ function Checkout({
       )}
       {(phase.kind === "failed" || phase.kind === "expired") && (
         <p
-          role="alert"
           className={
             "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
           }
@@ -679,7 +683,6 @@ function Checkout({
           className={
             "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
           }
-          role="status"
         >
           {phaseNote(phase)}
         </p>

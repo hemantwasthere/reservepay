@@ -78,9 +78,6 @@ export function PaymentSteps({ phase }: { phase: CheckoutPhase }) {
           );
         })}
       </ol>
-      <span className="sr-only" role="status" aria-live="polite">
-        {note ?? ""}
-      </span>
     </div>
   );
 }
