@@ -247,7 +247,15 @@ function Checkout({
         setJournalError("");
         // A saved journal means a signed transaction may be in flight;
         // resume at the confirmation step and let the poll loop refine it.
-        if (saved) setPhase({ kind: "confirming" });
+        // If the journal disappeared (another tab settled it), leave the
+        // journal-tracking phases so Pay is enabled again.
+        setPhase((phase) =>
+          saved
+            ? { kind: "confirming" }
+            : ["confirming", "verifying", "unavailable"].includes(phase.kind)
+              ? { kind: "ready" }
+              : phase,
+        );
       } catch (error) {
         setJournalError(
           error instanceof Error
@@ -287,7 +295,10 @@ function Checkout({
             });
         }
       } catch {
-        if (!stopped) setPhase({ kind: "unavailable" });
+        // Only a pending payment depends on these checks. Without one a
+        // failed check must not disable Pay or overwrite states like
+        // rejected; with one, the next successful check moves the phase on.
+        if (!stopped && pending) setPhase({ kind: "unavailable" });
       } finally {
         running = false;
       }
