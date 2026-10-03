@@ -344,21 +344,34 @@ function MerchantWorkspace({
   } | null>(null);
   const [sessionData, setSessionData] = useState<SessionData>({
     profile: session.token ? undefined : null,
-    links: undefined,
+    titles: undefined,
   });
   // A token without delivered data means "still loading", never "no profile".
   useEffect(() => {
     setSessionData({
       profile: session.token ? undefined : null,
-      links: undefined,
+      titles: undefined,
     });
   }, [session.token]);
+  // Sorted and capped so the query args stay stable between balance polls.
+  const orderReferences = useMemo(
+    () =>
+      (orderBook?.orders ?? [])
+        .map((order) => order.reference)
+        .filter((reference) => /^[a-f0-9]{32}$/.test(reference))
+        .sort()
+        .slice(0, 100),
+    [orderBook],
+  );
   const titles = useMemo(
     () =>
       Object.fromEntries(
-        (sessionData.links ?? []).map((link) => [link.reference, link.title]),
+        Object.entries(sessionData.titles ?? {}).map(([reference, link]) => [
+          reference,
+          link.title,
+        ]),
       ),
-    [sessionData.links],
+    [sessionData.titles],
   );
   const profile = sessionData.profile;
   const [readError, setReadError] = useState("");
@@ -663,7 +676,11 @@ function MerchantWorkspace({
             </div>
           )}
         >
-          <SessionQueries token={session.token} onData={setSessionData} />
+          <SessionQueries
+            token={session.token}
+            references={orderReferences}
+            onData={setSessionData}
+          />
         </SessionErrorBoundary>
       )}
       <div
@@ -1278,23 +1295,28 @@ function MerchantWorkspace({
 
 type SessionData = {
   profile: FunctionReturnType<typeof api.merchants.me> | undefined;
-  links: FunctionReturnType<typeof api.payments.listForSession> | undefined;
+  titles: FunctionReturnType<typeof api.payments.titlesForReferences> | undefined;
 };
 
 // Runs the session-gated queries as a leaf component so the error boundary
 // only ever catches these queries, and lifts the results up to the workspace.
 function SessionQueries({
   token,
+  references,
   onData,
 }: {
   token: string;
+  references: string[];
   onData: (data: SessionData) => void;
 }) {
   const profile = useQuery(api.merchants.me, { session: token });
-  const links = useQuery(api.payments.listForSession, { session: token });
+  const titles = useQuery(api.payments.titlesForReferences, {
+    session: token,
+    references,
+  });
   useEffect(() => {
-    onData({ profile, links });
-  }, [profile, links, onData]);
+    onData({ profile, titles });
+  }, [profile, titles, onData]);
   return null;
 }
 

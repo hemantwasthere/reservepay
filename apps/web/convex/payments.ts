@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import {
   query,
   mutation,
@@ -33,14 +34,41 @@ export const list = query({
       .take(50),
 });
 export const listForSession = query({
-  args: { session: v.string() },
-  handler: async (ctx, { session }) => {
+  args: { session: v.string(), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { session, paginationOpts }) => {
     const merchant = await requireMerchant(ctx, session);
     return ctx.db
       .query("paymentLinks")
       .withIndex("by_merchant", (q) => q.eq("merchant", merchant))
       .order("desc")
-      .take(50);
+      .paginate(paginationOpts);
+  },
+});
+// Titles for the protected-orders view: resolves any of this merchant's
+// references, however old, instead of only the most recent page.
+export const titlesForReferences = query({
+  args: { session: v.string(), references: v.array(v.string()) },
+  handler: async (ctx, { session, references }) => {
+    const merchant = await requireMerchant(ctx, session);
+    if (references.length > 100)
+      throw new ConvexError("At most 100 references per request.");
+    const titles: Record<string, { title: string; description?: string }> = {};
+    for (const reference of new Set(references)) {
+      if (!/^[a-f0-9]{32}$/.test(reference))
+        throw new ConvexError("Invalid payment reference.");
+      const link = await ctx.db
+        .query("paymentLinks")
+        .withIndex("by_reference", (q) =>
+          q.eq("merchant", merchant).eq("reference", reference),
+        )
+        .unique();
+      if (link)
+        titles[reference] = {
+          title: link.title,
+          ...(link.description ? { description: link.description } : {}),
+        };
+    }
+    return titles;
   },
 });
 export const findReference = internalQuery({

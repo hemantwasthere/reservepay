@@ -52,7 +52,10 @@ describe("merchant-approved payment links", () => {
       }),
     ).toEqual([]);
     await expect(
-      t.query(api.payments.listForSession, { session: "bad-token" }),
+      t.query(api.payments.listForSession, {
+        session: "bad-token",
+        paginationOpts: { numItems: 20, cursor: null },
+      }),
     ).rejects.toThrow("Sign in again.");
   });
   it("creates only with wallet approval and keeps exact retries idempotent", async () => {
@@ -63,7 +66,12 @@ describe("merchant-approved payment links", () => {
     expect(await t.action(api.paymentActions.create, request)).toBe(id);
     const { token } = await signIn(t, seller);
     expect(
-      await t.query(api.payments.listForSession, { session: token }),
+      (
+        await t.query(api.payments.listForSession, {
+          session: token,
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page,
     ).toHaveLength(1);
     expect((await t.query(api.payments.get, { id }))?.receipt).toBeUndefined();
   });
@@ -74,14 +82,27 @@ describe("merchant-approved payment links", () => {
     const stranger = Keypair.generate();
     const { token } = await signIn(t, stranger);
     expect(
-      await t.query(api.payments.listForSession, { session: token }),
+      (
+        await t.query(api.payments.listForSession, {
+          session: token,
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page,
     ).toHaveLength(0);
     await expect(
-      t.query(api.payments.listForSession, { session: "ff".repeat(32) }),
+      t.query(api.payments.listForSession, {
+        session: "ff".repeat(32),
+        paginationOpts: { numItems: 20, cursor: null },
+      }),
     ).rejects.toThrow("Sign in again.");
     const { token: own } = await signIn(t, seller);
     expect(
-      await t.query(api.payments.listForSession, { session: own }),
+      (
+        await t.query(api.payments.listForSession, {
+          session: own,
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page,
     ).toHaveLength(1);
   });
   it("rejects forged approvals, changed terms, and expired approvals", async () => {
@@ -312,5 +333,79 @@ describe("deactivating payment links", () => {
     await expect(
       t.mutation(api.payments.reactivate, { session: token, id }),
     ).rejects.toThrow("already been paid");
+  });
+});
+
+describe("paginated link history", () => {
+  it("pages newest-first without duplicates", async () => {
+    const t = convexTest(schema, modules);
+    // Seed directly: the creation rate limit is exercised elsewhere.
+    const references: string[] = [];
+    for (let index = 0; index < 25; index++) {
+      const value = terms();
+      references.push(value.reference);
+      await t.run((ctx) => ctx.db.insert("paymentLinks", value));
+    }
+    const { token } = await signIn(t, seller);
+    const first = await t.query(api.payments.listForSession, {
+      session: token,
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(first.page).toHaveLength(20);
+    expect(first.isDone).toBe(false);
+    const rest = await t.query(api.payments.listForSession, {
+      session: token,
+      paginationOpts: { numItems: 20, cursor: first.continueCursor },
+    });
+    expect(rest.page).toHaveLength(5);
+    expect(rest.isDone).toBe(true);
+    const page = [...first.page, ...rest.page];
+    expect(new Set(page.map((link) => link._id)).size).toBe(25);
+    expect(page.map((link) => link.reference)).toEqual(
+      [...references].reverse(),
+    );
+  });
+});
+
+describe("titles for protected orders", () => {
+  it("resolves this merchant's references at any age", async () => {
+    const t = convexTest(schema, modules);
+    const own = { ...terms(), description: "Scope of work." };
+    const otherMerchant = Keypair.generate().publicKey.toBase58();
+    const foreign = { ...terms(), merchant: otherMerchant };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("paymentLinks", own);
+      await ctx.db.insert("paymentLinks", foreign);
+    });
+    const { token } = await signIn(t, seller);
+    const titles = await t.query(api.payments.titlesForReferences, {
+      session: token,
+      references: [own.reference, foreign.reference, "ab".repeat(16)],
+    });
+    expect(titles).toEqual({
+      [own.reference]: { title: own.title, description: own.description },
+    });
+  });
+  it("rejects oversized and malformed requests", async () => {
+    const t = convexTest(schema, modules);
+    const { token } = await signIn(t, seller);
+    await expect(
+      t.query(api.payments.titlesForReferences, {
+        session: token,
+        references: Array.from({ length: 101 }, () => "ab".repeat(16)),
+      }),
+    ).rejects.toThrow("At most 100");
+    await expect(
+      t.query(api.payments.titlesForReferences, {
+        session: token,
+        references: ["not-a-reference"],
+      }),
+    ).rejects.toThrow("Invalid payment reference.");
+    await expect(
+      t.query(api.payments.titlesForReferences, {
+        session: "bad-token",
+        references: [],
+      }),
+    ).rejects.toThrow("Sign in again.");
   });
 });

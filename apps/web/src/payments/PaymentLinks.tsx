@@ -10,7 +10,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConvexError } from "convex/values";
 import { useRef, useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, usePaginatedQuery } from "convex/react";
 import {
   Link2,
   Copy,
@@ -134,9 +134,14 @@ function LinkManager({
   isCurrent: (value: WalletConnection) => boolean;
   onPaid: () => void;
 }) {
-  const links = useQuery(
+  const {
+    results: links,
+    status,
+    loadMore,
+  } = usePaginatedQuery(
     api.payments.listForSession,
     session ? { session } : "skip",
+    { initialNumItems: 20 },
   );
   const create = useAction(api.paymentActions.create);
   const sync = useAction(api.paymentActions.sync);
@@ -551,15 +556,28 @@ function LinkManager({
           ))}
         </ul>
       )}
-      {links?.length === 50 && (
-        <p
+      {status === "CanLoadMore" || status === "LoadingMore" ? (
+        <Button
+          variant="unstyled"
+          size="unstyled"
           className={
-            "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
+            "payment-text-button inline-flex items-center gap-[7px] text-muted-foreground bg-transparent [border:0] text-[11px] py-[10px] px-0 mt-[10px]"
           }
+          type="button"
+          disabled={status === "LoadingMore"}
+          onClick={() => loadMore(20)}
         >
-          Showing your 50 most recent links.
-        </p>
-      )}
+          {status === "LoadingMore" ? (
+            <LoaderCircle
+              size={14}
+              className={
+                "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+              }
+            />
+          ) : null}
+          {status === "LoadingMore" ? "Loading…" : "Load more"}
+        </Button>
+      ) : null}
     </>
   );
 }
