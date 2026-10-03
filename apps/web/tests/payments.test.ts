@@ -461,9 +461,10 @@ describe("titles for protected orders", () => {
     const own = { ...terms(), description: "Scope of work." };
     const otherMerchant = Keypair.generate().publicKey.toBase58();
     const foreign = { ...terms(), merchant: otherMerchant };
-    await t.run(async (ctx) => {
-      await ctx.db.insert("paymentLinks", own);
+    const ownId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("paymentLinks", own);
       await ctx.db.insert("paymentLinks", foreign);
+      return id;
     });
     const { token } = await signIn(t, seller);
     const titles = await t.query(api.payments.titlesForReferences, {
@@ -471,8 +472,19 @@ describe("titles for protected orders", () => {
       references: [own.reference, foreign.reference, "ab".repeat(16)],
     });
     expect(titles).toEqual({
-      [own.reference]: { title: own.title, description: own.description },
+      [own.reference]: {
+        title: own.title,
+        description: own.description,
+        id: ownId,
+        refundPending: false,
+      },
     });
+    await t.run((ctx) => ctx.db.patch(ownId, { refundPending: true }));
+    const updated = await t.query(api.payments.titlesForReferences, {
+      session: token,
+      references: [own.reference],
+    });
+    expect(updated[own.reference]?.refundPending).toBe(true);
   });
   it("rejects oversized and malformed requests", async () => {
     const t = convexTest(schema, modules);

@@ -58,14 +58,24 @@ export const listForSessionPaginated = query({
   },
 });
 // Titles for the protected-orders view: resolves any of this merchant's
-// references, however old, instead of only the most recent page.
+// references, however old, instead of only the most recent page. The id and
+// dispute state power the Release action; link ids are already public
+// through /pay/:id.
 export const titlesForReferences = query({
   args: { session: v.string(), references: v.array(v.string()) },
   handler: async (ctx, { session, references }) => {
     const merchant = await requireMerchant(ctx, session);
     if (references.length > 100)
       throw new ConvexError("At most 100 references per request.");
-    const titles: Record<string, { title: string; description?: string }> = {};
+    const titles: Record<
+      string,
+      {
+        title: string;
+        description?: string;
+        id: string;
+        refundPending: boolean;
+      }
+    > = {};
     for (const reference of new Set(references)) {
       if (!/^[a-f0-9]{32}$/.test(reference))
         throw new ConvexError("Invalid payment reference.");
@@ -79,6 +89,8 @@ export const titlesForReferences = query({
         titles[reference] = {
           title: link.title,
           ...(link.description ? { description: link.description } : {}),
+          id: link._id,
+          refundPending: link.refundPending === true,
         };
     }
     return titles;

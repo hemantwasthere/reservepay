@@ -355,31 +355,29 @@ function MerchantWorkspace({
       titles: undefined,
     });
   }, [session.token]);
-  // Newest orders first, so the 100-reference cap drops the oldest orders
-  // instead of an arbitrary alphabetical slice. The tiebreak keeps the
-  // query args stable between balance polls.
+  // Open orders first (oldest expiry first), then the rest newest first, so
+  // the orders that need a Release action keep their link data inside the
+  // 100-reference cap. The tiebreak keeps the query args stable between
+  // balance polls.
   const orderReferences = useMemo(
     () =>
       [...(orderBook?.orders ?? [])]
         .filter((order) => /^[a-f0-9]{32}$/.test(order.reference))
-        .sort(
-          (a, b) =>
-            b.createdAt - a.createdAt ||
-            a.reference.localeCompare(b.reference),
-        )
+        .sort((a, b) => {
+          if ((a.status === "paid") !== (b.status === "paid"))
+            return a.status === "paid" ? -1 : 1;
+          if (a.status === "paid")
+            return (
+              a.expiresAt - b.expiresAt ||
+              a.reference.localeCompare(b.reference)
+            );
+          return (
+            b.createdAt - a.createdAt || a.reference.localeCompare(b.reference)
+          );
+        })
         .slice(0, 100)
         .map((order) => order.reference),
     [orderBook],
-  );
-  const titles = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(sessionData.titles ?? {}).map(([reference, link]) => [
-          reference,
-          link.title,
-        ]),
-      ),
-    [sessionData.titles],
   );
   const profile = sessionData.profile;
   const [readError, setReadError] = useState("");
@@ -820,7 +818,7 @@ function MerchantWorkspace({
           orders={orderBook?.orders ?? null}
           mismatch={Boolean(orderBook?.mismatch)}
           loading={loading}
-          titles={titles}
+          titles={sessionData.titles ?? {}}
         />
       )}
       <div

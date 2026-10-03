@@ -25,6 +25,13 @@ const tabs = [
   { key: "refunded", label: "Refunded" },
 ] as const;
 
+type OrderLink = {
+  title: string;
+  description?: string;
+  id: string;
+  refundPending: boolean;
+};
+
 export function ProtectedOrders({
   orders,
   mismatch,
@@ -34,7 +41,7 @@ export function ProtectedOrders({
   orders: MerchantOrder[] | null;
   mismatch: boolean;
   loading: boolean;
-  titles: Record<string, string>;
+  titles: Record<string, OrderLink>;
 }) {
   const [tab, setTab] = useState<(typeof tabs)[number]["key"]>("paid");
   const now = Date.now();
@@ -141,7 +148,15 @@ export function ProtectedOrders({
             "protected-order-list [list-style:none] p-0 [margin:10px_0_0] [&_li]:[border-bottom:1px_solid_var(--line)] [&_li:last-child]:[border-bottom:0]"
           }
         >
-          {shown.map((order) => (
+          {shown.map((order) => {
+            const link = titles[order.reference];
+            const disputed = order.status === "paid" && Boolean(link?.refundPending);
+            const releasable =
+              order.status === "paid" &&
+              order.expiresAt <= now &&
+              link !== undefined &&
+              !link.refundPending;
+            return (
             <li key={order.address} className={"py-[16px]"}>
               <div
                 className={
@@ -154,8 +169,7 @@ export function ProtectedOrders({
                   }
                 >
                   <strong>
-                    {titles[order.reference] ??
-                      `Order · ${order.reference.slice(0, 8)}`}
+                    {link?.title ?? `Order · ${order.reference.slice(0, 8)}`}
                   </strong>
                   <span>Buyer {short(order.buyer)}</span>
                 </div>
@@ -182,24 +196,40 @@ export function ProtectedOrders({
                   {new Date(order.createdAt).toLocaleDateString()}
                 </div>
                 <div
-                  className={`text-[11px] whitespace-nowrap ${order.status === "paid" && order.expiresAt <= now ? "text-[light-dark(#805e2e,var(--warning))]" : order.status === "paid" ? "text-[light-dark(#476238,var(--primary))]" : "text-muted-foreground"}`}
+                  className={`text-[11px] whitespace-nowrap ${disputed || (order.status === "paid" && order.expiresAt <= now) ? "text-[light-dark(#805e2e,var(--warning))]" : order.status === "paid" ? "text-[light-dark(#476238,var(--primary))]" : "text-muted-foreground"}`}
                 >
-                  {remaining(order, now)}
+                  {disputed
+                    ? "Refund requested · awaiting resolver"
+                    : remaining(order, now)}
                 </div>
-                <a
-                  className={
-                    "inline-flex items-center gap-[5px] text-primary text-[11px] whitespace-nowrap"
-                  }
-                  href={explorer(order.address)}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`View order ${titles[order.reference] ?? order.reference.slice(0, 8)} on Solana Explorer`}
-                >
-                  Explorer <ArrowUpRight size={12} />
-                </a>
+                <div className={"flex items-center gap-[12px]"}>
+                  {releasable && link && (
+                    <a
+                      className={
+                        "inline-flex items-center gap-[5px] text-primary text-[11px] whitespace-nowrap font-[500]"
+                      }
+                      href={`/pay/${link.id}`}
+                      aria-label={`Release ${link.title}`}
+                    >
+                      Release <ArrowUpRight size={12} />
+                    </a>
+                  )}
+                  <a
+                    className={
+                      "inline-flex items-center gap-[5px] text-primary text-[11px] whitespace-nowrap"
+                    }
+                    href={explorer(order.address)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`View order ${link?.title ?? order.reference.slice(0, 8)} on Solana Explorer`}
+                  >
+                    Explorer <ArrowUpRight size={12} />
+                  </a>
+                </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </Card>
