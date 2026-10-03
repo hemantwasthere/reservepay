@@ -145,7 +145,7 @@ function LinkManager({
   );
   const create = useAction(api.paymentActions.create);
   const sync = useAction(api.paymentActions.sync);
-  const deactivate = useMutation(api.payments.deactivate);
+  const deactivate = useAction(api.paymentActions.deactivate);
   const reactivate = useMutation(api.payments.reactivate);
   const { notify } = useToast();
   const [title, setTitle] = useState("");

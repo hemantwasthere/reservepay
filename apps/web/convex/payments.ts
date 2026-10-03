@@ -131,7 +131,9 @@ const ownedUnpaidLink = async (
   if (link.receipt) throw new ConvexError("This link has already been paid.");
   return link;
 };
-export const deactivate = mutation({
+// Internal: callers must check the chain first (see paymentActions.deactivate)
+// so a link paid seconds ago is never reported inactive.
+export const deactivate = internalMutation({
   args: { session: v.string(), id: v.id("paymentLinks") },
   handler: async (ctx, { session, id }) => {
     const link = await ownedUnpaidLink(ctx, session, id);

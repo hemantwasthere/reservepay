@@ -70,6 +70,25 @@ export const sync = action({
   },
 });
 
+export const deactivate = action({
+  args: { session: v.string(), id: v.id("paymentLinks") },
+  handler: async (ctx, { session, id }): Promise<void> => {
+    // Checkout only records a receipt on its next status check, up to 10
+    // seconds after payment. Record any on-chain order first so a link the
+    // buyer just paid can never be reported inactive.
+    const link = await ctx.runQuery(api.payments.get, { id });
+    if (link && !link.receipt) {
+      const receipt = await paymentClient(rpc).readOrder(link);
+      if (receipt)
+        await ctx.runMutation(internal.payments.record, {
+          id: link._id,
+          receipt,
+        });
+    }
+    await ctx.runMutation(internal.payments.deactivate, { session, id });
+  },
+});
+
 export const requestRefund = action({
   args: {
     id: v.string(),

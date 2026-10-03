@@ -281,14 +281,15 @@ describe("payment link descriptions", () => {
 
 describe("deactivating payment links", () => {
   it("lets the owner deactivate and reactivate an unpaid link", async () => {
+    readOrder.mockResolvedValue(null);
     const t = convexTest(schema, modules);
     const id = await t.mutation(internal.payments.insert, terms());
     const { token } = await signIn(t, seller);
-    await t.mutation(api.payments.deactivate, { session: token, id });
+    await t.action(api.paymentActions.deactivate, { session: token, id });
     const deactivated = await t.query(api.payments.get, { id });
     expect(deactivated?.deactivatedAt).toBeGreaterThan(0);
     // Deactivating twice is a no-op.
-    await t.mutation(api.payments.deactivate, { session: token, id });
+    await t.action(api.paymentActions.deactivate, { session: token, id });
     expect((await t.query(api.payments.get, { id }))?.deactivatedAt).toBe(
       deactivated?.deactivatedAt,
     );
@@ -298,20 +299,43 @@ describe("deactivating payment links", () => {
     ).toBeUndefined();
   });
   it("never reveals another merchant's link", async () => {
+    readOrder.mockResolvedValue(null);
     const t = convexTest(schema, modules);
     const id = await t.mutation(internal.payments.insert, terms());
     const { token } = await signIn(t, Keypair.generate());
     await expect(
-      t.mutation(api.payments.deactivate, { session: token, id }),
+      t.action(api.paymentActions.deactivate, { session: token, id }),
     ).rejects.toThrow("not found");
     await expect(
       t.mutation(api.payments.reactivate, { session: token, id }),
     ).rejects.toThrow("not found");
     await expect(
-      t.mutation(api.payments.deactivate, { session: "bad-token", id }),
+      t.action(api.paymentActions.deactivate, { session: "bad-token", id }),
     ).rejects.toThrow("Sign in again.");
   });
+  it("records a just-paid order from the chain instead of deactivating", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    const { token } = await signIn(t, seller);
+    // The buyer paid seconds ago; checkout has not synced the receipt yet.
+    const receipt = {
+      order: "order",
+      buyer: "buyer",
+      reserveAmount: "50000",
+      createdAt: 1000,
+      expiresAt: 86401000,
+      status: "paid" as const,
+    };
+    readOrder.mockResolvedValue(receipt);
+    await expect(
+      t.action(api.paymentActions.deactivate, { session: token, id }),
+    ).rejects.toThrow("already been paid");
+    const link = await t.query(api.payments.get, { id });
+    expect(link?.receipt).toEqual(receipt);
+    expect(link?.deactivatedAt).toBeUndefined();
+  });
   it("refuses to deactivate a paid link but still records its receipt", async () => {
+    readOrder.mockResolvedValue(null);
     const t = convexTest(schema, modules);
     const id = await t.mutation(internal.payments.insert, terms());
     const { token } = await signIn(t, seller);
@@ -323,12 +347,12 @@ describe("deactivating payment links", () => {
       expiresAt: 86401000,
       status: "paid" as const,
     };
-    await t.mutation(api.payments.deactivate, { session: token, id });
+    await t.action(api.paymentActions.deactivate, { session: token, id });
     // A buyer can still pay a stale tab; moved funds must get their receipt.
     await t.mutation(internal.payments.record, { id, receipt });
     expect((await t.query(api.payments.get, { id }))?.receipt).toEqual(receipt);
     await expect(
-      t.mutation(api.payments.deactivate, { session: token, id }),
+      t.action(api.paymentActions.deactivate, { session: token, id }),
     ).rejects.toThrow("already been paid");
     await expect(
       t.mutation(api.payments.reactivate, { session: token, id }),
