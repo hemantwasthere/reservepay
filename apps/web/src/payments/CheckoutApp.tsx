@@ -30,6 +30,7 @@ import {
   paymentsConfigured,
 } from "./PaymentProvider";
 import { protectionLabel } from "./terms";
+import { PaymentSteps } from "./PaymentSteps";
 import {
   loadPayment,
   savePayment,
@@ -564,6 +565,7 @@ function Checkout({
         </div>
       ) : (
         <>
+          {phase.kind !== "ready" && <PaymentSteps phase={phase} />}
           {!active && (
             <p
               className={
