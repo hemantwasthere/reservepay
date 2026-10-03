@@ -92,11 +92,12 @@ export const insert = internalMutation({
       )
       .unique();
     if (previous) {
+      // Compare every signed field, not just the keys present in this
+      // request: a hand-crafted retry that omits a field (e.g. the
+      // description) must not silently match a link that has one.
       if (
-        Object.keys(terms).some(
-          (key) =>
-            previous[key as keyof typeof terms] !==
-            terms[key as keyof typeof terms],
+        (Object.keys(termsFields) as (keyof typeof terms)[]).some(
+          (key) => (previous[key] ?? undefined) !== (terms[key] ?? undefined),
         )
       )
         throw new ConvexError(

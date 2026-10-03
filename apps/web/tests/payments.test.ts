@@ -252,6 +252,30 @@ describe("payment link descriptions", () => {
       }),
     ).rejects.toThrow("did not approve");
   });
+  it("rejects a retry that drops or adds the description", async () => {
+    read.mockResolvedValue({ ready: true, registered: true });
+    const t = convexTest(schema, modules),
+      withDescription = terms();
+    await t.mutation(internal.payments.insert, {
+      ...withDescription,
+      description: "Original scope.",
+    });
+    await expect(
+      t.mutation(internal.payments.insert, withDescription),
+    ).rejects.toThrow("already used");
+    const withoutDescription = terms();
+    await t.mutation(internal.payments.insert, withoutDescription);
+    await expect(
+      t.mutation(internal.payments.insert, {
+        ...withoutDescription,
+        description: "Added later.",
+      }),
+    ).rejects.toThrow("already used");
+    // An exact retry, description included, still returns the same id.
+    const exact = { ...terms(), description: "Same every time." };
+    const id = await t.mutation(internal.payments.insert, exact);
+    expect(await t.mutation(internal.payments.insert, exact)).toBe(id);
+  });
   it("still verifies v1 links without a description", async () => {
     read.mockResolvedValue({ ready: true, registered: true });
     const t = convexTest(schema, modules),
