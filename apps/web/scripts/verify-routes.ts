@@ -23,6 +23,9 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     "/app/profile",
     "/app/profile/",
     "/app/profile/index.html",
+    "/app/disputes",
+    "/app/disputes/",
+    "/app/disputes/index.html",
     "/pay/test-link",
     "/pay/test-link/",
     "/pay/test-link?source=merchant",
@@ -36,6 +39,7 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     const checkout = path.startsWith("/pay");
     const payments = path.startsWith("/app/payments");
     const profile = path.startsWith("/app/profile");
+    const disputes = path.startsWith("/app/disputes");
     assert.ok(
       html.includes(
         dashboard
@@ -56,7 +60,7 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
     );
     assert.ok(
       html.includes(
-        `<title>${payments ? "Payment links | ReservePay" : profile ? "Profile | ReservePay" : dashboard ? "Merchant dashboard | ReservePay" : checkout ? "Protected checkout | ReservePay" : site.title}</title>`,
+        `<title>${payments ? "Payment links | ReservePay" : profile ? "Profile | ReservePay" : disputes ? "Disputes | ReservePay" : dashboard ? "Merchant dashboard | ReservePay" : checkout ? "Protected checkout | ReservePay" : site.title}</title>`,
       ),
       `${name}: wrong page at ${path}`,
     );
@@ -65,7 +69,9 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
         ? "Your next payment,"
         : profile
           ? "Your name,"
-          : "Your reserve,";
+          : disputes
+            ? "Every dispute,"
+            : "Your reserve,";
       assert.ok(
         html.includes(marker),
         `${name}: ${path} is missing its own page heading`,
@@ -73,6 +79,7 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
       for (const other of [
         "Your next payment,",
         "Your name,",
+        "Every dispute,",
         "Your reserve,",
       ].filter((heading) => heading !== marker))
         assert.ok(
@@ -85,7 +92,9 @@ async function verify(server: PreviewServer["httpServer"], name: string) {
             ? 'href="/app/payments" aria-label="Payment links" aria-current="page"'
             : profile
               ? 'href="/app/profile" aria-label="Profile" aria-current="page"'
-              : 'href="/app" aria-label="Overview" aria-current="page"',
+              : disputes
+                ? 'href="/app/disputes" aria-label="Disputes" aria-current="page"'
+                : 'href="/app" aria-label="Overview" aria-current="page"',
         ),
         `${name}: active workspace navigation`,
       );

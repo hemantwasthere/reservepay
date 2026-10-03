@@ -20,7 +20,7 @@ Pending logins are canceled on disconnect, explicit sign-out, wallet switch, or 
 3. Run `bun run check`. Session lifecycle regression tests exercise late nonce, wallet-signature, and session responses; sign-out without an existing token; wallet switching; unmounting; duplicate attempts; and a newer successful login.
 4. Deploy the additive Convex schema/functions first. Retain both the legacy public list API and the session-only array API so old browser tabs continue working. Never repurpose its argument shape for the authenticated endpoint.
 5. Verify public checkout metadata, the legacy list, nonce issuance, signed session creation, authenticated profile/link queries, and revocation. Use disposable test wallets without funds. Do not exercise financial transactions as an authentication smoke test.
-6. Publish the frontend and check `/`, `/app`, `/app/payments`, `/app/profile`, and a valid `/pay/:id` page. Verify CI and the hosting deployment correspond to the published commit.
+6. Publish the frontend and check `/`, `/app`, `/app/payments`, `/app/profile`, `/app/disputes`, and a valid `/pay/:id` page. Verify CI and the hosting deployment correspond to the published commit.
 
 A frontend rollback can use the previous frontend with this backend because its public APIs remain compatible. Leave the additive backend deployed during that rollback. Removing the new functions while a new frontend is still in use would break checkout and login.
 

@@ -2,6 +2,7 @@ import {
   ChartNoAxesCombined,
   Link2,
   Store,
+  Scale,
   ShieldCheck,
   CircleHelp,
   ArrowUpRight,
@@ -26,7 +27,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export type WorkspacePage = "overview" | "payments" | "profile";
+export type WorkspacePage = "overview" | "payments" | "profile" | "disputes";
 
 // Fade content before the rail narrows; reveal it once the opening rail has room.
 // Fixed text widths and icon positions prevent clipping, wrapping, and sideways jumps.
@@ -36,8 +37,19 @@ const labelClasses = `shrink-0 whitespace-nowrap ${fadeClasses}`;
 const menuClasses =
   "h-10 gap-3 rounded border border-transparent p-[11px] text-muted-foreground transition-[width,background-color,color,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-accent group-data-[collapsible=icon]:delay-[100ms,0ms,0ms,0ms] group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-[11px] motion-reduce:transition-none [&>span:last-child]:overflow-visible";
 
-export function WorkspaceSidebar({ page }: { page: WorkspacePage }) {
+export function WorkspaceSidebar({
+  page,
+  resolver = false,
+}: {
+  page: WorkspacePage;
+  // UI gating only, not a security boundary: the on-chain
+  // has_one = resolver constraint gates decisions, and the queue is public.
+  resolver?: boolean;
+}) {
   const { setOpenMobile, isMobile, state } = useSidebar();
+  // Keep the item visible on the page itself so direct visits keep their nav
+  // marker (and see the resolver-only notice there).
+  const showDisputes = resolver || page === "disputes";
   return (
     <Sidebar
       collapsible="icon"
@@ -84,6 +96,16 @@ export function WorkspaceSidebar({ page }: { page: WorkspacePage }) {
                 label: "Profile",
                 icon: Store,
               },
+              ...(showDisputes
+                ? [
+                    {
+                      page: "disputes",
+                      href: "/app/disputes",
+                      label: "Disputes",
+                      icon: Scale,
+                    },
+                  ]
+                : []),
             ].map((item) => (
               <SidebarMenuItem key={item.page}>
                 <SidebarMenuButton

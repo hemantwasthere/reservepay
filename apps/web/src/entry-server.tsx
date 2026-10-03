@@ -16,7 +16,7 @@ export function render() {
 }
 
 export function renderMerchant(
-  page: "overview" | "payments" | "profile" = "overview",
+  page: "overview" | "payments" | "profile" | "disputes" = "overview",
 ) {
   return renderToString(
     <StrictMode>

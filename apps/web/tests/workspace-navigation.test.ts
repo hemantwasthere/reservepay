@@ -19,6 +19,7 @@ function Probe() {
     createElement("a", { id: "home", href: "/" }, "Home"),
     createElement("a", { id: "faq", href: "/#faq-title" }, "FAQ"),
     createElement("a", { id: "profile", href: "/app/profile" }, "Profile"),
+    createElement("a", { id: "disputes", href: "/app/disputes" }, "Disputes"),
     createElement(
       "a",
       { id: "external", href: "https://example.com/app" },
@@ -68,6 +69,14 @@ it("navigates and handles back/forward without remounting or losing form state",
   expect(container.querySelector("#page")?.textContent).toBe("payments");
   expect(mounts).toBe(1);
   expect(input.value).toBe("Unsaved profile");
+});
+it("routes the disputes page with its own title", async () => {
+  await act(async () =>
+    container.querySelector<HTMLAnchorElement>("#disputes")!.click(),
+  );
+  expect(location.pathname).toBe("/app/disputes");
+  expect(container.querySelector("#page")?.textContent).toBe("disputes");
+  expect(document.title).toBe("Disputes | ReservePay");
 });
 it("leaves modified clicks, external destinations and new tabs to the browser", async () => {
   async function intercepted(selector: string, options: MouseEventInit = {}) {

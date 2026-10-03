@@ -40,6 +40,14 @@
     {
       "source": "/app/profile/",
       "destination": "/app/profile/index.html"
+    },
+    {
+      "source": "/app/disputes",
+      "destination": "/app/disputes/index.html"
+    },
+    {
+      "source": "/app/disputes/",
+      "destination": "/app/disputes/index.html"
     }
   ],
   "headers": [

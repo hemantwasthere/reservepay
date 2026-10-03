@@ -9,7 +9,9 @@ const page =
     ? "payments"
     : root.dataset.page === "profile"
       ? "profile"
-      : "overview";
+      : root.dataset.page === "disputes"
+        ? "disputes"
+        : "overview";
 const app = (
   <StrictMode>
     <SiteApp initialPage={page} Merchant={MerchantApp} />

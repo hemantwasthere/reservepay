@@ -19,6 +19,9 @@ const routeDashboard: Connect.NextHandleFunction = (
   if (path === "/app/profile" || path === "/app/profile/") {
     request.url = `/app/profile/index.html${query.length ? `?${query.join("?")}` : ""}`;
   }
+  if (path === "/app/disputes" || path === "/app/disputes/") {
+    request.url = `/app/disputes/index.html${query.length ? `?${query.join("?")}` : ""}`;
+  }
   if (/^\/pay(?:\/[^/]+)?\/?$/.test(path)) {
     request.url = `/pay/index.html${query.length ? `?${query.join("?")}` : ""}`;
   }
@@ -76,7 +79,9 @@ export default defineConfig({
           ? ("payments" as const)
           : context.filename.endsWith("/app/profile/index.html")
             ? ("profile" as const)
-            : null;
+            : context.filename.endsWith("/app/disputes/index.html")
+              ? ("disputes" as const)
+              : null;
         const content = page
           ? renderMerchant(page)
           : context.filename.endsWith("/app/index.html")
@@ -85,7 +90,7 @@ export default defineConfig({
               ? renderCheckout()
               : render();
         return html.replace(
-          /<div id="root"(?: data-page="(?:payments|profile)")?><\/div>/,
+          /<div id="root"(?: data-page="(?:payments|profile|disputes)")?><\/div>/,
           () =>
             `<div id="root"${page ? ` data-page="${page}"` : ""}>${content}</div>`,
         );
@@ -96,6 +101,7 @@ export default defineConfig({
       transformIndexHtml: (_, context) =>
         context.filename.endsWith("/app/payments/index.html") ||
         context.filename.endsWith("/app/profile/index.html") ||
+        context.filename.endsWith("/app/disputes/index.html") ||
         context.filename.endsWith("/app/index.html") ||
         context.filename.endsWith("/pay/index.html")
           ? []
@@ -152,6 +158,7 @@ export default defineConfig({
         app: resolve(import.meta.dirname, "app/index.html"),
         payments: resolve(import.meta.dirname, "app/payments/index.html"),
         profile: resolve(import.meta.dirname, "app/profile/index.html"),
+        disputes: resolve(import.meta.dirname, "app/disputes/index.html"),
         pay: resolve(import.meta.dirname, "pay/index.html"),
       },
     },

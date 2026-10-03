@@ -20,6 +20,7 @@ try {
     ["dist/app/index.html", renderMerchant()],
     ["dist/app/payments/index.html", renderMerchant("payments")],
     ["dist/app/profile/index.html", renderMerchant("profile")],
+    ["dist/app/disputes/index.html", renderMerchant("disputes")],
     ["dist/pay/index.html", renderCheckout()],
   ]) {
     const path = resolve(file);
@@ -28,7 +29,9 @@ try {
       ? '<div id="root" data-page="payments"></div>'
       : file.includes("/profile/")
         ? '<div id="root" data-page="profile"></div>'
-        : '<div id="root"></div>';
+        : file.includes("/disputes/")
+          ? '<div id="root" data-page="disputes"></div>'
+          : '<div id="root"></div>';
     if (!template.includes(marker))
       throw new Error("Prerender root is missing.");
     await writeFile(

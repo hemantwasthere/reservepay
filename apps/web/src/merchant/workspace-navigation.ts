@@ -10,7 +10,9 @@ export function workspacePage(path: string): WorkspacePage | null {
       ? "payments"
       : normalized === "/app/profile"
         ? "profile"
-        : null;
+        : normalized === "/app/disputes"
+          ? "disputes"
+          : null;
 }
 
 export type SitePage = WorkspacePage | "landing";
@@ -69,7 +71,7 @@ export function useSiteNavigation(initialPage: SitePage) {
     document.title =
       page === "landing"
         ? site.title
-        : `${page === "overview" ? "Merchant workspace" : page === "payments" ? "Payment links" : "Merchant profile"} | ReservePay`;
+        : `${page === "overview" ? "Merchant workspace" : page === "payments" ? "Payment links" : page === "disputes" ? "Disputes" : "Merchant profile"} | ReservePay`;
     const robots = document.querySelector('meta[name="robots"]');
     robots?.setAttribute(
       "content",

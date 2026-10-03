@@ -1,12 +1,32 @@
 import { LoaderCircle, ArrowUpRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefundQueue } from "../payments/RefundQueue";
 import { PaymentLinks } from "../payments/PaymentLinks";
+import { useResolver } from "../payments/useResolver";
 import { SignInCard } from "./SignInCard";
 import type { WalletConnection } from "../lib/WalletControl";
 import type { MerchantSession } from "../lib/useMerchantSession";
 import { type MerchantState } from "./client";
+
+// One-line pointer to the resolver's own page. UI gating only: the on-chain
+// resolver constraint gates decisions, and the dispute queue is public.
+function DisputesLink({ active }: { active: WalletConnection | null }) {
+  const { resolver } = useResolver();
+  if (!active || !resolver || active.account.address !== resolver) return null;
+  return (
+    <p className="my-4 text-xs leading-6 text-muted-foreground">
+      You are the protocol resolver.{" "}
+      <a
+        className="text-primary underline underline-offset-4"
+        href="/app/disputes"
+      >
+        Review refund requests
+      </a>
+      .
+    </p>
+  );
+}
+
 export function MerchantPayments({
   state,
   error,
@@ -52,7 +72,7 @@ export function MerchantPayments({
     );
   return (
     <>
-      <RefundQueue active={active} />
+      <DisputesLink active={active} />
       {active && session.status !== "signed-in" ? (
         <SignInCard active={active} session={session} />
       ) : (

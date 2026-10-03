@@ -10,10 +10,12 @@ import {
 } from "./WorkspaceSidebar";
 import { MerchantPayments } from "./MerchantPayments";
 import { MerchantProfile } from "./MerchantProfile";
+import { MerchantDisputes } from "./MerchantDisputes";
 import { ProtectedOrders } from "./ProtectedOrders";
 import { SignInCard } from "./SignInCard";
 import { KeyboardShortcuts } from "../lib/KeyboardShortcuts";
 import { useToast } from "../lib/Toast";
+import { useResolver } from "../payments/useResolver";
 import {
   MerchantSessionGate,
   SessionErrorBoundary,
@@ -100,6 +102,8 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
       activeRef.current?.wallet.identity === value.wallet.identity,
     [],
   );
+  // UI gating only; the on-chain resolver constraint is the real gate.
+  const { resolver } = useResolver();
   return (
     <MerchantSessionGate active={active}>
       {(session) => (
@@ -176,7 +180,12 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
             </div>
           </header>
           <div className={"flex min-h-[calc(100svh-88px)]"}>
-            <WorkspaceSidebar page={page} />
+            <WorkspaceSidebar
+              page={page}
+              resolver={Boolean(
+                active && resolver && active.account.address === resolver,
+              )}
+            />
             <main
               id="merchant-main"
               className={
@@ -199,7 +208,9 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
                       ? "PAYMENTS / PAYMENT LINKS"
                       : page === "profile"
                         ? "MERCHANT / PROFILE"
-                        : "RESERVE / OVERVIEW"}
+                        : page === "disputes"
+                          ? "RESOLVER / DISPUTES"
+                          : "RESERVE / OVERVIEW"}
                   </div>
                   <h1>
                     {page === "payments" ? (
@@ -209,6 +220,10 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
                     ) : page === "profile" ? (
                       <>
                         Your name, <em>on every checkout.</em>
+                      </>
+                    ) : page === "disputes" ? (
+                      <>
+                        Every dispute, <em>decided on time.</em>
                       </>
                     ) : (
                       <>
@@ -221,7 +236,9 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
                       ? "Create a checkout, share it, and follow every protected payment."
                       : page === "profile"
                         ? "Tell buyers who they are paying. Your name, image and website are public."
-                        : "The foundation for protected payments. Yours to manage."}
+                        : page === "disputes"
+                          ? "Review refund requests before protection runs out. Your decision is final."
+                          : "The foundation for protected payments. Yours to manage."}
                   </p>
                 </div>
                 <span
@@ -271,6 +288,12 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
                   active={active}
                   session={session}
                   walletLoading={walletLoading}
+                />
+              </div>
+              <div hidden={page !== "disputes"}>
+                <MerchantDisputes
+                  key={active?.account.address ?? "disconnected"}
+                  active={active}
                 />
               </div>
               <div hidden={page !== "overview"}>
