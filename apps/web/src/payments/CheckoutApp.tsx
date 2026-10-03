@@ -330,6 +330,9 @@ function Checkout({
     )
       return;
     const wallet = active;
+    // Tracks how far the payment got so an error marks the step that
+    // actually failed instead of always marking Review.
+    let stage: "review" | "approve" | "send" = "review";
     // Re-read the link: a tab loaded before the merchant deactivated or
     // the link was paid must not pay. The live query usually wins this
     // race; re-checking closes the rest of it.
@@ -352,6 +355,7 @@ function Checkout({
       );
       if (!isCurrent(wallet))
         throw new Error("Wallet changed. Nothing was submitted.");
+      stage = "approve";
       setPhase({ kind: "approving" });
       let bytes: Uint8Array;
       try {
@@ -381,6 +385,7 @@ function Checkout({
         buyer: wallet.account.address,
       };
       // Persist before broadcast. If storage is unavailable, no transaction is sent.
+      stage = "send";
       savePayment(id, record);
       setPending(record);
       setPhase({ kind: "sending" });
@@ -418,7 +423,7 @@ function Checkout({
             error instanceof Error
               ? error.message
               : "Payment could not be prepared.";
-          setPhase({ kind: "error", message: description });
+          setPhase({ kind: "error", message: description, at: stage });
           notify({
             title: "Payment needs attention",
             description,

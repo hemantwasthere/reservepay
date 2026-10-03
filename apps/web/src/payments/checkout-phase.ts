@@ -8,7 +8,9 @@ export type CheckoutPhase =
   | { kind: "verifying" } // confirmed on Solana, waiting for the finalized receipt
   | { kind: "failed" } // the transaction landed with an error — no payment
   | { kind: "expired" } // blockhash expired, never landed — no payment
-  | { kind: "error"; message: string } // could not prepare (balance, coverage, wallet changed, link inactive…)
+  // Could not prepare (balance, coverage, wallet changed, link inactive…).
+  // `at` marks how far the payment got, so the failing step is the red one.
+  | { kind: "error"; message: string; at?: "review" | "approve" | "send" }
   | { kind: "unavailable" }; // verification RPC down; keep polling, don't retry
 
 export type StepState = "todo" | "active" | "done" | "error";
@@ -34,7 +36,11 @@ export function stepStates(phase: CheckoutPhase): StepState[] {
     case "expired":
       return ["done", "done", "done", "error", "todo"];
     case "error":
-      return ["error", "todo", "todo", "todo", "todo"];
+      return phase.at === "send"
+        ? ["done", "done", "error", "todo", "todo"]
+        : phase.at === "approve"
+          ? ["done", "error", "todo", "todo", "todo"]
+          : ["error", "todo", "todo", "todo", "todo"];
   }
 }
 

@@ -101,6 +101,23 @@ describe("checkout phase steps", () => {
       "todo",
       "todo",
     ]);
+    expect(
+      stepStates({ kind: "error", message: "x", at: "approve" }),
+    ).toEqual(["done", "error", "todo", "todo", "todo"]);
+    expect(stepStates({ kind: "error", message: "x", at: "send" })).toEqual([
+      "done",
+      "done",
+      "error",
+      "todo",
+      "todo",
+    ]);
+    expect(stepStates({ kind: "error", message: "x", at: "review" })).toEqual([
+      "error",
+      "todo",
+      "todo",
+      "todo",
+      "todo",
+    ]);
   });
 
   it("gives every phase exactly one active or error step, except ready", () => {
