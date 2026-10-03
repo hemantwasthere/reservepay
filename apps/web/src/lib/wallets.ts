@@ -13,7 +13,9 @@ import type {
 export type ConnectedAccount = { address: string; label?: string };
 
 // A buyer declining a wallet prompt is a normal choice, not a failure.
-// Matches the shapes Phantom, Solflare and Backpack actually throw.
+// Requires decline evidence: the standard 4001 code, a UserRejected
+// name, or a decline-style message. A bare WalletSign*Error name is a
+// signing failure (locked device, internal error), not a decline.
 export function isWalletRejection(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const { code, name, message } = error as {
@@ -22,11 +24,7 @@ export function isWalletRejection(error: unknown): boolean {
     message?: unknown;
   };
   if (code === 4001) return true;
-  if (
-    typeof name === "string" &&
-    /WalletSign(Transaction|Message)Error|UserRejected/.test(name)
-  )
-    return true;
+  if (typeof name === "string" && /UserRejected/i.test(name)) return true;
   return typeof message === "string" && /reject|declin|denied|cancel/i.test(message);
 }
 

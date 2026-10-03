@@ -67,14 +67,25 @@ describe("wallet rejection detection", () => {
         message: "User rejected",
       }),
     ).toBe(true);
+    expect(isWalletRejection({ name: "UserRejectedError" })).toBe(true);
+    expect(isWalletRejection(new Error("Approval Denied"))).toBe(true);
+    expect(isWalletRejection(new Error("User declined to sign"))).toBe(true);
+  });
+
+  it("does not read signing failures as declines", () => {
+    // A WalletSign*Error name alone is a failure, e.g. a locked Ledger.
     expect(
       isWalletRejection({
         name: "WalletSignMessageError",
         message: "Signing failed",
       }),
-    ).toBe(true);
-    expect(isWalletRejection(new Error("Approval Denied"))).toBe(true);
-    expect(isWalletRejection(new Error("User declined to sign"))).toBe(true);
+    ).toBe(false);
+    expect(
+      isWalletRejection({
+        name: "WalletSignTransactionError",
+        message: "Ledger device locked",
+      }),
+    ).toBe(false);
   });
 
   it("leaves genuine errors untouched", () => {
