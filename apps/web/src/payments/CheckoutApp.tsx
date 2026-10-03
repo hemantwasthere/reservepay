@@ -337,7 +337,11 @@ function Checkout({
       setPending(null);
     } catch {}
   }, [id, link?.receipt]);
-  const announcement = checkoutAnnouncement(phase, Boolean(link?.receipt));
+  // Stay quiet until the link loads: a resumed journal sets "confirming"
+  // before we know whether a receipt (or no link) makes it moot.
+  const announcement = link
+    ? checkoutAnnouncement(phase, Boolean(link.receipt))
+    : "";
   useEffect(() => announce(announcement), [announce, announcement]);
   useEffect(() => () => announce(""), [announce]);
   const pay = async () => {
