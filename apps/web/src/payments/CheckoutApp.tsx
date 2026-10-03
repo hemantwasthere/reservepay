@@ -4,7 +4,7 @@ import { MerchantAvatar } from "../merchant/MerchantAvatar";
 import { OrderActions } from "./OrderActions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAction, useQuery } from "convex/react";
 import { PublicKey } from "@solana/web3.js";
 import {
@@ -429,8 +429,9 @@ function Checkout({
       if (mounted.current) setLocked(false);
     }
   };
+  let content: ReactNode;
   if (link === undefined)
-    return (
+    content = (
       <Card
         as="section"
         className={
@@ -441,8 +442,8 @@ function Checkout({
         Loading payment details…
       </Card>
     );
-  if (!link)
-    return (
+  else if (!link)
+    content = (
       <Card
         as="section"
         className={
@@ -453,8 +454,8 @@ function Checkout({
         <p>Check the URL or ask the merchant for their payment link.</p>
       </Card>
     );
-  if (link.receipt)
-    return (
+  else if (link.receipt)
+    content = (
       <Receipt
         merchantProfile={merchantProfile}
         link={link}
@@ -463,7 +464,8 @@ function Checkout({
         isCurrent={isCurrent}
       />
     );
-  return (
+  else
+    content = (
     <Card
       as="section"
       className={
@@ -471,11 +473,6 @@ function Checkout({
       }
       aria-busy={phaseBusy(phase)}
     >
-      {/* Always mounted so the first phase change is announced too; the
-          visible notices are plain text so updates are read exactly once. */}
-      <span className="sr-only" role="status" aria-live="polite">
-        {phaseNote(phase) ?? ""}
-      </span>
       <span
         className={
           "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
@@ -700,6 +697,19 @@ function Checkout({
         </a>
       )}
     </Card>
+    );
+  return (
+    <>
+      {/* Outside the card: aria-busy on the card can hold back updates
+          inside it, and mounting on every path from the first render
+          means the first phase after a refresh is a change that gets
+          announced. The visible notices are plain text so updates are
+          read exactly once. */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {phaseNote(phase) ?? ""}
+      </span>
+      {content}
+    </>
   );
 }
 function Receipt({
