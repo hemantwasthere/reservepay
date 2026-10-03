@@ -4,17 +4,13 @@ import { MerchantApp } from "./merchant/MerchantApp";
 import { ToastProvider } from "./lib/Toast";
 import { StrictMode } from "react";
 import { renderToString } from "react-dom/server";
-import { App } from "./App";
-import { DemoProvider } from "./lib/demo-store";
+import { SiteApp } from "./lib/SiteApp";
+import { ThemeProvider } from "./lib/Theme";
 
 export function render() {
   return renderToString(
     <StrictMode>
-      <DemoProvider>
-        <ToastProvider>
-          <App />
-        </ToastProvider>
-      </DemoProvider>
+      <SiteApp />
     </StrictMode>,
   );
 }
@@ -24,11 +20,7 @@ export function renderMerchant(
 ) {
   return renderToString(
     <StrictMode>
-      <ToastProvider>
-        <PaymentProvider>
-          <MerchantApp page={page} />
-        </PaymentProvider>
-      </ToastProvider>
+      <SiteApp initialPage={page} Merchant={MerchantApp} />
     </StrictMode>,
   );
 }
@@ -36,11 +28,13 @@ export function renderMerchant(
 export function renderCheckout() {
   return renderToString(
     <StrictMode>
-      <ToastProvider>
-        <PaymentProvider>
-          <CheckoutApp />
-        </PaymentProvider>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <PaymentProvider>
+            <CheckoutApp />
+          </PaymentProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </StrictMode>,
   );
 }

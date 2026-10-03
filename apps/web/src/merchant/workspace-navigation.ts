@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { site } from "../lib/seo";
 import type { WorkspacePage } from "./WorkspaceSidebar";
 
 export function workspacePage(path: string): WorkspacePage | null {
@@ -12,15 +13,20 @@ export function workspacePage(path: string): WorkspacePage | null {
         : null;
 }
 
-// Keep the wallet, session and reactive subscriptions alive across workspace
-// routes. Real hrefs still support reloads, direct entry and opening a new tab.
-export function useWorkspaceNavigation(initialPage: WorkspacePage) {
-  const [page, setPage] = useState(initialPage);
+export type SitePage = WorkspacePage | "landing";
+
+// Keep the mounted workspace and its live subscriptions through landing visits.
+// Real hrefs preserve direct entry, modified clicks, and browser history.
+export function useSiteNavigation(initialPage: SitePage) {
+  const [{ page, hash }, setRoute] = useState(() => ({
+    page: initialPage,
+    hash: typeof window === "undefined" ? "" : window.location.hash,
+  }));
   useEffect(() => {
-    const show = (next: WorkspacePage) => {
-      setPage(next);
-      window.scrollTo({ top: 0, behavior: "instant" });
-      document.getElementById("merchant-main")?.focus({ preventScroll: true });
+    const show = (url: URL) => {
+      const next =
+        url.pathname === "/" ? "landing" : workspacePage(url.pathname);
+      if (next) setRoute({ page: next, hash: url.hash });
     };
     const click = (event: MouseEvent) => {
       if (
@@ -41,17 +47,17 @@ export function useWorkspaceNavigation(initialPage: WorkspacePage) {
       )
         return;
       const url = new URL(anchor.href, window.location.href);
-      const next = workspacePage(url.pathname);
-      if (url.origin !== window.location.origin || !next || url.hash) return;
+      const next =
+        url.pathname === "/" ? "landing" : workspacePage(url.pathname);
+      if (url.origin !== window.location.origin || !next) return;
+      // Let native in-page anchors keep their usual scroll/focus behavior.
+      if (url.pathname === window.location.pathname && url.hash) return;
       event.preventDefault();
       if (url.href !== window.location.href)
         window.history.pushState(null, "", url);
-      show(next);
+      show(url);
     };
-    const pop = () => {
-      const next = workspacePage(window.location.pathname);
-      if (next) show(next);
-    };
+    const pop = () => show(new URL(window.location.href));
     document.addEventListener("click", click);
     window.addEventListener("popstate", pop);
     return () => {
@@ -60,7 +66,31 @@ export function useWorkspaceNavigation(initialPage: WorkspacePage) {
     };
   }, []);
   useEffect(() => {
-    document.title = `${page === "overview" ? "Merchant workspace" : page === "payments" ? "Payment links" : "Merchant profile"} | ReservePay`;
-  }, [page]);
+    document.title =
+      page === "landing"
+        ? site.title
+        : `${page === "overview" ? "Merchant workspace" : page === "payments" ? "Payment links" : "Merchant profile"} | ReservePay`;
+    const robots = document.querySelector('meta[name="robots"]');
+    robots?.setAttribute(
+      "content",
+      page === "landing"
+        ? "index, follow, max-image-preview:large"
+        : "noindex, nofollow",
+    );
+    const frame = requestAnimationFrame(() => {
+      let target: HTMLElement | null = null;
+      try {
+        target = hash
+          ? document.getElementById(decodeURIComponent(hash.slice(1)))
+          : null;
+      } catch {}
+      if (target) target.scrollIntoView();
+      else window.scrollTo({ top: 0, behavior: "instant" });
+      document
+        .getElementById(page === "landing" ? "main" : "merchant-main")
+        ?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [page, hash]);
   return page;
 }

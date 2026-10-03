@@ -1,3 +1,4 @@
+import { ThemeControl } from "@/lib/Theme";
 import {
   Accordion,
   AccordionItem,
@@ -107,8 +108,8 @@ function AppHeader() {
       <nav
         className={
           menuOpen
-            ? 'navigation flex items-center gap-[30px] text-[#62675b] text-[12px] [&_a:hover]:text-primary max-[1100px]:gap-[20px] max-[900px]:gap-[15px] max-[900px]:text-[10px] max-[700px]:hidden max-[700px]:[&.is-open]:flex max-[700px]:[&.is-open]:absolute max-[700px]:[&.is-open]:left-0 max-[700px]:[&.is-open]:right-0 max-[700px]:[&.is-open]:top-[71px] max-[700px]:[&.is-open]:bg-background max-[700px]:[&.is-open]:[border-bottom:1px_solid_var(--line)] max-[700px]:[&.is-open]:p-[22px] max-[700px]:[&.is-open]:flex-col max-[700px]:[&.is-open]:items-start max-[700px]:[&.is-open]:gap-[22px] max-[700px]:[&.is-open]:text-[13px] max-[700px]:[&.is-open]:shadow-[0_10px_20px_#2930250a] max-[700px]:[&.is-open]:animate-[feedback-in_200ms_var(--ease-settle)_both] [&_a]:relative [&_a::after]:[content:""] [&_a::after]:absolute [&_a::after]:left-0 [&_a::after]:right-0 [&_a::after]:bottom-[-5px] [&_a::after]:h-[1px] [&_a::after]:bg-current [&_a::after]:[transform:scaleX(0)] [&_a::after]:[transform-origin:left] [&_a::after]:[transition:transform_250ms_var(--ease-settle)] [&_a:focus-visible::after]:[transform:scaleX(1)] [@media((hover:_hover)_and_(pointer:_fine))]:[&_a:hover::after]:[transform:scaleX(1)] is-open'
-            : 'navigation flex items-center gap-[30px] text-[#62675b] text-[12px] [&_a:hover]:text-primary max-[1100px]:gap-[20px] max-[900px]:gap-[15px] max-[900px]:text-[10px] max-[700px]:hidden max-[700px]:[&.is-open]:flex max-[700px]:[&.is-open]:absolute max-[700px]:[&.is-open]:left-0 max-[700px]:[&.is-open]:right-0 max-[700px]:[&.is-open]:top-[71px] max-[700px]:[&.is-open]:bg-background max-[700px]:[&.is-open]:[border-bottom:1px_solid_var(--line)] max-[700px]:[&.is-open]:p-[22px] max-[700px]:[&.is-open]:flex-col max-[700px]:[&.is-open]:items-start max-[700px]:[&.is-open]:gap-[22px] max-[700px]:[&.is-open]:text-[13px] max-[700px]:[&.is-open]:shadow-[0_10px_20px_#2930250a] max-[700px]:[&.is-open]:animate-[feedback-in_200ms_var(--ease-settle)_both] [&_a]:relative [&_a::after]:[content:""] [&_a::after]:absolute [&_a::after]:left-0 [&_a::after]:right-0 [&_a::after]:bottom-[-5px] [&_a::after]:h-[1px] [&_a::after]:bg-current [&_a::after]:[transform:scaleX(0)] [&_a::after]:[transform-origin:left] [&_a::after]:[transition:transform_250ms_var(--ease-settle)] [&_a:focus-visible::after]:[transform:scaleX(1)] [@media((hover:_hover)_and_(pointer:_fine))]:[&_a:hover::after]:[transform:scaleX(1)]'
+            ? 'navigation flex items-center gap-[30px] text-[light-dark(#62675b,var(--muted-foreground))] text-[12px] [&_a:hover]:text-primary max-[1100px]:gap-[20px] max-[900px]:gap-[15px] max-[900px]:text-[10px] max-[700px]:hidden max-[700px]:[&.is-open]:flex max-[700px]:[&.is-open]:absolute max-[700px]:[&.is-open]:left-0 max-[700px]:[&.is-open]:right-0 max-[700px]:[&.is-open]:top-[71px] max-[700px]:[&.is-open]:bg-background max-[700px]:[&.is-open]:[border-bottom:1px_solid_var(--line)] max-[700px]:[&.is-open]:p-[22px] max-[700px]:[&.is-open]:flex-col max-[700px]:[&.is-open]:items-start max-[700px]:[&.is-open]:gap-[22px] max-[700px]:[&.is-open]:text-[13px] max-[700px]:[&.is-open]:shadow-[0_10px_20px_#2930250a] max-[700px]:[&.is-open]:animate-[feedback-in_200ms_var(--ease-settle)_both] [&_a]:relative [&_a::after]:[content:""] [&_a::after]:absolute [&_a::after]:left-0 [&_a::after]:right-0 [&_a::after]:bottom-[-5px] [&_a::after]:h-[1px] [&_a::after]:bg-current [&_a::after]:[transform:scaleX(0)] [&_a::after]:[transform-origin:left] [&_a::after]:[transition:transform_250ms_var(--ease-settle)] [&_a:focus-visible::after]:[transform:scaleX(1)] [@media((hover:_hover)_and_(pointer:_fine))]:[&_a:hover::after]:[transform:scaleX(1)] is-open'
+            : 'navigation flex items-center gap-[30px] text-[light-dark(#62675b,var(--muted-foreground))] text-[12px] [&_a:hover]:text-primary max-[1100px]:gap-[20px] max-[900px]:gap-[15px] max-[900px]:text-[10px] max-[700px]:hidden max-[700px]:[&.is-open]:flex max-[700px]:[&.is-open]:absolute max-[700px]:[&.is-open]:left-0 max-[700px]:[&.is-open]:right-0 max-[700px]:[&.is-open]:top-[71px] max-[700px]:[&.is-open]:bg-background max-[700px]:[&.is-open]:[border-bottom:1px_solid_var(--line)] max-[700px]:[&.is-open]:p-[22px] max-[700px]:[&.is-open]:flex-col max-[700px]:[&.is-open]:items-start max-[700px]:[&.is-open]:gap-[22px] max-[700px]:[&.is-open]:text-[13px] max-[700px]:[&.is-open]:shadow-[0_10px_20px_#2930250a] max-[700px]:[&.is-open]:animate-[feedback-in_200ms_var(--ease-settle)_both] [&_a]:relative [&_a::after]:[content:""] [&_a::after]:absolute [&_a::after]:left-0 [&_a::after]:right-0 [&_a::after]:bottom-[-5px] [&_a::after]:h-[1px] [&_a::after]:bg-current [&_a::after]:[transform:scaleX(0)] [&_a::after]:[transform-origin:left] [&_a::after]:[transition:transform_250ms_var(--ease-settle)] [&_a:focus-visible::after]:[transform:scaleX(1)] [@media((hover:_hover)_and_(pointer:_fine))]:[&_a:hover::after]:[transform:scaleX(1)]'
         }
         id="main-navigation"
         aria-label="Main navigation"
@@ -128,9 +129,10 @@ function AppHeader() {
           "header-actions flex items-center gap-[22px] max-[900px]:gap-[12px] max-[700px]:gap-[8px]"
         }
       >
+        <ThemeControl />
         <a
           className={
-            "source-link text-[#62675b] [transition:color_180ms_ease,_background-color_180ms_ease,_border-color_180ms_ease,_box-shadow_180ms_ease,_transform_220ms_var(--ease-settle)] max-[700px]:hidden"
+            "source-link text-[light-dark(#62675b,var(--muted-foreground))] [transition:color_180ms_ease,_background-color_180ms_ease,_border-color_180ms_ease,_box-shadow_180ms_ease,_transform_220ms_var(--ease-settle)] max-[700px]:hidden"
           }
           href={sourceUrl}
           target="_blank"
@@ -191,7 +193,7 @@ function ReserveVisual() {
     <Card
       as="div"
       className={
-        'reserve-visual bg-[#f9faf6] [border:1px_solid_#d4dacc] shadow-[0_4px_0_#eff1e9,_0_5px_0_#d4dacc] relative max-[700px]:w-[100%] max-[700px]:max-w-[440px] max-[700px]:[justify-self:center] [&.is-revealed_.payer-node]:animate-[node-confirm-loop_5s_ease_240ms_infinite] [&.is-revealed_.route-packet]:animate-[payment-travel_5s_ease-in-out_infinite] [&.is-revealed_.destination]:animate-[node-confirm-loop_5s_ease_1650ms_infinite] [&.is-revealed_.new-block]:animate-[reserve-deposit_5s_ease_var(--block-delay)_infinite] [&.is-revealed_.coverage-line>svg]:animate-[confirm-in_450ms_var(--ease-settle)_1850ms_both] [&[data-destination="merchant"]_.merchant-packet]:stroke-[#426b36] [&[data-destination="merchant"]_.merchant-packet]:[stroke-width:3] [&[data-destination="reserve"]_.reserve-packet]:stroke-[#426b36] [&[data-destination="reserve"]_.reserve-packet]:[stroke-width:3] [&[data-destination="reserve"]_.reserve-foundation]:bg-[#e9f0e350] [&[data-paused="true"]_.routing-diagram_*]:[animation-play-state:paused]! motion-reduce:[&_.replay-flow]:hidden'
+        'reserve-visual bg-[light-dark(#f9faf6,var(--card))] [border:1px_solid_light-dark(#d4dacc,var(--border))] shadow-[0_4px_0_light-dark(#eff1e9,var(--border)),_0_5px_0_light-dark(#d4dacc,var(--border))] relative max-[700px]:w-[100%] max-[700px]:max-w-[440px] max-[700px]:[justify-self:center] [&.is-revealed_.payer-node]:animate-[node-confirm-loop_5s_ease_240ms_infinite] [&.is-revealed_.route-packet]:animate-[payment-travel_5s_ease-in-out_infinite] [&.is-revealed_.destination]:animate-[node-confirm-loop_5s_ease_1650ms_infinite] [&.is-revealed_.new-block]:animate-[reserve-deposit_5s_ease_var(--block-delay)_infinite] [&.is-revealed_.coverage-line>svg]:animate-[confirm-in_450ms_var(--ease-settle)_1850ms_both] [&[data-destination="merchant"]_.merchant-packet]:stroke-[light-dark(#426b36,var(--primary))] [&[data-destination="merchant"]_.merchant-packet]:[stroke-width:3] [&[data-destination="reserve"]_.reserve-packet]:stroke-[light-dark(#426b36,var(--primary))] [&[data-destination="reserve"]_.reserve-packet]:[stroke-width:3] [&[data-destination="reserve"]_.reserve-foundation]:bg-[light-dark(#e9f0e350,var(--accent))] [&[data-paused="true"]_.routing-diagram_*]:[animation-play-state:paused]! motion-reduce:[&_.replay-flow]:hidden'
       }
       ref={visual}
       data-paused={paused || !visible}
@@ -207,7 +209,7 @@ function ReserveVisual() {
         <span>PAYMENT ROUTING</span>
         <span
           className={
-            'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+            'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[light-dark(#608a4b,var(--primary))] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[light-dark(#8c9185,var(--primary))]'
           }
         >
           PROTECTED
@@ -225,7 +227,7 @@ function ReserveVisual() {
         >
           <span
             className={
-              "node-icon grid place-items-center w-[33px] h-[33px] bg-[#f0f2eb]"
+              "node-icon grid place-items-center w-[33px] h-[33px] bg-[light-dark(#f0f2eb,var(--secondary))]"
             }
           >
             <Wallet size={18} />
@@ -240,7 +242,7 @@ function ReserveVisual() {
         </div>
         <svg
           className={
-            "route-lines block w-[100%] h-[48px] overflow-visible fill-[#658555]"
+            "route-lines block w-[100%] h-[48px] overflow-visible fill-[light-dark(#658555,var(--primary))]"
           }
           viewBox="0 0 400 48"
           preserveAspectRatio="none"
@@ -248,20 +250,20 @@ function ReserveVisual() {
         >
           <path
             className={
-              "route-track [fill:none] stroke-[#b8c6ac] [stroke-width:1] [vector-effect:non-scaling-stroke]"
+              "route-track [fill:none] stroke-[light-dark(#b8c6ac,var(--primary))] [stroke-width:1] [vector-effect:non-scaling-stroke]"
             }
             d="M200 0V24H97V48M200 24H303V48"
           />
           <path
             className={
-              "route-packet [fill:none] stroke-[#658555] [stroke-width:2] [stroke-linecap:round] [stroke-dasharray:5_100] [stroke-dashoffset:5] opacity-[0] merchant-packet"
+              "route-packet [fill:none] stroke-[light-dark(#658555,var(--primary))] [stroke-width:2] [stroke-linecap:round] [stroke-dasharray:5_100] [stroke-dashoffset:5] opacity-[0] merchant-packet"
             }
             pathLength="100"
             d="M200 0V24H97V48"
           />
           <path
             className={
-              "route-packet [fill:none] stroke-[#658555] [stroke-width:2] [stroke-linecap:round] [stroke-dasharray:5_100] [stroke-dashoffset:5] opacity-[0] reserve-packet"
+              "route-packet [fill:none] stroke-[light-dark(#658555,var(--primary))] [stroke-width:2] [stroke-linecap:round] [stroke-dasharray:5_100] [stroke-dashoffset:5] opacity-[0] reserve-packet"
             }
             pathLength="100"
             d="M200 0V24H303V48"
@@ -279,7 +281,7 @@ function ReserveVisual() {
             size="unstyled"
             type="button"
             className={
-              'destination p-[16px] flex flex-col items-start [border:1px_solid_var(--line)] bg-card text-left min-w-[0] [transition:transform_250ms_var(--ease-settle),_border-color_250ms_ease,_background-color_250ms_ease,_box-shadow_250ms_ease] [&>svg]:text-primary [&>svg]:mb-[14px] [&>span]:[font:7px_var(--mono)] [&>span]:tracking-[0.6px] [&>span]:text-muted-foreground [&>span]:whitespace-nowrap [&>span]:flex [&>span]:items-center [&>span]:gap-[5px] [&>strong]:text-[32px] [&>strong]:tracking-[-1px] [&>strong]:leading-[1.4] [&>strong]:font-[500] [&>strong_span]:text-muted-foreground [&>small]:text-[9px] [&>small]:text-muted-foreground max-[1100px]:p-[13px] max-[1100px]:[&>span]:text-[6px] max-[1100px]:[&>small]:text-[8px] max-[900px]:[&>strong]:text-[27px] max-[700px]:p-[16px] max-[700px]:[&>span]:text-[8px] max-[700px]:[&>strong]:text-[32px] max-[700px]:[&>small]:text-[9px] max-[380px]:p-[12px] max-[380px]:[&>span]:text-[6px] max-[380px]:[&>small]:text-[8px] [&>span>svg]:opacity-[0.5] [&>span>svg]:[transition:opacity_180ms_ease,_transform_220ms_var(--ease-settle)] [&[aria-pressed="true"]]:border-[#88a474] [&[aria-pressed="true"]]:shadow-[inset_0_0_0_1px_#88a47430] [&:active]:[transform:translateY(1px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover]:[transform:translateY(-2px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover]:border-[#9eb48d] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover>span>svg]:opacity-[1] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover>span>svg]:[transform:translate(1px,_-1px)] motion-reduce:[&>span>svg]:[transform:none]! motion-reduce:[&:hover]:[transform:none]! motion-reduce:[&:active]:[transform:none]! merchant-destination'
+              'destination p-[16px] flex flex-col items-start [border:1px_solid_var(--line)] bg-card text-left min-w-[0] [transition:transform_250ms_var(--ease-settle),_border-color_250ms_ease,_background-color_250ms_ease,_box-shadow_250ms_ease] [&>svg]:text-primary [&>svg]:mb-[14px] [&>span]:[font:7px_var(--mono)] [&>span]:tracking-[0.6px] [&>span]:text-muted-foreground [&>span]:whitespace-nowrap [&>span]:flex [&>span]:items-center [&>span]:gap-[5px] [&>strong]:text-[32px] [&>strong]:tracking-[-1px] [&>strong]:leading-[1.4] [&>strong]:font-[500] [&>strong_span]:text-muted-foreground [&>small]:text-[9px] [&>small]:text-muted-foreground max-[1100px]:p-[13px] max-[1100px]:[&>span]:text-[6px] max-[1100px]:[&>small]:text-[8px] max-[900px]:[&>strong]:text-[27px] max-[700px]:p-[16px] max-[700px]:[&>span]:text-[8px] max-[700px]:[&>strong]:text-[32px] max-[700px]:[&>small]:text-[9px] max-[380px]:p-[12px] max-[380px]:[&>span]:text-[6px] max-[380px]:[&>small]:text-[8px] [&>span>svg]:opacity-[0.5] [&>span>svg]:[transition:opacity_180ms_ease,_transform_220ms_var(--ease-settle)] [&[aria-pressed="true"]]:border-[light-dark(#88a474,var(--border))] [&[aria-pressed="true"]]:shadow-[inset_0_0_0_1px_#88a47430] [&:active]:[transform:translateY(1px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover]:[transform:translateY(-2px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover]:border-[light-dark(#9eb48d,var(--border))] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover>span>svg]:opacity-[1] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover>span>svg]:[transform:translate(1px,_-1px)] motion-reduce:[&>span>svg]:[transform:none]! motion-reduce:[&:hover]:[transform:none]! motion-reduce:[&:active]:[transform:none]! merchant-destination'
             }
             aria-pressed={destination === "merchant"}
             aria-describedby={captionId}
@@ -299,7 +301,7 @@ function ReserveVisual() {
             size="unstyled"
             type="button"
             className={
-              'destination p-[16px] flex flex-col items-start [border:1px_solid_var(--line)] text-left min-w-[0] [transition:transform_250ms_var(--ease-settle),_border-color_250ms_ease,_background-color_250ms_ease,_box-shadow_250ms_ease] [&>svg]:text-primary [&>svg]:mb-[14px] [&>span]:[font:7px_var(--mono)] [&>span]:tracking-[0.6px] [&>span]:text-muted-foreground [&>span]:whitespace-nowrap [&>span]:flex [&>span]:items-center [&>span]:gap-[5px] [&>strong]:text-[32px] [&>strong]:tracking-[-1px] [&>strong]:leading-[1.4] [&>strong]:font-[500] [&>strong_span]:text-muted-foreground [&>small]:text-[9px] [&>small]:text-muted-foreground max-[1100px]:p-[13px] max-[1100px]:[&>span]:text-[6px] max-[1100px]:[&>small]:text-[8px] max-[900px]:[&>strong]:text-[27px] max-[700px]:p-[16px] max-[700px]:[&>span]:text-[8px] max-[700px]:[&>strong]:text-[32px] max-[700px]:[&>small]:text-[9px] max-[380px]:p-[12px] max-[380px]:[&>span]:text-[6px] max-[380px]:[&>small]:text-[8px] [&>span>svg]:opacity-[0.5] [&>span>svg]:[transition:opacity_180ms_ease,_transform_220ms_var(--ease-settle)] [&[aria-pressed="true"]]:border-[#88a474] [&[aria-pressed="true"]]:shadow-[inset_0_0_0_1px_#88a47430] [&:active]:[transform:translateY(1px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover]:[transform:translateY(-2px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover]:border-[#9eb48d] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover>span>svg]:opacity-[1] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover>span>svg]:[transform:translate(1px,_-1px)] motion-reduce:[&>span>svg]:[transform:none]! motion-reduce:[&:hover]:[transform:none]! motion-reduce:[&:active]:[transform:none]! reserve-destination bg-[#edf3e5] border-[#cbdabf]'
+              'destination p-[16px] flex flex-col items-start [border:1px_solid_var(--line)] text-left min-w-[0] [transition:transform_250ms_var(--ease-settle),_border-color_250ms_ease,_background-color_250ms_ease,_box-shadow_250ms_ease] [&>svg]:text-primary [&>svg]:mb-[14px] [&>span]:[font:7px_var(--mono)] [&>span]:tracking-[0.6px] [&>span]:text-muted-foreground [&>span]:whitespace-nowrap [&>span]:flex [&>span]:items-center [&>span]:gap-[5px] [&>strong]:text-[32px] [&>strong]:tracking-[-1px] [&>strong]:leading-[1.4] [&>strong]:font-[500] [&>strong_span]:text-muted-foreground [&>small]:text-[9px] [&>small]:text-muted-foreground max-[1100px]:p-[13px] max-[1100px]:[&>span]:text-[6px] max-[1100px]:[&>small]:text-[8px] max-[900px]:[&>strong]:text-[27px] max-[700px]:p-[16px] max-[700px]:[&>span]:text-[8px] max-[700px]:[&>strong]:text-[32px] max-[700px]:[&>small]:text-[9px] max-[380px]:p-[12px] max-[380px]:[&>span]:text-[6px] max-[380px]:[&>small]:text-[8px] [&>span>svg]:opacity-[0.5] [&>span>svg]:[transition:opacity_180ms_ease,_transform_220ms_var(--ease-settle)] [&[aria-pressed="true"]]:border-[light-dark(#88a474,var(--border))] [&[aria-pressed="true"]]:shadow-[inset_0_0_0_1px_#88a47430] [&:active]:[transform:translateY(1px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover]:[transform:translateY(-2px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover]:border-[light-dark(#9eb48d,var(--border))] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover>span>svg]:opacity-[1] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover>span>svg]:[transform:translate(1px,_-1px)] motion-reduce:[&>span>svg]:[transform:none]! motion-reduce:[&:hover]:[transform:none]! motion-reduce:[&:active]:[transform:none]! reserve-destination bg-[light-dark(#edf3e5,var(--secondary))] border-[light-dark(#cbdabf,var(--border))]'
             }
             aria-pressed={destination === "reserve"}
             aria-describedby={captionId}
@@ -322,7 +324,7 @@ function ReserveVisual() {
         >
           <div
             className={
-              "reserve-blocks grid grid-cols-[repeat(24,_1fr)] gap-[3px] [&_span]:aspect-[1] [&_span]:bg-[#dbe4d1] [&_span]:[border:1px_solid_#ced9c2] [&_span]:[transition:transform_220ms_var(--ease-settle),_filter_220ms_ease,_box-shadow_220ms_ease] [&_.new-block]:bg-[#769764] [&_.new-block]:border-[#658a51] max-[900px]:gap-[2px] max-[700px]:gap-[3px] [@media((hover:_hover)_and_(pointer:_fine))]:[&_span:hover]:[transform:translateY(-1.5px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&_span:hover]:[filter:brightness(1.08)] [@media((hover:_hover)_and_(pointer:_fine))]:[&_span:hover]:shadow-[0_2px_3px_#426b3620] motion-reduce:[&_span:hover]:[transform:none]!"
+              "reserve-blocks grid grid-cols-[repeat(24,_1fr)] gap-[3px] [&_span]:aspect-[1] [&_span]:bg-[light-dark(#dbe4d1,var(--accent))] [&_span]:[border:1px_solid_light-dark(#ced9c2,var(--border))] [&_span]:[transition:transform_220ms_var(--ease-settle),_filter_220ms_ease,_box-shadow_220ms_ease] [&_.new-block]:bg-[light-dark(#769764,var(--primary))] [&_.new-block]:border-[light-dark(#658a51,var(--border))] max-[900px]:gap-[2px] max-[700px]:gap-[3px] [@media((hover:_hover)_and_(pointer:_fine))]:[&_span:hover]:[transform:translateY(-1.5px)] [@media((hover:_hover)_and_(pointer:_fine))]:[&_span:hover]:[filter:brightness(1.08)] [@media((hover:_hover)_and_(pointer:_fine))]:[&_span:hover]:shadow-[0_2px_3px_#426b3620] motion-reduce:[&_span:hover]:[transform:none]!"
             }
             aria-hidden="true"
           >
@@ -340,7 +342,7 @@ function ReserveVisual() {
           </div>
           <div
             className={
-              "foundation-label flex justify-between gap-[5px] text-[8px] text-muted-foreground mt-[10px] [&_span]:flex [&_span]:gap-[5px] [&_span]:items-center [&_i]:w-[6px] [&_i]:h-[6px] [&_i]:bg-[#d1ddc6] [&_span:last-child_i]:bg-[#769764] max-[900px]:text-[6px] max-[700px]:text-[8px] max-[380px]:text-[6px]"
+              "foundation-label flex justify-between gap-[5px] text-[8px] text-muted-foreground mt-[10px] [&_span]:flex [&_span]:gap-[5px] [&_span]:items-center [&_i]:w-[6px] [&_i]:h-[6px] [&_i]:bg-[light-dark(#d1ddc6,var(--accent))] [&_span:last-child_i]:bg-[light-dark(#769764,var(--primary))] max-[900px]:text-[6px] max-[700px]:text-[8px] max-[380px]:text-[6px]"
             }
           >
             <span>
@@ -353,7 +355,7 @@ function ReserveVisual() {
         </div>
         <div
           className={
-            "coverage-line [padding:14px_0_18px] [border-top:1px_dashed_#cbd5c1] flex items-center gap-[8px] text-[#567344] text-[10px] [&_strong]:ml-auto [&_strong]:[font:12px_var(--mono)]"
+            "coverage-line [padding:14px_0_18px] [border-top:1px_dashed_light-dark(#cbd5c1,var(--border))] flex items-center gap-[8px] text-[light-dark(#567344,var(--primary))] text-[10px] [&_strong]:ml-auto [&_strong]:[font:12px_var(--mono)]"
           }
         >
           <ShieldCheck size={17} />
@@ -387,7 +389,7 @@ function ReserveVisual() {
           size="unstyled"
           type="button"
           className={
-            "replay-flow [transition:color_180ms_ease,_background-color_180ms_ease,_border-color_180ms_ease,_box-shadow_180ms_ease,_transform_220ms_var(--ease-settle)] inline-flex items-center gap-[6px] min-h-[32px] [border:0] p-0 bg-transparent text-[#637953] [font:inherit] tracking-[inherit] [&:active]:[transform:translateY(1px)_scale(0.985)] [&_svg]:[transition:transform_400ms_var(--ease-settle)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_svg]:[transform:rotate(-35deg)] motion-reduce:[&:active]:[transform:none]! motion-reduce:[&_svg]:[transform:none]!"
+            "replay-flow [transition:color_180ms_ease,_background-color_180ms_ease,_border-color_180ms_ease,_box-shadow_180ms_ease,_transform_220ms_var(--ease-settle)] inline-flex items-center gap-[6px] min-h-[32px] [border:0] p-0 bg-transparent text-[light-dark(#637953,var(--primary))] [font:inherit] tracking-[inherit] [&:active]:[transform:translateY(1px)_scale(0.985)] [&_svg]:[transition:transform_400ms_var(--ease-settle)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_svg]:[transform:rotate(-35deg)] motion-reduce:[&:active]:[transform:none]! motion-reduce:[&_svg]:[transform:none]!"
           }
           onClick={() => setPaused((value) => !value)}
           aria-label={
@@ -490,7 +492,7 @@ function CheckoutDemo() {
   return (
     <section
       className={
-        'demo-section [padding:72px_64px_40px] bg-[#f0f2eaaa] max-[1100px]:pl-[36px] max-[1100px]:pr-[36px] max-[700px]:py-[48px] max-[700px]:px-[26px] max-[380px]:pl-[20px] max-[380px]:pr-[20px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[#9ba391] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[#9ba391] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
+        'demo-section [padding:72px_64px_40px] bg-[light-dark(#f0f2eaaa,var(--muted))] max-[1100px]:pl-[36px] max-[1100px]:pr-[36px] max-[700px]:py-[48px] max-[700px]:px-[26px] max-[380px]:pl-[20px] max-[380px]:pr-[20px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
       }
       id="demo"
       aria-labelledby="demo-title"
@@ -518,7 +520,7 @@ function CheckoutDemo() {
       <Card
         as="div"
         className={
-          'demo-workbench grid grid-cols-[0.92fr_1.08fr] [border:1px_solid_#d1d8c7] bg-card shadow-[0_5px_20px_#28351d03] max-[900px]:grid-cols-[1fr_1fr] max-[700px]:grid-cols-[minmax(0,_1fr)] [&_.split-bar]:overflow-hidden [&_.split-bar_span]:relative [&_.split-bar_span]:overflow-hidden [&_.split-bar_span]:[transition:flex_480ms_var(--ease-settle),_background-color_300ms_ease] [&[data-state="paid"]_.split-bar_span::after]:[content:""] [&[data-state="paid"]_.split-bar_span::after]:absolute [&[data-state="paid"]_.split-bar_span::after]:inset-0 [&[data-state="paid"]_.split-bar_span::after]:[background:linear-gradient(90deg,_transparent,_#ffffff65,_transparent)] [&[data-state="paid"]_.split-bar_span::after]:animate-[settlement-sweep_800ms_ease-out]'
+          'demo-workbench grid grid-cols-[0.92fr_1.08fr] [border:1px_solid_light-dark(#d1d8c7,var(--border))] bg-card shadow-[0_5px_20px_#28351d03] max-[900px]:grid-cols-[1fr_1fr] max-[700px]:grid-cols-[minmax(0,_1fr)] [&_.split-bar]:overflow-hidden [&_.split-bar_span]:relative [&_.split-bar_span]:overflow-hidden [&_.split-bar_span]:[transition:flex_480ms_var(--ease-settle),_background-color_300ms_ease] [&[data-state="paid"]_.split-bar_span::after]:[content:""] [&[data-state="paid"]_.split-bar_span::after]:absolute [&[data-state="paid"]_.split-bar_span::after]:inset-0 [&[data-state="paid"]_.split-bar_span::after]:[background:linear-gradient(90deg,_transparent,_#ffffff65,_transparent)] [&[data-state="paid"]_.split-bar_span::after]:animate-[settlement-sweep_800ms_ease-out]'
         }
         data-reveal
         data-state={state}
@@ -539,7 +541,7 @@ function CheckoutDemo() {
             </span>
             <span
               className={
-                "demo-badge [font:7px_var(--mono)] tracking-[1px] bg-[#edf0e7] [border:1px_solid_#dce2d3] text-muted-foreground py-[4px] px-[6px]"
+                "demo-badge [font:7px_var(--mono)] tracking-[1px] bg-[light-dark(#edf0e7,var(--secondary))] [border:1px_solid_light-dark(#dce2d3,var(--border))] text-muted-foreground py-[4px] px-[6px]"
               }
             >
               SIMULATION
@@ -557,7 +559,7 @@ function CheckoutDemo() {
             >
               <div
                 className={
-                  "product-art relative w-[51px] h-[58px] bg-[#e0e8d7] grid place-items-center overflow-hidden shrink-[0] [&>span]:[font:italic_37px_Georgia] [&>span]:text-[#526c40] [&>span]:[transform:rotate(-9deg)] [&>span]:z-[1] [&_i]:absolute [&_i]:w-[47px] [&_i]:h-[70px] [&_i]:[border:1px_solid_#b7c7a6] [&_i]:[transform:rotate(40deg)] max-[900px]:w-[41px] max-[900px]:h-[48px] max-[700px]:w-[47px] max-[700px]:h-[54px] [&>i]:[transition:transform_600ms_var(--ease-settle)]"
+                  "product-art relative w-[51px] h-[58px] bg-[light-dark(#e0e8d7,var(--accent))] grid place-items-center overflow-hidden shrink-[0] [&>span]:[font:italic_37px_Georgia] [&>span]:text-[light-dark(#526c40,var(--primary))] [&>span]:[transform:rotate(-9deg)] [&>span]:z-[1] [&_i]:absolute [&_i]:w-[47px] [&_i]:h-[70px] [&_i]:[border:1px_solid_light-dark(#b7c7a6,var(--border))] [&_i]:[transform:rotate(40deg)] max-[900px]:w-[41px] max-[900px]:h-[48px] max-[700px]:w-[47px] max-[700px]:h-[54px] [&>i]:[transition:transform_600ms_var(--ease-settle)]"
                 }
                 aria-hidden="true"
               >
@@ -585,7 +587,7 @@ function CheckoutDemo() {
               Order total <span>USDC ON SOLANA</span>
             </label>
             <div
-              className={`amount-input [&_input]:text-[34px] [&_input]:tracking-[-1.5px] [&_input]:font-[500] [&_input]:[background:none] [&_input]:[border:0] [&_input]:[outline:none] [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:text-foreground [&_input]:p-0 [&_input]:[appearance:textfield] [&_input]:[-moz-appearance:textfield] [&_input::-webkit-inner-spin-button]:[-webkit-appearance:none] [&_input::-webkit-inner-spin-button]:m-0 [&_input::-webkit-outer-spin-button]:[-webkit-appearance:none] [&_input::-webkit-outer-spin-button]:m-0 flex items-center gap-[7px] py-[13px] px-[15px] [border:1px_solid_#dce2d3] bg-[#f8faf4] [&>span]:text-[30px] [&>span]:text-[#a0aa95] [&>span]:font-[400] [&:focus-within]:border-[#64874d] [&_svg]:text-[#668eaa] [&_svg]:shrink-[0] [&.has-error]:border-[#a55745] ${!valid ? "has-error" : ""}`}
+              className={`amount-input [&_input]:text-[34px] [&_input]:tracking-[-1.5px] [&_input]:font-[500] [&_input]:[background:none] [&_input]:[border:0] [&_input]:[outline:none] [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:text-foreground [&_input]:p-0 [&_input]:[appearance:textfield] [&_input]:[-moz-appearance:textfield] [&_input::-webkit-inner-spin-button]:[-webkit-appearance:none] [&_input::-webkit-inner-spin-button]:m-0 [&_input::-webkit-outer-spin-button]:[-webkit-appearance:none] [&_input::-webkit-outer-spin-button]:m-0 flex items-center gap-[7px] py-[13px] px-[15px] [border:1px_solid_light-dark(#dce2d3,var(--border))] bg-[light-dark(#f8faf4,var(--card))] [&>span]:text-[30px] [&>span]:text-[light-dark(#a0aa95,var(--muted-foreground))] [&>span]:font-[400] [&:focus-within]:border-[light-dark(#64874d,var(--border))] [&_svg]:text-[light-dark(#668eaa,var(--info))] [&_svg]:shrink-[0] [&.has-error]:border-[light-dark(#a55745,var(--border))] ${!valid ? "has-error" : ""}`}
             >
               <span>$</span>
               <Input
@@ -609,7 +611,9 @@ function CheckoutDemo() {
             </div>
             {!valid && (
               <p
-                className={"input-error text-[10px] text-[#9d4734] mt-[6px]"}
+                className={
+                  "input-error text-[10px] text-[light-dark(#9d4734,var(--danger))] mt-[6px]"
+                }
                 id={`${inputId}-error`}
               >
                 Enter $1–$10,000 with up to two decimal places.
@@ -617,7 +621,7 @@ function CheckoutDemo() {
             )}
             <div
               className={
-                "protection-note flex items-center gap-[11px] my-[23px] mx-0 text-[#678256] [&>svg]:shrink-[0] [&>svg:last-child]:ml-auto [&_div]:grid [&_div]:gap-[5px] [&_strong]:text-[11px] [&_strong]:font-[500] [&_strong]:text-[#506444] [&_span]:text-[9px] [&_span]:text-[#657653] max-[900px]:gap-[7px] max-[900px]:[&_strong]:text-[10px] max-[900px]:[&_span]:text-[8px] max-[700px]:gap-[10px] max-[700px]:[&_strong]:text-[11px] max-[700px]:[&_span]:text-[9px] max-[380px]:[&_span]:text-[8px]"
+                "protection-note flex items-center gap-[11px] my-[23px] mx-0 text-[light-dark(#678256,var(--primary))] [&>svg]:shrink-[0] [&>svg:last-child]:ml-auto [&_div]:grid [&_div]:gap-[5px] [&_strong]:text-[11px] [&_strong]:font-[500] [&_strong]:text-[light-dark(#506444,var(--primary))] [&_span]:text-[9px] [&_span]:text-[light-dark(#657653,var(--primary))] max-[900px]:gap-[7px] max-[900px]:[&_strong]:text-[10px] max-[900px]:[&_span]:text-[8px] max-[700px]:gap-[10px] max-[700px]:[&_strong]:text-[11px] max-[700px]:[&_span]:text-[9px] max-[380px]:[&_span]:text-[8px]"
               }
             >
               <ShieldCheck size={19} />
@@ -665,7 +669,7 @@ function CheckoutDemo() {
                 </Button>
               ) : (
                 <div
-                  className={`payment-status min-h-[46px] flex items-center gap-[9px] py-0 px-[13px] bg-[#e7efdd] [border:1px_solid_#ccdcbe] text-primary text-[12px] animate-[feedback-in_300ms_var(--ease-settle)_both] [&_.icon-button]:ml-auto [&.refunded]:[color:var(--info)] [&.refunded]:[background:var(--info-soft)] [&.refunded]:border-[#cedce5] [&>svg]:animate-[confirm-in_350ms_var(--ease-settle)_both] [&>svg_polyline]:[stroke-dasharray:40] [&>svg_polyline]:animate-[check-draw_420ms_ease-out_both] [&>svg_path]:[stroke-dasharray:40] [&>svg_path]:animate-[check-draw_420ms_ease-out_both] ${state}`}
+                  className={`payment-status min-h-[46px] flex items-center gap-[9px] py-0 px-[13px] bg-[light-dark(#e7efdd,var(--secondary))] [border:1px_solid_light-dark(#ccdcbe,var(--border))] text-primary text-[12px] animate-[feedback-in_300ms_var(--ease-settle)_both] [&_.icon-button]:ml-auto [&.refunded]:[color:var(--info)] [&.refunded]:[background:var(--info-soft)] [&.refunded]:border-[light-dark(#cedce5,var(--border))] [&>svg]:animate-[confirm-in_350ms_var(--ease-settle)_both] [&>svg_polyline]:[stroke-dasharray:40] [&>svg_polyline]:animate-[check-draw_420ms_ease-out_both] [&>svg_path]:[stroke-dasharray:40] [&>svg_path]:animate-[check-draw_420ms_ease-out_both] ${state}`}
                   key={state}
                 >
                   <CheckCheck size={19} />
@@ -702,14 +706,16 @@ function CheckoutDemo() {
             )}
             <p
               className={
-                "demo-disclaimer flex items-center justify-center gap-[6px] text-[9px] text-[#69765d] mt-[14px]"
+                "demo-disclaimer flex items-center justify-center gap-[6px] text-[9px] text-[light-dark(#69765d,var(--muted-foreground))] mt-[14px]"
               }
             >
               <LockKeyhole size={11} /> Interactive demo. No real funds move.
             </p>
           </div>
         </div>
-        <div className={"settlement-panel bg-[#f8faf4]"}>
+        <div
+          className={"settlement-panel bg-[light-dark(#f8faf4,var(--card))]"}
+        >
           <div
             className={
               "panel-topline min-h-[49px] flex items-center justify-between gap-[10px] py-0 px-[24px] [border-bottom:1px_solid_var(--line)] [font:8px_var(--mono)] tracking-[0.9px] text-muted-foreground [&>span]:flex [&>span]:items-center [&>span]:gap-[8px] max-[700px]:py-0 max-[700px]:px-[23px]"
@@ -717,7 +723,7 @@ function CheckoutDemo() {
           >
             <span>BEHIND THE PAYMENT</span>
             <span
-              className={`status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185] ${state === "ready" ? "neutral" : ""}`}
+              className={`status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[light-dark(#608a4b,var(--primary))] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[light-dark(#8c9185,var(--primary))] ${state === "ready" ? "neutral" : ""}`}
             >
               {state === "ready" ? "PREVIEW" : "SIMULATED"}
             </span>
@@ -729,7 +735,7 @@ function CheckoutDemo() {
           >
             <div
               className={
-                "settlement-heading [&_h3]:text-[17px] [&_h3]:tracking-[-0.5px] [&_p]:text-[10px] [&_p]:text-[#657456] [&_p]:mt-[8px] max-[900px]:[&_h3]:text-[15px] max-[700px]:[&_h3]:text-[17px] max-[700px]:[&_p]:text-[11px] animate-[feedback-in_300ms_var(--ease-settle)_both]"
+                "settlement-heading [&_h3]:text-[17px] [&_h3]:tracking-[-0.5px] [&_p]:text-[10px] [&_p]:text-[light-dark(#657456,var(--muted-foreground))] [&_p]:mt-[8px] max-[900px]:[&_h3]:text-[15px] max-[700px]:[&_h3]:text-[17px] max-[700px]:[&_p]:text-[11px] animate-[feedback-in_300ms_var(--ease-settle)_both]"
               }
               key={state}
             >
@@ -750,7 +756,7 @@ function CheckoutDemo() {
             </div>
             <div
               className={
-                "split-bar flex gap-[4px] h-[8px] [margin:26px_0_23px] [&_span]:[transition:flex_0.3s] [&_span]:min-w-[0] [&_span:first-child]:bg-[#779d5b] [&_span:last-child]:bg-[#c7d7b5]"
+                "split-bar flex gap-[4px] h-[8px] [margin:26px_0_23px] [&_span]:[transition:flex_0.3s] [&_span]:min-w-[0] [&_span:first-child]:bg-[light-dark(#779d5b,var(--primary))] [&_span:last-child]:bg-[light-dark(#c7d7b5,var(--accent))]"
               }
               aria-hidden="true"
             >
@@ -784,7 +790,7 @@ function CheckoutDemo() {
                 <dt>
                   <i
                     className={
-                      "legend-dot w-[5px] h-[5px] inline-block merchant-dot bg-[#779d5b]"
+                      "legend-dot w-[5px] h-[5px] inline-block merchant-dot bg-[light-dark(#779d5b,var(--primary))]"
                     }
                   />
                   {state === "refunded"
@@ -813,7 +819,7 @@ function CheckoutDemo() {
                 <dt>
                   <i
                     className={
-                      "legend-dot w-[5px] h-[5px] inline-block reserve-dot bg-[#c7d7b5]"
+                      "legend-dot w-[5px] h-[5px] inline-block reserve-dot bg-[light-dark(#c7d7b5,var(--accent))]"
                     }
                   />
                   {state === "refunded"
@@ -837,7 +843,7 @@ function CheckoutDemo() {
             </dl>
             <div
               className={
-                "rate-control mt-[26px] [&_label]:flex [&_label]:justify-between [&_label]:items-center [&_label]:text-[10px] [&_label]:text-muted-foreground [&_strong]:[font:11px_var(--mono)] [&_strong]:text-[#536443] [&>div]:flex [&>div]:justify-between [&>div]:[font:7px_var(--mono)] [&>div]:text-muted-foreground [&>div]:tracking-[0.3px] max-[700px]:[&_label]:text-[11px]"
+                "rate-control mt-[26px] [&_label]:flex [&_label]:justify-between [&_label]:items-center [&_label]:text-[10px] [&_label]:text-muted-foreground [&_strong]:[font:11px_var(--mono)] [&_strong]:text-[light-dark(#536443,var(--primary))] [&>div]:flex [&>div]:justify-between [&>div]:[font:7px_var(--mono)] [&>div]:text-muted-foreground [&>div]:tracking-[0.3px] max-[700px]:[&_label]:text-[11px]"
               }
             >
               <label htmlFor={`${inputId}-rate`}>
@@ -864,7 +870,7 @@ function CheckoutDemo() {
             </div>
             <div
               className={
-                "coverage-note flex items-start gap-[10px] [border-top:1px_dashed_#d3ddc8] pt-[20px] mt-[23px] text-[#627751] [&_svg]:shrink-[0] [&_svg]:mt-[3px] [&_p]:text-[10px] [&_p]:leading-[1.7] [&_strong]:text-[#626f56] [&_strong]:font-[500] max-[700px]:[&_p]:text-[11px]"
+                "coverage-note flex items-start gap-[10px] [border-top:1px_dashed_light-dark(#d3ddc8,var(--border))] pt-[20px] mt-[23px] text-[light-dark(#627751,var(--primary))] [&_svg]:shrink-[0] [&_svg]:mt-[3px] [&_p]:text-[10px] [&_p]:leading-[1.7] [&_strong]:text-[light-dark(#626f56,var(--muted-foreground))] [&_strong]:font-[500] max-[700px]:[&_p]:text-[11px]"
               }
             >
               <ShieldCheck size={17} />
@@ -1012,7 +1018,7 @@ export function App() {
       <a
         href="#main"
         className={
-          "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-white p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
+          "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-background p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
         }
       >
         Skip to content
@@ -1026,7 +1032,7 @@ export function App() {
         <main id="main" tabIndex={-1}>
           <section
             className={
-              'hero [padding:96px_64px_83px] grid grid-cols-[1.12fr_1fr] gap-[50px] items-center bg-[linear-gradient(#dce0d532_1px,_transparent_1px),_linear-gradient(90deg,_#dce0d532_1px,_transparent_1px)] bg-size-[64px_64px] [&_h1]:text-[clamp(48px,_5.3vw,_73px)] [&_h1]:font-[500] [&_h1]:tracking-[-4.4px] [&_h1]:leading-[1.07] [&_h1]:[margin:28px_0_25px] [&_h1]:whitespace-nowrap [&_h1_em]:text-primary [&_h1_em]:tracking-[-4px] min-[1440px]:pt-[110px] min-[1440px]:pb-[97px] max-[1100px]:[padding:76px_36px_78px] max-[1100px]:gap-[30px] max-[1100px]:[&_h1]:text-[60px] max-[1100px]:[&_h1]:tracking-[-3.7px] max-[900px]:gap-[25px] max-[900px]:[&_h1]:text-[49px] max-[900px]:[&_h1]:tracking-[-3px] max-[900px]:[&_h1_em]:tracking-[-3px] max-[700px]:grid-cols-[minmax(0,_1fr)] max-[700px]:[padding:56px_27px_60px] max-[700px]:gap-[40px] max-[700px]:[&_h1]:text-[clamp(39px,_8.8vw,_60px)] max-[700px]:[&_h1]:tracking-[-2.7px] max-[700px]:[&_h1]:leading-[1.08] max-[700px]:[&_h1]:[margin:24px_0_21px] max-[700px]:[&_h1_em]:tracking-[-2.7px] max-[380px]:pl-[20px] max-[380px]:pr-[20px] max-[380px]:[&_h1]:text-[34px] max-[380px]:[&_h1]:tracking-[-2.4px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[#9ba391] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[#9ba391] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
+              'hero [padding:96px_64px_83px] grid grid-cols-[1.12fr_1fr] gap-[50px] items-center bg-[linear-gradient(light-dark(#dce0d532,var(--border))_1px,_transparent_1px),_linear-gradient(90deg,_light-dark(#dce0d532,var(--border))_1px,_transparent_1px)] bg-size-[64px_64px] [&_h1]:text-[clamp(48px,_5.3vw,_73px)] [&_h1]:font-[500] [&_h1]:tracking-[-4.4px] [&_h1]:leading-[1.07] [&_h1]:[margin:28px_0_25px] [&_h1]:whitespace-nowrap [&_h1_em]:text-primary [&_h1_em]:tracking-[-4px] min-[1440px]:pt-[110px] min-[1440px]:pb-[97px] max-[1100px]:[padding:76px_36px_78px] max-[1100px]:gap-[30px] max-[1100px]:[&_h1]:text-[60px] max-[1100px]:[&_h1]:tracking-[-3.7px] max-[900px]:gap-[25px] max-[900px]:[&_h1]:text-[49px] max-[900px]:[&_h1]:tracking-[-3px] max-[900px]:[&_h1_em]:tracking-[-3px] max-[700px]:grid-cols-[minmax(0,_1fr)] max-[700px]:[padding:56px_27px_60px] max-[700px]:gap-[40px] max-[700px]:[&_h1]:text-[clamp(39px,_8.8vw,_60px)] max-[700px]:[&_h1]:tracking-[-2.7px] max-[700px]:[&_h1]:leading-[1.08] max-[700px]:[&_h1]:[margin:24px_0_21px] max-[700px]:[&_h1_em]:tracking-[-2.7px] max-[380px]:pl-[20px] max-[380px]:pr-[20px] max-[380px]:[&_h1]:text-[34px] max-[380px]:[&_h1]:tracking-[-2.4px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
             }
           >
             <div className={"hero-copy"} data-reveal-stagger>
@@ -1038,7 +1044,7 @@ export function App() {
               >
                 <span
                   className={
-                    'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+                    'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[light-dark(#608a4b,var(--primary))] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[light-dark(#8c9185,var(--primary))]'
                   }
                 />{" "}
                 THE TRUST LAYER FOR STABLECOINS <ArrowUpRight size={13} />
@@ -1050,7 +1056,7 @@ export function App() {
               </h1>
               <p
                 className={
-                  "hero-lede text-[#646b5c] text-[15px] leading-[1.8] max-[1100px]:text-[13px] max-[900px]:text-[12px] max-[700px]:text-[13px] max-[700px]:max-w-[390px]"
+                  "hero-lede text-[light-dark(#646b5c,var(--muted-foreground))] text-[15px] leading-[1.8] max-[1100px]:text-[13px] max-[900px]:text-[12px] max-[700px]:text-[13px] max-[700px]:max-w-[390px]"
                 }
               >
                 Get paid now. Keep buyers protected.
@@ -1090,7 +1096,7 @@ export function App() {
               >
                 <span
                   className={
-                    "solana-mark w-[14px] grid gap-[2px] [&_i]:h-[3px] [&_i]:bg-[#777e6b] [&_i]:[transform:skew(-27deg)] [&_i:nth-child(2)]:[transform:skew(27deg)]"
+                    "solana-mark w-[14px] grid gap-[2px] [&_i]:h-[3px] [&_i]:bg-[light-dark(#777e6b,var(--primary))] [&_i]:[transform:skew(-27deg)] [&_i:nth-child(2)]:[transform:skew(27deg)]"
                   }
                   aria-hidden="true"
                 >
@@ -1099,7 +1105,11 @@ export function App() {
                   <i />
                 </span>{" "}
                 BUILT ON SOLANA{" "}
-                <span className={"divider-slash text-[#c3c8bb] py-0 px-[4px]"}>
+                <span
+                  className={
+                    "divider-slash text-[light-dark(#c3c8bb,var(--muted-foreground))] py-0 px-[4px]"
+                  }
+                >
                   /
                 </span>{" "}
                 SETTLED IN USDC
@@ -1120,7 +1130,7 @@ export function App() {
           </section>
           <div
             className={
-              "principles-strip grid grid-cols-[repeat(4,_1fr)] [border-bottom:1px_solid_var(--line)] py-0 px-[24px] [&>span]:min-h-[76px] [&>span]:flex [&>span]:items-center [&>span]:justify-center [&>span]:gap-[9px] [&>span]:text-muted-foreground [&>span]:text-[11px] [&_svg]:text-[#7e8b71] max-[1100px]:py-0 max-[1100px]:px-[10px] max-[1100px]:[&>span]:text-[9px] max-[700px]:grid-cols-[1fr_1fr] max-[700px]:p-0 max-[700px]:[&>span]:text-[9px] max-[700px]:[&>span]:min-h-[58px] max-[700px]:[&>span]:gap-[7px] max-[700px]:[&>span:nth-child(odd)]:[border-right:1px_solid_var(--line)] max-[700px]:[&>span:nth-child(n+3)]:[border-top:1px_solid_var(--line)] max-[700px]:[&_svg]:w-[13px]"
+              "principles-strip grid grid-cols-[repeat(4,_1fr)] [border-bottom:1px_solid_var(--line)] py-0 px-[24px] [&>span]:min-h-[76px] [&>span]:flex [&>span]:items-center [&>span]:justify-center [&>span]:gap-[9px] [&>span]:text-muted-foreground [&>span]:text-[11px] [&_svg]:text-[light-dark(#7e8b71,var(--muted-foreground))] max-[1100px]:py-0 max-[1100px]:px-[10px] max-[1100px]:[&>span]:text-[9px] max-[700px]:grid-cols-[1fr_1fr] max-[700px]:p-0 max-[700px]:[&>span]:text-[9px] max-[700px]:[&>span]:min-h-[58px] max-[700px]:[&>span]:gap-[7px] max-[700px]:[&>span:nth-child(odd)]:[border-right:1px_solid_var(--line)] max-[700px]:[&>span:nth-child(n+3)]:[border-top:1px_solid_var(--line)] max-[700px]:[&_svg]:w-[13px]"
             }
             data-reveal-stagger
           >
@@ -1139,7 +1149,7 @@ export function App() {
           </div>
           <section
             className={
-              'flow-section [padding:70px_64px_64px] max-[1100px]:pl-[36px] max-[1100px]:pr-[36px] max-[700px]:py-[48px] max-[700px]:px-[26px] max-[380px]:pl-[20px] max-[380px]:pr-[20px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[#9ba391] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[#9ba391] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
+              'flow-section [padding:70px_64px_64px] max-[1100px]:pl-[36px] max-[1100px]:pr-[36px] max-[700px]:py-[48px] max-[700px]:px-[26px] max-[380px]:pl-[20px] max-[380px]:pr-[20px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
             }
             id="how"
             aria-labelledby="flow-title"
@@ -1166,7 +1176,7 @@ export function App() {
             </div>
             <div
               className={
-                "flow-grid grid grid-cols-[repeat(4,_1fr)] [border:1px_solid_var(--line)] [&_article]:[padding:25px_22px_20px] [&_article]:bg-[#f8f9f4] [&_article]:[transition:background-color_220ms_ease] [&_article+article]:[border-left:1px_solid_var(--line)] [&_h3]:text-[15px] [&_h3]:tracking-[-0.4px] [&_h3]:mb-[12px] [&_p]:text-[11px] [&_p]:text-[#646e5a] [&_p]:leading-[1.8] [&_p]:min-h-[80px] max-[1100px]:[&_article]:[padding:23px_16px_18px] max-[1100px]:[&_h3]:text-[13px] max-[1100px]:[&_p]:min-h-[100px] max-[900px]:grid-cols-[1fr_1fr] max-[900px]:[&_article]:p-[25px] max-[900px]:[&_article:nth-child(3)]:[border-left:0] max-[900px]:[&_article:nth-child(n+3)]:[border-top:1px_solid_var(--line)] max-[900px]:[&_p]:min-h-[0] max-[900px]:[&_p]:text-[12px] max-[900px]:[&_h3]:text-[16px] max-[700px]:[&_article]:[padding:22px_17px_18px] max-[700px]:[&_h3]:text-[13px] max-[700px]:[&_h3]:leading-[1.4] max-[700px]:[&_p]:text-[10px] max-[380px]:grid-cols-[minmax(0,_1fr)] max-[380px]:[&_article+article]:[border-left:0] max-[380px]:[&_article+article]:[border-top:1px_solid_var(--line)] max-[380px]:[&_h3]:text-[16px] max-[380px]:[&_p]:text-[12px] [@media((hover:_hover)_and_(pointer:_fine))]:[&_article:hover]:bg-[#edf2e7] [@media((hover:_hover)_and_(pointer:_fine))]:[&_article:hover_.step-top_svg]:[transform:translateY(-2px)]"
+                "flow-grid grid grid-cols-[repeat(4,_1fr)] [border:1px_solid_var(--line)] [&_article]:[padding:25px_22px_20px] [&_article]:bg-[light-dark(#f8f9f4,var(--card))] [&_article]:[transition:background-color_220ms_ease] [&_article+article]:[border-left:1px_solid_var(--line)] [&_h3]:text-[15px] [&_h3]:tracking-[-0.4px] [&_h3]:mb-[12px] [&_p]:text-[11px] [&_p]:text-[light-dark(#646e5a,var(--muted-foreground))] [&_p]:leading-[1.8] [&_p]:min-h-[80px] max-[1100px]:[&_article]:[padding:23px_16px_18px] max-[1100px]:[&_h3]:text-[13px] max-[1100px]:[&_p]:min-h-[100px] max-[900px]:grid-cols-[1fr_1fr] max-[900px]:[&_article]:p-[25px] max-[900px]:[&_article:nth-child(3)]:[border-left:0] max-[900px]:[&_article:nth-child(n+3)]:[border-top:1px_solid_var(--line)] max-[900px]:[&_p]:min-h-[0] max-[900px]:[&_p]:text-[12px] max-[900px]:[&_h3]:text-[16px] max-[700px]:[&_article]:[padding:22px_17px_18px] max-[700px]:[&_h3]:text-[13px] max-[700px]:[&_h3]:leading-[1.4] max-[700px]:[&_p]:text-[10px] max-[380px]:grid-cols-[minmax(0,_1fr)] max-[380px]:[&_article+article]:[border-left:0] max-[380px]:[&_article+article]:[border-top:1px_solid_var(--line)] max-[380px]:[&_h3]:text-[16px] max-[380px]:[&_p]:text-[12px] [@media((hover:_hover)_and_(pointer:_fine))]:[&_article:hover]:bg-[light-dark(#edf2e7,var(--secondary))] [@media((hover:_hover)_and_(pointer:_fine))]:[&_article:hover_.step-top_svg]:[transform:translateY(-2px)]"
               }
               data-reveal-stagger
             >
@@ -1325,14 +1335,14 @@ export function App() {
           </section>
           <section
             className={
-              'protocol-section grid grid-cols-[1fr_1fr] items-center gap-[72px] py-[77px] px-[64px] max-[1100px]:pl-[36px] max-[1100px]:pr-[36px] max-[1100px]:gap-[42px] max-[900px]:gap-[30px] max-[700px]:py-[48px] max-[700px]:px-[26px] max-[700px]:grid-cols-[minmax(0,_1fr)] max-[700px]:gap-[33px] max-[380px]:pl-[20px] max-[380px]:pr-[20px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[#9ba391] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[#9ba391] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
+              'protocol-section grid grid-cols-[1fr_1fr] items-center gap-[72px] py-[77px] px-[64px] max-[1100px]:pl-[36px] max-[1100px]:pr-[36px] max-[1100px]:gap-[42px] max-[900px]:gap-[30px] max-[700px]:py-[48px] max-[700px]:px-[26px] max-[700px]:grid-cols-[minmax(0,_1fr)] max-[700px]:gap-[33px] max-[380px]:pl-[20px] max-[380px]:pr-[20px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
             }
             id="protocol"
             aria-labelledby="protocol-title"
           >
             <div
               className={
-                "protocol-copy [&_h2]:mt-[23px] [&_h2_em]:text-[#768367] [&>p]:text-[#656f5b] [&>p]:max-w-[365px] [&>p]:text-[12px] [&>p]:my-[22px] [&>p]:mx-0 [&_.button]:text-[11px] [&_.button]:min-h-[40px] [&_.button]:py-0 [&_.button]:px-[14px] max-[700px]:[&>p]:max-w-[none]"
+                "protocol-copy [&_h2]:mt-[23px] [&_h2_em]:text-[light-dark(#768367,var(--muted-foreground))] [&>p]:text-[light-dark(#656f5b,var(--muted-foreground))] [&>p]:max-w-[365px] [&>p]:text-[12px] [&>p]:my-[22px] [&>p]:mx-0 [&_.button]:text-[11px] [&_.button]:min-h-[40px] [&_.button]:py-0 [&_.button]:px-[14px] max-[700px]:[&>p]:max-w-[none]"
               }
               data-reveal
             >
@@ -1362,7 +1372,7 @@ export function App() {
             <Card
               as="div"
               className={
-                "protocol-rules [border:1px_solid_var(--line)] bg-[#f9faf6] [&>.panel-topline]:py-0 [&>.panel-topline]:px-[21px] [&>.panel-topline]:min-h-[48px] [&>.panel-topline]:bg-[#f0f3e9] [&>div:not(.panel-topline)]:flex [&>div:not(.panel-topline)]:gap-[17px] [&>div:not(.panel-topline)]:items-center [&>div:not(.panel-topline)]:min-h-[70px] [&>div:not(.panel-topline)]:[border-bottom:1px_solid_var(--line)] [&>div:not(.panel-topline)]:py-0 [&>div:not(.panel-topline)]:px-[21px] [&>div>span:first-child]:[font:9px_var(--mono)] [&>div>span:first-child]:text-muted-foreground [&>div>p]:text-[12px] [&>div>svg]:text-[#7b9169] [&>div>svg]:ml-auto [&>div>svg]:[transition:transform_280ms_var(--ease-settle)] max-[900px]:[&>div>p]:text-[10px] max-[900px]:[&>div:not(.panel-topline)]:gap-[12px] max-[900px]:[&>div:not(.panel-topline)]:py-0 max-[900px]:[&>div:not(.panel-topline)]:px-[16px] max-[700px]:[&>div>p]:text-[11px] max-[700px]:[&>div:not(.panel-topline)]:py-0 max-[700px]:[&>div:not(.panel-topline)]:px-[20px] max-[380px]:[&>div>p]:text-[10px] [@media((hover:_hover)_and_(pointer:_fine))]:[&>div:hover>svg]:[transform:translateY(-2px)] motion-reduce:[&>div>svg]:[transform:none]!"
+                "protocol-rules [border:1px_solid_var(--line)] bg-[light-dark(#f9faf6,var(--card))] [&>.panel-topline]:py-0 [&>.panel-topline]:px-[21px] [&>.panel-topline]:min-h-[48px] [&>.panel-topline]:bg-[light-dark(#f0f3e9,var(--secondary))] [&>div:not(.panel-topline)]:flex [&>div:not(.panel-topline)]:gap-[17px] [&>div:not(.panel-topline)]:items-center [&>div:not(.panel-topline)]:min-h-[70px] [&>div:not(.panel-topline)]:[border-bottom:1px_solid_var(--line)] [&>div:not(.panel-topline)]:py-0 [&>div:not(.panel-topline)]:px-[21px] [&>div>span:first-child]:[font:9px_var(--mono)] [&>div>span:first-child]:text-muted-foreground [&>div>p]:text-[12px] [&>div>svg]:text-[light-dark(#7b9169,var(--muted-foreground))] [&>div>svg]:ml-auto [&>div>svg]:[transition:transform_280ms_var(--ease-settle)] max-[900px]:[&>div>p]:text-[10px] max-[900px]:[&>div:not(.panel-topline)]:gap-[12px] max-[900px]:[&>div:not(.panel-topline)]:py-0 max-[900px]:[&>div:not(.panel-topline)]:px-[16px] max-[700px]:[&>div>p]:text-[11px] max-[700px]:[&>div:not(.panel-topline)]:py-0 max-[700px]:[&>div:not(.panel-topline)]:px-[20px] max-[380px]:[&>div>p]:text-[10px] [@media((hover:_hover)_and_(pointer:_fine))]:[&>div:hover>svg]:[transform:translateY(-2px)] motion-reduce:[&>div>svg]:[transform:none]!"
               }
               data-reveal
             >
@@ -1398,7 +1408,7 @@ export function App() {
               >
                 <span
                   className={
-                    'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+                    'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[light-dark(#608a4b,var(--primary))] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[light-dark(#8c9185,var(--primary))]'
                   }
                 />{" "}
                 Devnet preview · Deployed on Solana
@@ -1407,7 +1417,7 @@ export function App() {
           </section>
           <section
             className={
-              'faq-section [padding:68px_64px_76px] grid grid-cols-[1fr_1.6fr] gap-[70px] [&_h2]:mt-[23px] max-[1100px]:pl-[36px] max-[1100px]:pr-[36px] max-[900px]:gap-[35px] max-[700px]:py-[48px] max-[700px]:px-[26px] max-[700px]:grid-cols-[minmax(0,_1fr)] max-[700px]:gap-[30px] max-[700px]:[&_h2_br]:hidden max-[380px]:pl-[20px] max-[380px]:pr-[20px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[#9ba391] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[#9ba391] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
+              'faq-section [padding:68px_64px_76px] grid grid-cols-[1fr_1.6fr] gap-[70px] [&_h2]:mt-[23px] max-[1100px]:pl-[36px] max-[1100px]:pr-[36px] max-[900px]:gap-[35px] max-[700px]:py-[48px] max-[700px]:px-[26px] max-[700px]:grid-cols-[minmax(0,_1fr)] max-[700px]:gap-[30px] max-[700px]:[&_h2_br]:hidden max-[380px]:pl-[20px] max-[380px]:pr-[20px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
             }
             aria-labelledby="faq-title"
           >
@@ -1445,7 +1455,7 @@ export function App() {
           </section>
           <section
             className={
-              'closing-section text-center py-[70px] px-[24px] bg-[linear-gradient(#dce0d55c_1px,_transparent_1px),_linear-gradient(90deg,_#dce0d55c_1px,_transparent_1px)] bg-size-[50px_50px] [&>.section-label]:justify-center [&>.section-label]:text-[8px] [&>.section-label]:text-muted-foreground [&_h2]:text-[54px] [&_h2]:tracking-[-2.4px] [&_h2]:leading-[1.1] [&_h2]:my-[25px] [&_h2]:mx-0 [&_em]:text-primary [&_.button]:text-[12px] [&_.button]:min-h-[43px] max-[700px]:py-[53px] max-[700px]:px-[22px] max-[700px]:[&_h2]:text-[39px] max-[700px]:[&_h2]:tracking-[-1.7px] max-[700px]:[&>.section-label]:text-[8px] max-[380px]:[&_h2]:text-[34px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[#9ba391] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[#9ba391] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
+              'closing-section text-center py-[70px] px-[24px] bg-[linear-gradient(light-dark(#dce0d55c,var(--border))_1px,_transparent_1px),_linear-gradient(90deg,_light-dark(#dce0d55c,var(--border))_1px,_transparent_1px)] bg-size-[50px_50px] [&>.section-label]:justify-center [&>.section-label]:text-[8px] [&>.section-label]:text-muted-foreground [&_h2]:text-[54px] [&_h2]:tracking-[-2.4px] [&_h2]:leading-[1.1] [&_h2]:my-[25px] [&_h2]:mx-0 [&_em]:text-primary [&_.button]:text-[12px] [&_.button]:min-h-[43px] max-[700px]:py-[53px] max-[700px]:px-[22px] max-[700px]:[&_h2]:text-[39px] max-[700px]:[&_h2]:tracking-[-1.7px] max-[700px]:[&>.section-label]:text-[8px] max-[380px]:[&_h2]:text-[34px] section-frame relative [border-bottom:1px_solid_var(--line)] [&::before]:[content:"+"] [&::before]:absolute [&::before]:bottom-[-9px] [&::before]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::before]:[font:17px_var(--mono)] [&::before]:z-[2] [&::before]:left-[-6px] [&::after]:[content:"+"] [&::after]:absolute [&::after]:bottom-[-9px] [&::after]:text-[light-dark(#9ba391,var(--muted-foreground))] [&::after]:[font:17px_var(--mono)] [&::after]:z-[2] [&::after]:right-[-6px]'
             }
             data-reveal-stagger
           >
@@ -1477,7 +1487,7 @@ export function App() {
         <footer>
           <div
             className={
-              "footer-main flex items-center justify-between pb-[34px] [&_.brand]:text-[20px] [&_p]:text-[11px] [&_p]:text-[#68745c] [&_p]:mt-[12px] max-[700px]:items-start max-[700px]:gap-[25px] max-[700px]:[&_p]:text-[9px]"
+              "footer-main flex items-center justify-between pb-[34px] [&_.brand]:text-[20px] [&_p]:text-[11px] [&_p]:text-[light-dark(#68745c,var(--muted-foreground))] [&_p]:mt-[12px] max-[700px]:items-start max-[700px]:gap-[25px] max-[700px]:[&_p]:text-[9px]"
             }
             data-reveal
           >
@@ -1506,7 +1516,7 @@ export function App() {
             <span>
               <span
                 className={
-                  'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+                  'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[light-dark(#608a4b,var(--primary))] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[light-dark(#8c9185,var(--primary))]'
                 }
               />{" "}
               BUILT ON SOLANA

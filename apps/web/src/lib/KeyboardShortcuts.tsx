@@ -29,6 +29,7 @@ export function KeyboardShortcuts({
     const handle = (event: KeyboardEvent) => {
       if (
         !enabled ||
+        Boolean(document.querySelector(`[data-site-page="${dashboard ? "workspace" : "landing"}"][hidden]`)) ||
         event.repeat ||
         !event.altKey ||
         !event.shiftKey ||
@@ -73,7 +74,7 @@ export function KeyboardShortcuts({
     };
     document.addEventListener("keydown", handle);
     return () => document.removeEventListener("keydown", handle);
-  }, [enabled, payments]);
+  }, [enabled, payments, dashboard]);
   const shortcuts = [
     ...[{ label: "Show shortcuts", keys: ["Alt", "Shift", "K"] }],
     ...(dashboard
@@ -84,7 +85,7 @@ export function KeyboardShortcuts({
             keys: ["Alt", "Shift", "R"],
           },
           { label: "Focus amount", keys: ["Alt", "Shift", "A"] },
-          { label: "Toggle sidebar", keys: ["Alt", "Shift", "B"] },
+          { label: "Toggle sidebar", keys: ["⌘", "B"] },
         ]
       : []),
     { label: "Close a panel", keys: ["Esc"] },
@@ -108,8 +109,8 @@ export function KeyboardShortcuts({
             A few helpful shortcuts
           </DialogTitle>
           <DialogDescription className="text-xs leading-relaxed">
-            Use Alt (⌥ on Mac) + Shift with the keys below. Shortcuts pause
-            while you type.
+            Use the key combinations below (⌘ is Command and ⌥ is Alt on Mac).
+            Shortcuts pause while you type.
           </DialogDescription>
         </DialogHeader>
         <dl className="divide-y divide-border">

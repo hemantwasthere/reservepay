@@ -50,7 +50,7 @@ export function ProtectedOrders({
     >
       <CardHeader
         className={
-          "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+          "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[light-dark(#91a481,var(--primary))]"
         }
       >
         <div>
@@ -68,7 +68,7 @@ export function ProtectedOrders({
       {mismatch && (
         <div
           className={
-            "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
+            "merchant-alert [border:1px_solid_light-dark(#e6d9b6,var(--border))] bg-[light-dark(#f9f5e8,var(--warning-soft))] text-[light-dark(#78623b,var(--warning))] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
           }
           role="alert"
         >
@@ -78,7 +78,7 @@ export function ProtectedOrders({
       )}
       <div
         className={
-          'transfer-tabs flex bg-[#f0f2eb] p-[4px] rounded-[4px] my-[21px] mx-0 gap-[4px] [&_button]:flex-[1] [&_button]:[border:1px_solid_transparent] [&_button]:bg-transparent [&_button]:text-[11px] [&_button]:p-[8px] [&_button]:rounded-[3px] [&_button]:text-muted-foreground [&_button]:[transition:background_0.2s,_box-shadow_0.2s] [&_button[aria-pressed="true"]]:bg-card [&_button[aria-pressed="true"]]:border-[#dce2d3] [&_button[aria-pressed="true"]]:shadow-[0_1px_3px_#24282008] [&_button[aria-pressed="true"]]:text-foreground max-w-[340px]'
+          'transfer-tabs flex bg-[light-dark(#f0f2eb,var(--secondary))] p-[4px] rounded-[4px] my-[21px] mx-0 gap-[4px] [&_button]:flex-[1] [&_button]:[border:1px_solid_transparent] [&_button]:bg-transparent [&_button]:text-[11px] [&_button]:p-[8px] [&_button]:rounded-[3px] [&_button]:text-muted-foreground [&_button]:[transition:background_0.2s,_box-shadow_0.2s] [&_button[aria-pressed="true"]]:bg-card [&_button[aria-pressed="true"]]:border-[light-dark(#dce2d3,var(--border))] [&_button[aria-pressed="true"]]:shadow-[0_1px_3px_#24282008] [&_button[aria-pressed="true"]]:text-foreground max-w-[340px]'
         }
         role="group"
         aria-label="Order status"
@@ -99,7 +99,7 @@ export function ProtectedOrders({
       {!orders ? (
         <div
           className={
-            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
           }
           role="status"
         >
@@ -118,7 +118,7 @@ export function ProtectedOrders({
       ) : shown.length === 0 ? (
         <div
           className={
-            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500] [&_a]:text-primary"
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500] [&_a]:text-primary"
           }
         >
           {tab === "paid" ? (
@@ -182,7 +182,7 @@ export function ProtectedOrders({
                   {new Date(order.createdAt).toLocaleDateString()}
                 </div>
                 <div
-                  className={`text-[11px] whitespace-nowrap ${order.status === "paid" && order.expiresAt <= now ? "text-[#805e2e]" : order.status === "paid" ? "text-[#476238]" : "text-muted-foreground"}`}
+                  className={`text-[11px] whitespace-nowrap ${order.status === "paid" && order.expiresAt <= now ? "text-[light-dark(#805e2e,var(--warning))]" : order.status === "paid" ? "text-[light-dark(#476238,var(--primary))]" : "text-muted-foreground"}`}
                 >
                   {remaining(order, now)}
                 </div>

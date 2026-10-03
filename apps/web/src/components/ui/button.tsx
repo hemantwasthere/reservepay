@@ -11,15 +11,15 @@ const buttonVariants = cva(
       variant: {
         brand:
           actionStyles +
-          " bg-primary text-white [&:hover:not(:disabled)]:bg-[#315428]",
+          " bg-primary text-primary-foreground [&:hover:not(:disabled)]:bg-primary/90",
         ink:
           actionStyles +
-          " bg-foreground text-white [&:hover:not(:disabled)]:bg-[#414939]",
+          " bg-foreground text-background [&:hover:not(:disabled)]:bg-foreground/90",
         quiet:
           actionStyles +
-          " border-[#cdd3c5] bg-transparent [&:hover]:bg-[#eaf0e3]",
+          " border-[light-dark(#cdd3c5,var(--border))] bg-transparent [&:hover]:bg-[light-dark(#eaf0e3,var(--secondary))]",
         default:
-          "border border-transparent bg-primary text-primary-foreground hover:bg-[#315428]",
+          "border border-transparent bg-primary text-primary-foreground hover:bg-primary/90",
         destructive: "bg-destructive text-white hover:bg-destructive/90",
         outline: "border border-border bg-card text-foreground hover:bg-accent",
         secondary: "bg-secondary text-secondary-foreground hover:bg-accent",
