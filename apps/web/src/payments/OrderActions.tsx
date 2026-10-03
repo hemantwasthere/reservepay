@@ -20,7 +20,7 @@ import {
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import type { WalletConnection } from "../lib/WalletControl";
-import { isWalletRejection } from "../lib/wallets";
+import { isWalletRejection, WalletRejected } from "../lib/wallets";
 import { connection, exactAmount, explorer } from "../merchant/client";
 import {
   validateSignedTransaction,
@@ -182,10 +182,16 @@ export function OrderActions({
           issuedAt: Date.now(),
         };
         setBusy("Approve the request in your wallet…");
-        const signature = await wallet.wallet.signMessage(
-          wallet.account.address,
-          refundApproval(request),
-        );
+        let signature: Uint8Array;
+        try {
+          signature = await wallet.wallet.signMessage(
+            wallet.account.address,
+            refundApproval(request),
+          );
+        } catch (e) {
+          if (isWalletRejection(e)) throw new WalletRejected();
+          throw e;
+        }
         if (!isCurrent(wallet))
           throw new Error("Your wallet changed. Please try again.");
         setBusy("Saving your request…");
@@ -213,13 +219,19 @@ export function OrderActions({
           if (!isCurrent(wallet))
             throw new Error("Your wallet changed. Please try again.");
           setBusy("Approve the transaction in your wallet…");
-          const bytes = await wallet.wallet.signTransaction(
-            wallet.account.address,
-            prepared.transaction.serialize({
-              requireAllSignatures: false,
-              verifySignatures: false,
-            }),
-          );
+          let bytes: Uint8Array;
+          try {
+            bytes = await wallet.wallet.signTransaction(
+              wallet.account.address,
+              prepared.transaction.serialize({
+                requireAllSignatures: false,
+                verifySignatures: false,
+              }),
+            );
+          } catch (e) {
+            if (isWalletRejection(e)) throw new WalletRejected();
+            throw e;
+          }
           if (!isCurrent(wallet))
             throw new Error("Your wallet changed. Please try again.");
           const signed = validateSignedTransaction(prepared.transaction, bytes);
@@ -262,7 +274,7 @@ export function OrderActions({
       }
     } catch (e) {
       if (mounted.current)
-        if (isWalletRejection(e))
+        if (e instanceof WalletRejected)
           setMessage("Cancelled in your wallet. Nothing was submitted.");
         else setError(errorText(e));
     } finally {

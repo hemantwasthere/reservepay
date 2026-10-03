@@ -40,7 +40,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import { formatUsdc, reservePosition } from "@reservepay/core/settlement";
 import { WalletControl, type WalletConnection } from "../lib/WalletControl";
-import { isWalletRejection } from "../lib/wallets";
+import { isWalletRejection, WalletRejected } from "../lib/wallets";
 import {
   client,
   connection,
@@ -598,15 +598,21 @@ function MerchantWorkspace({
       );
       if (!current()) throw new Error("Wallet changed. Nothing was submitted.");
       setBusy("Approve in your wallet…");
-      const bytes = await wallet.wallet.signTransaction!(
-        wallet.account.address,
-        new Uint8Array(
-          prepared.transaction.serialize({
-            requireAllSignatures: false,
-            verifySignatures: false,
-          }),
-        ),
-      );
+      let bytes: Uint8Array;
+      try {
+        bytes = await wallet.wallet.signTransaction!(
+          wallet.account.address,
+          new Uint8Array(
+            prepared.transaction.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false,
+            }),
+          ),
+        );
+      } catch (error) {
+        if (isWalletRejection(error)) throw new WalletRejected();
+        throw error;
+      }
       if (!current()) throw new Error("Wallet changed. Nothing was submitted.");
       const signed = validateSignedTransaction(prepared.transaction, bytes);
       const record: PendingTransaction = {
@@ -656,7 +662,7 @@ function MerchantWorkspace({
     } catch (error) {
       if (current())
         setMessage(
-          isWalletRejection(error)
+          error instanceof WalletRejected
             ? "Cancelled in your wallet. Nothing was submitted."
             : errorMessage(error),
         );

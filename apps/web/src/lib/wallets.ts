@@ -29,6 +29,17 @@ export function isWalletRejection(error: unknown): boolean {
     return true;
   return typeof message === "string" && /reject|declin|denied|cancel/i.test(message);
 }
+
+// Thrown by a wrapped wallet call when the user declined. Checking the
+// marker — instead of re-matching any error in the flow — keeps
+// unrelated failures (interrupted requests, RPC "access denied") from
+// being read as a cancellation.
+export class WalletRejected extends Error {
+  constructor() {
+    super("Cancelled in your wallet.");
+    this.name = "WalletRejected";
+  }
+}
 export type WalletOption = {
   identity: object;
   name: string;

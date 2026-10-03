@@ -23,7 +23,7 @@ import bs58 from "bs58";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { type WalletConnection } from "../lib/WalletControl";
-import { isWalletRejection } from "../lib/wallets";
+import { isWalletRejection, WalletRejected } from "../lib/wallets";
 import { SessionErrorBoundary } from "../lib/useMerchantSession";
 import { useToast } from "../lib/Toast";
 import { exactAmount, parseAmount } from "../merchant/client";
@@ -194,9 +194,15 @@ function LinkManager({
         };
         const message = paymentApproval(terms);
         setBusy("Approve link in your wallet…");
-        const signature = bs58.encode(
-          await active.wallet.signMessage(active.account.address, message),
-        );
+        let signature: string;
+        try {
+          signature = bs58.encode(
+            await active.wallet.signMessage(active.account.address, message),
+          );
+        } catch (error) {
+          if (isWalletRejection(error)) throw new WalletRejected();
+          throw error;
+        }
         if (!isCurrent(active))
           throw new Error("Wallet changed. Please try again.");
         request = { terms, signature };
@@ -212,7 +218,7 @@ function LinkManager({
     } catch (error) {
       if (isCurrent(active))
         setError(
-          isWalletRejection(error)
+          error instanceof WalletRejected
             ? "Cancelled in your wallet. No payment link was created."
             : error instanceof ConvexError && typeof error.data === "string"
               ? error.data

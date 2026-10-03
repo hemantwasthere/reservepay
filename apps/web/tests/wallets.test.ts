@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Wallet, WalletAccount } from "@wallet-standard/base";
 import type { StandardEventsChangeProperties } from "@wallet-standard/features";
-import { legacyPhantom, standardWallet, isWalletRejection } from "../src/lib/wallets";
+import {
+  legacyPhantom,
+  standardWallet,
+  isWalletRejection,
+  WalletRejected,
+} from "../src/lib/wallets";
 
 const account = (address: string, chain = "solana:mainnet"): WalletAccount => ({
   address,
@@ -81,6 +86,24 @@ describe("wallet rejection detection", () => {
     expect(isWalletRejection(new Error("Blockhash not found"))).toBe(false);
     expect(isWalletRejection(null)).toBe(false);
     expect(isWalletRejection(undefined)).toBe(false);
+  });
+
+  it("matches broadly, so it must only wrap the wallet call itself", () => {
+    // An RPC "access denied" looks like a decline to the heuristic; the
+    // WalletRejected marker is what keeps such errors from reading as
+    // cancellations outside the signing call.
+    expect(isWalletRejection(new Error("Access denied: missing signer"))).toBe(
+      true,
+    );
+  });
+
+  it("marks declines with WalletRejected so only signing errors read as cancelled", () => {
+    const rejected = new WalletRejected();
+    expect(rejected).toBeInstanceOf(Error);
+    expect(rejected.name).toBe("WalletRejected");
+    expect(rejected.message).toContain("Cancelled");
+    // The marker itself must not round-trip through the heuristic.
+    expect(isWalletRejection(rejected)).toBe(true);
   });
 });
 

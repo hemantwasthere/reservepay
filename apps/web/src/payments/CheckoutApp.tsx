@@ -43,11 +43,10 @@ import {
   phaseNote,
   type CheckoutPhase,
 } from "./checkout-phase";
-import { isWalletRejection } from "../lib/wallets";
+import { isWalletRejection, WalletRejected } from "../lib/wallets";
 
 // Declining the wallet prompt is a normal choice, so it gets its own
 // phase instead of the generic error path.
-class WalletRejected extends Error {}
 
 export function CheckoutApp() {
   const ready = usePaymentsReady();
