@@ -40,6 +40,7 @@ import {
 } from "./pending";
 import {
   canRetry,
+  checkoutAnnouncement,
   inFlight as phaseBusy,
   phaseNote,
   type CheckoutPhase,
@@ -54,6 +55,10 @@ export function CheckoutApp() {
   const [id, setId] = useState<string | null>(null);
   const [active, setActive] = useState<WalletConnection | null>(null);
   const [locked, setLocked] = useState(false);
+  // The live region lives here, mounted from the first render and outside
+  // any aria-busy card, so screen readers have registered it before the
+  // first phase (e.g. resuming a saved payment) is written into it.
+  const [announcement, setAnnouncement] = useState("");
   const currentWallet = useRef(active);
   const onChange = useCallback((next: WalletConnection | null) => {
     currentWallet.current = next;
@@ -155,10 +160,14 @@ export function CheckoutApp() {
             devnet SOL for fees. These tokens have no monetary value.
           </p>
         </div>
+        <span className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </span>
         <PaymentBoundary>
           {ready && id !== null ? (
             <Checkout
               id={id}
+              announce={setAnnouncement}
               active={active}
               setLocked={setLocked}
               isCurrent={isCurrent}
@@ -210,11 +219,13 @@ export function CheckoutApp() {
 }
 function Checkout({
   id,
+  announce,
   active,
   setLocked,
   isCurrent,
 }: {
   id: string;
+  announce: (text: string) => void;
   active: WalletConnection | null;
   setLocked: (value: boolean) => void;
   isCurrent: (value: WalletConnection) => boolean;
@@ -318,11 +329,17 @@ function Checkout({
   }, [id, Boolean(link), link?.receipt?.status, pending, sync]);
   useEffect(() => {
     if (!link?.receipt) return;
+    // The receipt view replaces payment progress; drop any phase left from
+    // the poll loop or a stale journal read so nothing announces over it.
+    setPhase({ kind: "ready" });
     try {
       clearPayment(id);
       setPending(null);
     } catch {}
   }, [id, link?.receipt]);
+  const announcement = checkoutAnnouncement(phase, Boolean(link?.receipt));
+  useEffect(() => announce(announcement), [announce, announcement]);
+  useEffect(() => () => announce(""), [announce]);
   const pay = async () => {
     if (
       !link ||
@@ -715,19 +732,7 @@ function Checkout({
       )}
     </Card>
     );
-  return (
-    <>
-      {/* Outside the card: aria-busy on the card can hold back updates
-          inside it, and mounting on every path from the first render
-          means the first phase after a refresh is a change that gets
-          announced. The visible notices are plain text so updates are
-          read exactly once. */}
-      <span className="sr-only" role="status" aria-live="polite">
-        {phaseNote(phase) ?? ""}
-      </span>
-      {content}
-    </>
-  );
+  return content;
 }
 function Receipt({
   merchantProfile,

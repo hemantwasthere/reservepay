@@ -54,6 +54,15 @@ export function inFlight(phase: CheckoutPhase): boolean {
   return ["preparing", "approving", "sending"].includes(phase.kind);
 }
 
+// What the page-level live region should say. Once a receipt exists the
+// receipt view takes over, so no payment-progress text may linger.
+export function checkoutAnnouncement(
+  phase: CheckoutPhase,
+  hasReceipt: boolean,
+): string {
+  return hasReceipt ? "" : (phaseNote(phase) ?? "");
+}
+
 // Single source for the text a phase shows: stepper sub-labels, the live
 // region announcement and the inline notice all read from here.
 export function phaseNote(phase: CheckoutPhase): string | null {

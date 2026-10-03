@@ -3,6 +3,7 @@ import {
   canRetry,
   inFlight,
   phaseNote,
+  checkoutAnnouncement,
   stepStates,
   type CheckoutPhase,
 } from "../src/payments/checkout-phase";
@@ -162,5 +163,22 @@ describe("checkout phase steps", () => {
     for (const phase of phases)
       if (!["ready", "error"].includes(phase.kind))
         expect(phaseNote(phase)).toBeTruthy();
+  });
+});
+
+describe("checkoutAnnouncement", () => {
+  it("announces payment progress until a receipt exists", () => {
+    expect(checkoutAnnouncement({ kind: "confirming" }, false)).toContain(
+      "safely reload",
+    );
+    expect(checkoutAnnouncement({ kind: "ready" }, false)).toBe("");
+  });
+  it("never announces payment progress over a receipt", () => {
+    for (const phase of [
+      { kind: "confirming" },
+      { kind: "verifying" },
+      { kind: "unavailable" },
+    ] as const)
+      expect(checkoutAnnouncement(phase, true)).toBe("");
   });
 });
