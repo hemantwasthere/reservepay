@@ -274,9 +274,12 @@ export function OrderActions({
       }
     } catch (e) {
       if (mounted.current)
-        if (e instanceof WalletRejected)
+        if (e instanceof WalletRejected) {
+          // The message renders behind an open dialog; close it so the
+          // buyer actually sees the cancellation.
+          setDialog(null);
           setMessage("Cancelled in your wallet. Nothing was submitted.");
-        else setError(errorText(e));
+        } else setError(errorText(e));
     } finally {
       inFlight.current = false;
       setLocked(false);
