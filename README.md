@@ -38,7 +38,7 @@ Merchants can withdraw only the surplus above locked liability. Reserve checks, 
 | Create links and follow payment history             | Submit a signed refund request before protection expires | Complete an open order, including before expiry    |
 | Complete orders after protection expires            | Follow the order’s final status from the same URL        | Approve every resolution with a wallet transaction |
 
-The app also includes a collapsible sidebar (⌘B), mobile navigation, System/Light/Dark appearance, wallet switching, and recovery for pending transactions after a reload or uncertain network response. Components use Tailwind CSS and locally customized shadcn primitives. The appearance menu is in the header on the landing page, workspace and checkout. Your choice persists across reloads and tabs; System follows changes to your device’s color scheme.
+The app also includes a collapsible sidebar (⌘B), mobile navigation, System/Light/Dark appearance, wallet switching, and recovery for pending transactions after a reload or uncertain network response. Components use Tailwind CSS and locally customized shadcn primitives. The appearance menu is in the header on the landing page, workspace and checkout. Press **Alt + Shift + T** (⌥⇧T on Mac) to cycle System → Light → Dark. Your choice persists across reloads and tabs; System follows changes to your device’s color scheme.
 
 ### Merchant workspace
 
@@ -170,7 +170,7 @@ Vercel builds with `bun run build` and serves `apps/web/dist`. Configure `VITE_C
 
 Deploy backend changes to the matching Convex deployment before enabling frontend code that depends on them. For a production Convex deployment, run `bun run deploy:backend` from `apps/web` with that deployment’s credentials. For a development deployment, use `bunx convex dev --once` there. Check the target deployment carefully; the hosted app still transacts on Solana **devnet**.
 
-The wallet-session rollout preserves `payments.list({ merchant })` for older browser tabs and uses `payments.listForSession({ session })` in the new app. The compatibility endpoint returns only the already-public link terms and receipts, never merchant profile fields. Deploy the additive backend first, verify both APIs and sign-in, then publish the frontend. See [the deployment checklist](docs/merchant-sessions.md).
+The payment-link rollout preserves `payments.list({ merchant })` and `payments.listForSession({ session })` for older browser tabs. The new app uses `payments.listForSessionPaginated` for history. Compatibility endpoints return only the already-public link terms and receipts, never merchant profile fields. Checkout checks current link availability through a server action before preparing payment and again after wallet approval. Deploy the additive backend first, verify the old and new APIs and sign-in, then publish the frontend. See [the deployment checklist](docs/merchant-sessions.md).
 
 ## Current scope
 

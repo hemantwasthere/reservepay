@@ -143,7 +143,7 @@ describe("wallet sign-in", () => {
       if (row) await ctx.db.patch(row._id, { expiresAt: Date.now() - 1 });
     });
     await expect(
-      t.query(api.payments.listForSession, {
+      t.query(api.payments.listForSessionPaginated, {
         session: token,
         paginationOpts: { numItems: 20, cursor: null },
       }),
@@ -152,7 +152,7 @@ describe("wallet sign-in", () => {
     await t.mutation(api.auth.signOut, { session: fresh.token });
     expect(await t.query(api.auth.me, { session: fresh.token })).toBeNull();
     await expect(
-      t.query(api.payments.listForSession, {
+      t.query(api.payments.listForSessionPaginated, {
         session: fresh.token,
         paginationOpts: { numItems: 20, cursor: null },
       }),

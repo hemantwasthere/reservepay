@@ -34,7 +34,19 @@ export const list = query({
       .order("desc")
       .take(50),
 });
+// Preserve the session-only array contract for existing tabs and rollbacks.
 export const listForSession = query({
+  args: { session: v.string() },
+  handler: async (ctx, { session }) => {
+    const merchant = await requireMerchant(ctx, session);
+    return ctx.db
+      .query("paymentLinks")
+      .withIndex("by_merchant", (q) => q.eq("merchant", merchant))
+      .order("desc")
+      .take(50);
+  },
+});
+export const listForSessionPaginated = query({
   args: { session: v.string(), paginationOpts: paginationOptsValidator },
   handler: async (ctx, { session, paginationOpts }) => {
     const merchant = await requireMerchant(ctx, session);
