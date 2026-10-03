@@ -23,6 +23,7 @@ import bs58 from "bs58";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { type WalletConnection } from "../lib/WalletControl";
+import { isWalletRejection } from "../lib/wallets";
 import { SessionErrorBoundary } from "../lib/useMerchantSession";
 import { useToast } from "../lib/Toast";
 import { exactAmount, parseAmount } from "../merchant/client";
@@ -211,11 +212,13 @@ function LinkManager({
     } catch (error) {
       if (isCurrent(active))
         setError(
-          error instanceof ConvexError && typeof error.data === "string"
-            ? error.data
-            : error instanceof Error
-              ? error.message
-              : "Could not create your payment link.",
+          isWalletRejection(error)
+            ? "Cancelled in your wallet. No payment link was created."
+            : error instanceof ConvexError && typeof error.data === "string"
+              ? error.data
+              : error instanceof Error
+                ? error.message
+                : "Could not create your payment link.",
         );
     } finally {
       inFlight.current = false;

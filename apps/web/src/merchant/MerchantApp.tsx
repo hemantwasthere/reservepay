@@ -40,6 +40,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import { formatUsdc, reservePosition } from "@reservepay/core/settlement";
 import { WalletControl, type WalletConnection } from "../lib/WalletControl";
+import { isWalletRejection } from "../lib/wallets";
 import {
   client,
   connection,
@@ -653,7 +654,12 @@ function MerchantWorkspace({
         );
       else await execute();
     } catch (error) {
-      if (current()) setMessage(errorMessage(error));
+      if (current())
+        setMessage(
+          isWalletRejection(error)
+            ? "Cancelled in your wallet. Nothing was submitted."
+            : errorMessage(error),
+        );
     } finally {
       actionInFlight.current = false;
       if (current()) {

@@ -20,6 +20,7 @@ import {
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import type { WalletConnection } from "../lib/WalletControl";
+import { isWalletRejection } from "../lib/wallets";
 import { connection, exactAmount, explorer } from "../merchant/client";
 import {
   validateSignedTransaction,
@@ -260,7 +261,10 @@ export function OrderActions({
         else await send();
       }
     } catch (e) {
-      if (mounted.current) setError(errorText(e));
+      if (mounted.current)
+        if (isWalletRejection(e))
+          setMessage("Cancelled in your wallet. Nothing was submitted.");
+        else setError(errorText(e));
     } finally {
       inFlight.current = false;
       setLocked(false);
