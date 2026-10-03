@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Wallet, WalletAccount } from "@wallet-standard/base";
 import type { StandardEventsChangeProperties } from "@wallet-standard/features";
-import { legacyPhantom, standardWallet } from "../src/lib/wallets";
+import { legacyPhantom, standardWallet, isWalletRejection } from "../src/lib/wallets";
 
 const account = (address: string, chain = "solana:mainnet"): WalletAccount => ({
   address,
@@ -49,6 +49,40 @@ function fixture() {
 }
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe("wallet rejection detection", () => {
+  it("recognizes the rejection shapes real wallets throw", () => {
+    expect(
+      isWalletRejection({ code: 4001, message: "User rejected the request." }),
+    ).toBe(true);
+    expect(isWalletRejection(new Error("Transaction cancelled"))).toBe(true);
+    expect(
+      isWalletRejection({
+        name: "WalletSignTransactionError",
+        message: "User rejected",
+      }),
+    ).toBe(true);
+    expect(
+      isWalletRejection({
+        name: "WalletSignMessageError",
+        message: "Signing failed",
+      }),
+    ).toBe(true);
+    expect(isWalletRejection(new Error("Approval Denied"))).toBe(true);
+    expect(isWalletRejection(new Error("User declined to sign"))).toBe(true);
+  });
+
+  it("leaves genuine errors untouched", () => {
+    expect(isWalletRejection(new Error("Insufficient funds"))).toBe(false);
+    expect(isWalletRejection("Wallet changed. Nothing was submitted.")).toBe(
+      false,
+    );
+    expect(isWalletRejection(new Error("fetch failed"))).toBe(false);
+    expect(isWalletRejection(new Error("Blockhash not found"))).toBe(false);
+    expect(isWalletRejection(null)).toBe(false);
+    expect(isWalletRejection(undefined)).toBe(false);
+  });
+});
 
 describe("wallet connections", () => {
   it("requests only previously authorized accounts on reconnect", async () => {

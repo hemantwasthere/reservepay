@@ -11,6 +11,24 @@ import type {
 } from "@wallet-standard/features";
 
 export type ConnectedAccount = { address: string; label?: string };
+
+// A buyer declining a wallet prompt is a normal choice, not a failure.
+// Matches the shapes Phantom, Solflare and Backpack actually throw.
+export function isWalletRejection(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { code, name, message } = error as {
+    code?: unknown;
+    name?: unknown;
+    message?: unknown;
+  };
+  if (code === 4001) return true;
+  if (
+    typeof name === "string" &&
+    /WalletSign(Transaction|Message)Error|UserRejected/.test(name)
+  )
+    return true;
+  return typeof message === "string" && /reject|declin|denied|cancel/i.test(message);
+}
 export type WalletOption = {
   identity: object;
   name: string;
