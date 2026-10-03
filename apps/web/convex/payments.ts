@@ -6,6 +6,7 @@ import {
   internalMutation,
   internalQuery,
   type MutationCtx,
+  type QueryCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { validateTerms } from "../src/payments/terms";
@@ -121,7 +122,7 @@ export const insert = internalMutation({
 // The merchant can stop an unpaid link without touching paid receipts. Other
 // merchants' link IDs are never revealed: same "not found" as a missing link.
 const ownedUnpaidLink = async (
-  ctx: MutationCtx,
+  ctx: QueryCtx | MutationCtx,
   session: string,
   id: Id<"paymentLinks">,
 ) => {
@@ -132,6 +133,11 @@ const ownedUnpaidLink = async (
   if (link.receipt) throw new ConvexError("This link has already been paid.");
   return link;
 };
+// Lets paymentActions.deactivate authorize before it touches the RPC.
+export const ownedUnpaidLinkForSession = internalQuery({
+  args: { session: v.string(), id: v.id("paymentLinks") },
+  handler: (ctx, { session, id }) => ownedUnpaidLink(ctx, session, id),
+});
 // Internal: callers must check the chain first (see paymentActions.deactivate)
 // so a link paid seconds ago is never reported inactive.
 export const deactivate = internalMutation({

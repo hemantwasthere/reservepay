@@ -337,26 +337,60 @@ describe("deactivating payment links", () => {
       t.action(api.paymentActions.deactivate, { session: "bad-token", id }),
     ).rejects.toThrow("Sign in again.");
   });
-  it("records a just-paid order from the chain instead of deactivating", async () => {
+  it("refuses to deactivate a link paid at confirmed but not yet finalized", async () => {
     const t = convexTest(schema, modules);
     const id = await t.mutation(internal.payments.insert, terms());
     const { token } = await signIn(t, seller);
-    // The buyer paid seconds ago; checkout has not synced the receipt yet.
-    const receipt = {
-      order: "order",
-      buyer: "buyer",
-      reserveAmount: "50000",
-      createdAt: 1000,
-      expiresAt: 86401000,
-      status: "paid" as const,
-    };
-    readOrder.mockResolvedValue(receipt);
+    // The buyer paid seconds ago: visible at confirmed, not yet finalized, so
+    // sync has not recorded a receipt.
+    readOrder.mockReset();
+    readOrder.mockImplementation(async (_link, commitment) =>
+      commitment === "confirmed"
+        ? {
+            order: "order",
+            buyer: "buyer",
+            reserveAmount: "50000",
+            createdAt: 1000,
+            expiresAt: 86401000,
+            status: "paid" as const,
+          }
+        : null,
+    );
     await expect(
       t.action(api.paymentActions.deactivate, { session: token, id }),
-    ).rejects.toThrow("already been paid");
+    ).rejects.toThrow("just paid");
+    expect(readOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ reference: expect.any(String) }),
+      "confirmed",
+    );
     const link = await t.query(api.payments.get, { id });
-    expect(link?.receipt).toEqual(receipt);
+    // Receipts are still only recorded at finalized, by sync.
+    expect(link?.receipt).toBeUndefined();
     expect(link?.deactivatedAt).toBeUndefined();
+  });
+  it("fails closed when the chain cannot be read", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    const { token } = await signIn(t, seller);
+    readOrder.mockReset();
+    readOrder.mockRejectedValue(new Error("RPC unavailable"));
+    await expect(
+      t.action(api.paymentActions.deactivate, { session: token, id }),
+    ).rejects.toThrow();
+    expect((await t.query(api.payments.get, { id }))?.deactivatedAt).toBeUndefined();
+  });
+  it("authorizes before reading the chain", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    const { token } = await signIn(t, Keypair.generate());
+    readOrder.mockReset();
+    await expect(
+      t.action(api.paymentActions.deactivate, { session: "bad-token", id }),
+    ).rejects.toThrow("Sign in again.");
+    await expect(
+      t.action(api.paymentActions.deactivate, { session: token, id }),
+    ).rejects.toThrow("not found");
+    expect(readOrder).not.toHaveBeenCalled();
   });
   it("refuses to deactivate a paid link but still records its receipt", async () => {
     readOrder.mockResolvedValue(null);

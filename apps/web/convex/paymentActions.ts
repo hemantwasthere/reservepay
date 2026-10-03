@@ -73,18 +73,18 @@ export const sync = action({
 export const deactivate = action({
   args: { session: v.string(), id: v.id("paymentLinks") },
   handler: async (ctx, { session, id }): Promise<void> => {
-    // Checkout only records a receipt on its next status check, up to 10
-    // seconds after payment. Record any on-chain order first so a link the
-    // buyer just paid can never be reported inactive.
-    const link = await ctx.runQuery(api.payments.get, { id });
-    if (link && !link.receipt) {
-      const receipt = await paymentClient(rpc).readOrder(link);
-      if (receipt)
-        await ctx.runMutation(internal.payments.record, {
-          id: link._id,
-          receipt,
-        });
-    }
+    // Authorize before any RPC, so strangers cannot trigger chain reads.
+    const link = await ctx.runQuery(
+      internal.payments.ownedUnpaidLinkForSession,
+      { session, id },
+    );
+    // Checkout counts a payment once it is confirmed, but receipts are only
+    // recorded at finalized (via sync). Refuse in between rather than mark a
+    // just-paid link inactive; an RPC failure also refuses.
+    if (await paymentClient(rpc).readOrder(link, "confirmed"))
+      throw new ConvexError(
+        "This link was just paid. Refresh in a moment to see the receipt.",
+      );
     await ctx.runMutation(internal.payments.deactivate, { session, id });
   },
 });
