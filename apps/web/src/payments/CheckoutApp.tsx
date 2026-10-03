@@ -36,6 +36,17 @@ import {
   clearPayment,
   type PendingPayment,
 } from "./pending";
+import {
+  canRetry,
+  inFlight as phaseBusy,
+  phaseNote,
+  type CheckoutPhase,
+} from "./checkout-phase";
+import { isWalletRejection } from "../lib/wallets";
+
+// Declining the wallet prompt is a normal choice, so it gets its own
+// phase instead of the generic error path.
+class WalletRejected extends Error {}
 
 export function CheckoutApp() {
   const ready = usePaymentsReady();
@@ -217,9 +228,7 @@ function Checkout({
   const [pending, setPending] = useState<PendingPayment | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [journalError, setJournalError] = useState("");
-  const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [phase, setPhase] = useState<CheckoutPhase>({ kind: "ready" });
   const inFlight = useRef(false);
   const mounted = useRef(true);
   const { notify } = useToast();
@@ -232,8 +241,12 @@ function Checkout({
   useEffect(() => {
     const read = () => {
       try {
-        setPending(loadPayment(id));
+        const saved = loadPayment(id);
+        setPending(saved);
         setJournalError("");
+        // A saved journal means a signed transaction may be in flight;
+        // resume at the confirmation step and let the poll loop refine it.
+        if (saved) setPhase({ kind: "confirming" });
       } catch (error) {
         setJournalError(
           error instanceof Error
@@ -260,31 +273,20 @@ function Checkout({
         if (verified) {
           clearPayment(id);
           setPending(null);
-          setError("");
-          setMessage("");
         } else if (pending) {
           const result = await transactionResult(connection, pending);
           if (stopped) return;
           if (result === "failed" || result === "expired") {
             clearPayment(id);
             setPending(null);
-            setError(
-              result === "failed"
-                ? "The transaction failed. No payment was made by this transaction."
-                : "The transaction expired without confirmation. You can try again.",
-            );
+            setPhase({ kind: result });
           } else
-            setMessage(
-              result === "confirmed"
-                ? "Confirmed on Solana. Verifying the finalized order…"
-                : "Waiting for Solana confirmation. You can safely reload this page.",
-            );
+            setPhase({
+              kind: result === "confirmed" ? "verifying" : "confirming",
+            });
         }
       } catch {
-        if (!stopped)
-          setMessage(
-            "Order verification is temporarily unavailable. We’ll keep checking; do not send another payment while one is pending.",
-          );
+        if (!stopped) setPhase({ kind: "unavailable" });
       } finally {
         running = false;
       }
@@ -338,16 +340,23 @@ function Checkout({
       );
       if (!isCurrent(wallet))
         throw new Error("Wallet changed. Nothing was submitted.");
-      setBusy("Approve payment in your wallet…");
-      const bytes = await wallet.wallet.signTransaction!(
-        wallet.account.address,
-        new Uint8Array(
-          prepared.transaction.serialize({
-            requireAllSignatures: false,
-            verifySignatures: false,
-          }),
-        ),
-      );
+      setPhase({ kind: "approving" });
+      let bytes: Uint8Array;
+      try {
+        bytes = await wallet.wallet.signTransaction!(
+          wallet.account.address,
+          new Uint8Array(
+            prepared.transaction.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false,
+            }),
+          ),
+        );
+      } catch (error) {
+        // A rejection happens before anything is saved or sent.
+        if (isWalletRejection(error)) throw new WalletRejected();
+        throw error;
+      }
       if (!isCurrent(wallet))
         throw new Error("Wallet changed. Nothing was submitted.");
       const signed = validateSignedTransaction(prepared.transaction, bytes);
@@ -362,24 +371,21 @@ function Checkout({
       // Persist before broadcast. If storage is unavailable, no transaction is sent.
       savePayment(id, record);
       setPending(record);
-      setBusy("Sending to Solana…");
+      setPhase({ kind: "sending" });
       try {
         await connection.sendRawTransaction(signed.bytes, {
           skipPreflight: false,
           preflightCommitment: "confirmed",
           maxRetries: 3,
         });
+        setPhase({ kind: "confirming" });
       } catch {
-        setMessage(
-          "Submission is uncertain. We’ll verify this transaction before allowing a retry.",
-        );
+        setPhase({ kind: "confirming", uncertain: true });
       }
     };
     inFlight.current = true;
     setLocked(true);
-    setBusy("Checking balance and reserve…");
-    setError("");
-    setMessage("");
+    setPhase({ kind: "preparing" });
     try {
       if (navigator.locks)
         await navigator.locks.request(
@@ -393,24 +399,24 @@ function Checkout({
         );
       else await execute();
     } catch (error) {
-      const description =
-        error instanceof Error
-          ? error.message
-          : "Payment could not be prepared.";
       if (mounted.current) {
-        setError(description);
-        notify({
-          title: "Payment needs attention",
-          description,
-          tone: "error",
-        });
+        if (error instanceof WalletRejected) setPhase({ kind: "rejected" });
+        else {
+          const description =
+            error instanceof Error
+              ? error.message
+              : "Payment could not be prepared.";
+          setPhase({ kind: "error", message: description });
+          notify({
+            title: "Payment needs attention",
+            description,
+            tone: "error",
+          });
+        }
       }
     } finally {
       inFlight.current = false;
-      if (mounted.current) {
-        setBusy("");
-        setLocked(false);
-      }
+      if (mounted.current) setLocked(false);
     }
   };
   if (link === undefined)
@@ -453,7 +459,7 @@ function Checkout({
       className={
         "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] bg-card [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] checkout-card p-[32px] mt-[20px] [&_h2]:text-[24px] [&_h2]:font-[500] [&_h2]:my-[12px] [&_h2]:mx-0 [&_h2]:[overflow-wrap:anywhere] [&_h2]:tracking-[-0.6px] [&>p]:leading-[1.7] [&>p]:text-muted-foreground max-[640px]:py-[24px] max-[640px]:px-[20px]"
       }
-      aria-busy={Boolean(busy)}
+      aria-busy={phaseBusy(phase)}
     >
       <span
         className={
@@ -594,12 +600,13 @@ function Checkout({
             disabled={
               !active?.wallet.signTransaction ||
               active?.account.address === link.merchant ||
-              Boolean(busy || pending || journalError) ||
+              Boolean(pending || journalError) ||
+              !canRetry(phase) ||
               !loaded
             }
             onClick={() => void pay()}
           >
-            {busy || pending ? (
+            {phaseBusy(phase) || pending ? (
               <LoaderCircle
                 size={17}
                 className={
@@ -609,10 +616,17 @@ function Checkout({
             ) : (
               <LockKeyhole size={16} />
             )}
-            {busy ||
-              (pending
-                ? "Payment in progress…"
-                : `Pay ${exactAmount(BigInt(link.amount))} USDC`)}
+            {pending
+              ? "Payment in progress…"
+              : phase.kind === "preparing"
+                ? "Checking balance and reserve…"
+                : phase.kind === "approving"
+                  ? "Approve payment in your wallet…"
+                  : phase.kind === "sending"
+                    ? "Sending to Solana…"
+                    : phase.kind !== "ready" && canRetry(phase)
+                      ? "Try again"
+                      : `Pay ${exactAmount(BigInt(link.amount))} USDC`}
           </Button>
         </>
       )}
@@ -624,24 +638,37 @@ function Checkout({
         A network fee and account rent in devnet SOL are shown in your wallet.
         Each link accepts one payment.
       </p>
-      {(error || journalError) && (
+      {(phase.kind === "error" || journalError) && (
         <p
           role="alert"
           className={
             "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
           }
         >
-          {error || journalError}
+          {phase.kind === "error" ? phase.message : journalError}
         </p>
       )}
-      {message && (
+      {(phase.kind === "failed" || phase.kind === "expired") && (
+        <p
+          role="alert"
+          className={
+            "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+          }
+        >
+          {phaseNote(phase)}
+        </p>
+      )}
+      {(phase.kind === "rejected" ||
+        phase.kind === "confirming" ||
+        phase.kind === "verifying" ||
+        phase.kind === "unavailable") && (
         <p
           className={
             "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
           }
           role="status"
         >
-          {message}
+          {phaseNote(phase)}
         </p>
       )}
       {pending && (
