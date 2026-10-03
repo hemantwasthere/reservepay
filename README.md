@@ -17,7 +17,7 @@ ReservePay is a USDC payment app on Solana. Merchants receive most of each payme
 3. **Get paid immediately.** At checkout, the program sends the merchant’s share to their wallet and adds the retained portion to their reserve. It locks liability for the **full payment**, backed by the reserve’s existing collateral plus the new retention.
 4. **Resolve the order.** Completion releases the retained portion and unlocks the liability. An authorized resolver can instead return the full payment to the original buyer from the reserve.
 
-![A 100 USDC payment sends 95 USDC to the merchant and adds 5 USDC to existing collateral; completion and a full refund are the two final outcomes](docs/images/payment-flow.svg)
+![A 100 USDC payment sends 95 USDC to the merchant and adds 5 USDC to existing collateral; completion and a full refund are the two final outcomes](docs/images/payment-flow.png)
 
 The diagram uses a 5% reserve rate and assumes no other open orders. The retained 5 USDC alone does **not** cover a 100 USDC refund: the merchant needs at least 95 USDC of existing collateral. Reserve rates come from the merchant’s on-chain configuration.
 
