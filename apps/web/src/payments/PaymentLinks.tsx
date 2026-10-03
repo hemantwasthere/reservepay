@@ -394,7 +394,8 @@ function LinkManager({
         }
       >
         <h3>
-          Recent payment links <span>{links?.length ?? ""}</span>
+          Recent payment links{" "}
+          <span>{status === "LoadingFirstPage" ? "" : links.length}</span>
         </h3>
         <Button
           variant="unstyled"
@@ -404,7 +405,7 @@ function LinkManager({
           }
           type="button"
           data-shortcut="refresh-orders"
-          disabled={!links || checking}
+          disabled={status === "LoadingFirstPage" || checking}
           onClick={() => void refresh()}
         >
           <RefreshCw
@@ -418,7 +419,7 @@ function LinkManager({
           {checking ? "Checking orders…" : "Refresh orders"}
         </Button>
       </div>
-      {links === undefined ? (
+      {status === "LoadingFirstPage" ? (
         <div
           className={
             "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
