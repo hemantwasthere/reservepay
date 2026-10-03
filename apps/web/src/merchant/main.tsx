@@ -13,7 +13,9 @@ const app = (
           page={
             document.getElementById("root")?.dataset.page === "payments"
               ? "payments"
-              : "overview"
+              : document.getElementById("root")?.dataset.page === "profile"
+                ? "profile"
+                : "overview"
           }
         />
       </PaymentProvider>

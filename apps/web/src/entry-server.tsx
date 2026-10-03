@@ -19,7 +19,9 @@ export function render() {
   );
 }
 
-export function renderMerchant(page: "overview" | "payments" = "overview") {
+export function renderMerchant(
+  page: "overview" | "payments" | "profile" = "overview",
+) {
   return renderToString(
     <StrictMode>
       <ToastProvider>

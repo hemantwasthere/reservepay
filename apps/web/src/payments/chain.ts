@@ -24,6 +24,7 @@ import { DEVNET_USDC, merchantClient } from "../merchant/client";
 import type { Reservepay } from "../merchant/reservepay";
 import idl from "../merchant/reservepay.json";
 import { referenceBytes, validateTerms, type PaymentTerms } from "./terms";
+import { orderStatus } from "./order-status";
 
 export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
   const program = new Program<Reservepay>(idl as Reservepay, {
@@ -77,12 +78,7 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
       const state = await this.readState(terms, commitment);
       if (!state) return null;
       const { order } = addresses(terms);
-      const status =
-        "open" in state.status
-          ? ("paid" as const)
-          : "completed" in state.status
-            ? ("completed" as const)
-            : ("refunded" as const);
+      const status = orderStatus(state.status);
       return {
         order: order.toBase58(),
         buyer: state.buyer.toBase58(),

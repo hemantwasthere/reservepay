@@ -19,6 +19,7 @@ import {
 import bs58 from "bs58";
 import { api } from "../../convex/_generated/api";
 import { type WalletConnection } from "../lib/WalletControl";
+import { SessionErrorBoundary } from "../lib/useMerchantSession";
 import { useToast } from "../lib/Toast";
 import { exactAmount, parseAmount } from "../merchant/client";
 import { paymentApproval, protectionLabel, type PaymentTerms } from "./terms";
@@ -30,6 +31,8 @@ import {
 
 export function PaymentLinks(props: {
   active: WalletConnection | null;
+  session: string | null;
+  onSessionExpired: () => void;
   registered: boolean;
   locked: boolean;
   setLocked: (value: boolean) => void;
@@ -101,7 +104,12 @@ export function PaymentLinks(props: {
         </div>
       ) : (
         <PaymentBoundary>
-          <LinkManager {...props} active={props.active} />
+          <SessionErrorBoundary
+            resetKey={props.session}
+            onExpire={props.onSessionExpired}
+          >
+            <LinkManager {...props} active={props.active} />
+          </SessionErrorBoundary>
         </PaymentBoundary>
       )}
     </Card>
@@ -109,20 +117,23 @@ export function PaymentLinks(props: {
 }
 function LinkManager({
   active,
+  session,
   locked,
   setLocked,
   isCurrent,
   onPaid,
 }: {
   active: WalletConnection;
+  session: string | null;
   locked: boolean;
   setLocked: (value: boolean) => void;
   isCurrent: (value: WalletConnection) => boolean;
   onPaid: () => void;
 }) {
-  const links = useQuery(api.payments.list, {
-    merchant: active.account.address,
-  });
+  const links = useQuery(
+    api.payments.list,
+    session ? { session } : "skip",
+  );
   const create = useAction(api.paymentActions.create);
   const sync = useAction(api.paymentActions.sync);
   const { notify } = useToast();

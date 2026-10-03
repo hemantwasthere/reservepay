@@ -17,6 +17,7 @@ import {
 import { PROGRAM_ID, merchantAddress, protocolAddress } from "@reservepay/core";
 import type { Reservepay } from "./reservepay";
 import idl from "./reservepay.json";
+import { orderStatus, type OrderStatus } from "../payments/order-status";
 
 export const DEVNET_USDC = new PublicKey(
   "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
@@ -41,6 +42,16 @@ export type MerchantState = {
   refundedOrders: bigint;
   volume: bigint;
   slot: number;
+};
+export type MerchantOrder = {
+  address: string;
+  reference: string;
+  buyer: string;
+  amount: bigint;
+  reserveAmount: bigint;
+  createdAt: number;
+  expiresAt: number;
+  status: OrderStatus;
 };
 
 export function parseAmount(value: string): bigint {
@@ -138,6 +149,36 @@ export function merchantClient(
         volume: BigInt(state?.totalVolume.toString() ?? "0"),
         slot: context.slot,
       };
+    },
+    async readOrders(
+      authority: PublicKey,
+      locked?: bigint,
+    ): Promise<{ orders: MerchantOrder[]; mismatch: boolean }> {
+      const { merchant } = addresses(authority);
+      // `merchant` is the first field after the 8-byte order discriminator.
+      const accounts = await program.account.order.all([
+        { memcmp: { offset: 8, bytes: merchant.toBase58() } },
+      ]);
+      const orders: MerchantOrder[] = accounts.map(({ publicKey, account }) => ({
+        address: publicKey.toBase58(),
+        reference: Buffer.from(account.reference).toString("hex"),
+        buyer: account.buyer.toBase58(),
+        amount: BigInt(account.amount.toString()),
+        reserveAmount: BigInt(account.reserveAmount.toString()),
+        createdAt: account.createdAt.toNumber() * 1000,
+        expiresAt: account.expiresAt.toNumber() * 1000,
+        status: orderStatus(account.status),
+      }));
+      orders.sort(
+        (a, b) =>
+          (a.status === "paid" ? 0 : 1) - (b.status === "paid" ? 0 : 1) ||
+          a.expiresAt - b.expiresAt,
+      );
+      const openTotal = orders.reduce(
+        (sum, order) => (order.status === "paid" ? sum + order.amount : sum),
+        0n,
+      );
+      return { orders, mismatch: locked !== undefined && openTotal !== locked };
     },
     async prepare(authority: PublicKey, action: ReserveAction, amount = 0n) {
       const state = await this.read(authority);

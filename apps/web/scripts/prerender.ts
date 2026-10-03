@@ -19,13 +19,16 @@ try {
     ["dist/index.html", render()],
     ["dist/app/index.html", renderMerchant()],
     ["dist/app/payments/index.html", renderMerchant("payments")],
+    ["dist/app/profile/index.html", renderMerchant("profile")],
     ["dist/pay/index.html", renderCheckout()],
   ]) {
     const path = resolve(file);
     const template = await readFile(path, "utf8");
     const marker = file.includes("/payments/")
       ? '<div id="root" data-page="payments"></div>'
-      : '<div id="root"></div>';
+      : file.includes("/profile/")
+        ? '<div id="root" data-page="profile"></div>'
+        : '<div id="root"></div>';
     if (!template.includes(marker))
       throw new Error("Prerender root is missing.");
     await writeFile(
