@@ -660,14 +660,24 @@ function Checkout({
         A network fee and account rent in devnet SOL are shown in your wallet.
         Each link accepts one payment.
       </p>
-      {(phase.kind === "error" || journalError) && (
+      {journalError && (
         <p
           role="alert"
           className={
             "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
           }
         >
-          {phase.kind === "error" ? phase.message : journalError}
+          {journalError}
+        </p>
+      )}
+      {phase.kind === "error" && (
+        // Plain text: the error toast already announces this message.
+        <p
+          className={
+            "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+          }
+        >
+          {phase.message}
         </p>
       )}
       {(phase.kind === "failed" || phase.kind === "expired") && (
