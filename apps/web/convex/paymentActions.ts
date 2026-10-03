@@ -3,13 +3,14 @@ import { ConvexError, v } from "convex/values";
 import { Connection, PublicKey } from "@solana/web3.js";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { termsFields, refundReason } from "./paymentValidators";
 import { paymentApproval } from "../src/payments/terms";
 import { paymentClient } from "../src/payments/chain";
 import { merchantClient } from "../src/merchant/client";
 import { refundApproval } from "../src/payments/refunds";
+import { syncLink } from "./syncLink";
 import type { Id } from "./_generated/dataModel";
 
 const rpc = new Connection("https://api.devnet.solana.com", {
@@ -75,10 +76,15 @@ export const sync = action({
   handler: async (ctx, { id }): Promise<boolean> => {
     const link = await ctx.runQuery(api.payments.get, { id });
     if (!link) throw new Error("Payment link not found.");
-    const receipt = await paymentClient(rpc).readOrder(link);
-    if (!receipt) return false;
-    await ctx.runMutation(internal.payments.record, { id: link._id, receipt });
-    return true;
+    return syncLink(ctx, link, rpc);
+  },
+});
+// Lets the keeper record the finalized receipt of an order it released.
+export const syncById = internalAction({
+  args: { id: v.id("paymentLinks") },
+  handler: async (ctx, { id }): Promise<void> => {
+    const link = await ctx.runQuery(api.payments.get, { id });
+    if (link) await syncLink(ctx, link, rpc);
   },
 });
 

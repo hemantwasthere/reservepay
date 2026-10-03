@@ -12,6 +12,8 @@ import type * as auth from "../auth.js";
 import type * as authActions from "../authActions.js";
 import type * as crons from "../crons.js";
 import type * as demoOrders from "../demoOrders.js";
+import type * as keeper from "../keeper.js";
+import type * as keeperActions from "../keeperActions.js";
 import type * as merchantImages from "../merchantImages.js";
 import type * as merchants from "../merchants.js";
 import type * as paymentActions from "../paymentActions.js";
@@ -19,6 +21,7 @@ import type * as paymentValidators from "../paymentValidators.js";
 import type * as payments from "../payments.js";
 import type * as session from "../session.js";
 import type * as signInNonce from "../signInNonce.js";
+import type * as syncLink from "../syncLink.js";
 
 import type {
   ApiFromModules,
@@ -31,6 +34,8 @@ declare const fullApi: ApiFromModules<{
   authActions: typeof authActions;
   crons: typeof crons;
   demoOrders: typeof demoOrders;
+  keeper: typeof keeper;
+  keeperActions: typeof keeperActions;
   merchantImages: typeof merchantImages;
   merchants: typeof merchants;
   paymentActions: typeof paymentActions;
@@ -38,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   payments: typeof payments;
   session: typeof session;
   signInNonce: typeof signInNonce;
+  syncLink: typeof syncLink;
 }>;
 
 /**

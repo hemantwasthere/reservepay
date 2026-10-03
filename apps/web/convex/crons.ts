@@ -10,4 +10,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "release expired orders and reconcile disputes",
+  { minutes: 5 },
+  internal.keeperActions.run,
+  {},
+);
+
 export default crons;
