@@ -62,9 +62,9 @@ _Sample devnet payment link. No wallet is connected in this screenshot._
 
 A buyer’s signed request records their refund request; it does not transfer funds. **A request does not freeze the order, extend protection, or guarantee a refund.** The configured resolver must approve an on-chain refund while the order remains open.
 
-After protection expires, completion is permissionless in the program; the app offers it to the merchant and resolver. The resolver can also complete early. Once an order is completed, it cannot be refunded through the program.
+After protection expires, completion is permissionless in the program; the app offers it to the merchant and resolver, and a keeper completes expired undisputed orders automatically. The resolver can also complete early. Once an order is completed, it cannot be refunded through the program.
 
-Payment metadata, receipts, and refund reason categories are public. Do not put private customer details in a payment title. The current workflow does not provide private evidence uploads, partial refunds, notifications, or an automated dispute process.
+Payment metadata, receipts, and refund reason categories are public. Do not put private customer details in a payment title. The current workflow does not provide private evidence uploads, partial refunds, or notifications. Dispute decisions stay manual; only completion of undisputed expired orders is automatic.
 
 See [refund and completion behavior](docs/order-resolution.md) for the complete workflow and recovery details.
 
@@ -140,6 +140,15 @@ Configure `SIGN_IN_SECRET` on the **Convex backend**, not in a `VITE_` variable.
 openssl rand -hex 32 | bunx convex env set SIGN_IN_SECRET
 ```
 
+Two more server-only backend variables control the order keeper; both are optional while you develop. Without `KEEPER_SECRET_KEY` the keeper skips every run and changes nothing.
+
+| Variable            | Used for                                                                                |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| `KEEPER_SECRET_KEY` | Base58 secret of the dedicated keeper keypair; enables automatic release of expired orders |
+| `KEEPER_RPC_URL`    | Optional dedicated RPC for the keeper; defaults to public devnet                        |
+
+See [devnet operations](docs/devnet.md) for keeper funding and protocol setup.
+
 For production, select the intended deployment with the Convex CLI's `--prod` option. Optional backend `SITE_ORIGIN` restricts sign-in to an exact origin such as `https://your-app.example.com` (no trailing slash). Without it, the hosted ReservePay domain and localhost are accepted. Keep an existing secret when redeploying; rotating it invalidates outstanding login challenges.
 
 ### Commands
@@ -164,7 +173,10 @@ The Anchor integration suite additionally requires Rust, the Solana CLI/local va
 | Account            | Address                                                                                                                                           |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ReservePay program | [`ERFq8y9tC4bjMk4AbLoM7zZXtvRcxsHdCMa9GpSnwxsU`](https://explorer.solana.com/address/ERFq8y9tC4bjMk4AbLoM7zZXtvRcxsHdCMa9GpSnwxsU?cluster=devnet) |
+| Protocol PDA       | [`5ZBgXZK52BbeJyap8dEcammaxkCXDfzrfEaFsPmRUvTt`](https://explorer.solana.com/address/5ZBgXZK52BbeJyap8dEcammaxkCXDfzrfEaFsPmRUvTt?cluster=devnet) |
 | Devnet USDC mint   | [`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`](https://explorer.solana.com/address/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU?cluster=devnet) |
+
+Protocol initialization, resolver rotation, and keeper configuration live in [devnet operations](docs/devnet.md).
 
 Vercel builds with `bun run build` and serves `apps/web/dist`. Configure `VITE_CONVEX_URL` for the intended backend before building. A frontend deployment does **not** deploy Convex changes or the Solana program.
 
@@ -175,8 +187,8 @@ The payment-link rollout preserves `payments.list({ merchant })` and `payments.l
 ## Current scope
 
 - **Single-use USDC links:** up to 10,000 USDC with 1 hour, 1 day, or 7 days of protection in the current UI.
-- **Recent history:** the latest 50 merchant links and up to 50 pending refund requests.
-- **Receipt updates:** polling and manual refresh; no background chain indexer yet.
+- **Recent history:** the latest 50 merchant links; the resolver's dispute queue paginates.
+- **Receipt updates:** polling and manual refresh, plus a keeper cron that releases expired undisputed orders and reconciles resolved disputes.
 - **Resolver-based refunds:** full refunds only, with wallet approval.
 - **Test network:** mainnet launch, operational monitoring, and a security audit remain separate work.
 
