@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   save: vi.fn(),
   notify: vi.fn(),
+  result: vi.fn(),
+  journal: null as unknown,
   cached: {
     title: "Active cached link",
     amount: "1000000",
@@ -61,19 +63,27 @@ vi.mock("../src/merchant/transactions", () => ({
     signature: "signed",
     bytes: new Uint8Array([1]),
   }),
-  transactionResult: async () => "pending",
+  transactionResult: mocks.result,
 }));
 vi.mock("../src/payments/chain", () => ({
   paymentClient: () => ({ prepare: mocks.prepare }),
 }));
 vi.mock("../src/payments/pending", () => ({
-  loadPayment: () => null,
-  savePayment: mocks.save,
-  clearPayment: () => {},
+  loadPayment: () => mocks.journal,
+  savePayment: (value: string, record: unknown) => {
+    mocks.journal = record;
+    mocks.save(value, record);
+  },
+  clearPayment: () => {
+    mocks.journal = null;
+  },
+  paymentKey: (id: string) => `reservepay:devnet:checkout:${id}`,
 }));
 let root: Root, container: HTMLDivElement;
 beforeEach(async () => {
   vi.resetAllMocks();
+  mocks.journal = null;
+  mocks.result.mockResolvedValue("pending");
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   history.replaceState(null, "", "/pay/test-link");
   mocks.check.mockResolvedValue(null);
@@ -98,6 +108,7 @@ async function pay() {
   expect(button.disabled).toBe(false);
   await act(async () => button.click());
 }
+
 it("blocks a stale active checkout before wallet signing when the server rejects it", async () => {
   mocks.check.mockRejectedValue(
     new Error("This payment link is no longer active."),
@@ -141,4 +152,104 @@ it("awaits the post-signature response before persisting and broadcasting", asyn
   expect(mocks.save.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.send.mock.invocationCallOrder[0],
   );
+});
+
+it.each([
+  ["failed", "resolve"],
+  ["failed", "reject"],
+  ["expired", "resolve"],
+  ["expired", "reject"],
+] as const)(
+  "keeps retry available after %s when the late send response is %s",
+  async (terminal, response) => {
+    let finishSend!: () => void;
+    mocks.send.mockImplementation(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          finishSend =
+            response === "resolve"
+              ? resolve
+              : () => reject(new Error("RPC response lost"));
+        }),
+    );
+    mocks.result.mockResolvedValue(terminal);
+    await pay();
+    expect(mocks.send).toHaveBeenCalledTimes(1);
+    expect(mocks.result).toHaveBeenCalled();
+    expect(mocks.journal).toBeNull();
+    const message =
+      terminal === "failed"
+        ? "The transaction failed."
+        : "The transaction expired";
+    expect(container.textContent).toContain(message);
+    await act(async () => finishSend());
+    const button = container.querySelector<HTMLButtonElement>(".checkout-pay")!;
+    expect(button.disabled).toBe(false);
+    expect(container.textContent).toContain(message);
+    expect(container.textContent).not.toContain(
+      "Waiting for Solana confirmation",
+    );
+    // The enabled control must really start a new attempt.
+    mocks.send.mockResolvedValue("signed");
+    mocks.result.mockResolvedValue("pending");
+    await pay();
+    expect(mocks.sign).toHaveBeenCalledTimes(2);
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+  },
+);
+it.each(["resolve", "reject"])(
+  "preserves confirmed progress when the late send response is %s",
+  async (response) => {
+    let finishSend!: () => void;
+    mocks.send.mockImplementation(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          finishSend =
+            response === "resolve"
+              ? resolve
+              : () => reject(new Error("RPC response lost"));
+        }),
+    );
+    mocks.result.mockResolvedValue("confirmed");
+    await pay();
+    expect(container.textContent).toContain("Verifying the finalized order");
+    await act(async () => finishSend());
+    expect(container.textContent).toContain("Verifying the finalized order");
+    expect(
+      container.querySelector<HTMLButtonElement>(".checkout-pay")!.disabled,
+    ).toBe(true);
+    expect(mocks.journal).not.toBeNull();
+  },
+);
+it.each(["resolve", "reject"])(
+  "starts confirmation when send returns %s before polling advances",
+  async (response) => {
+    // Hold the next poll so the send handler owns the initial transition.
+    mocks.sync.mockImplementation(() => new Promise(() => {}));
+    if (response === "reject")
+      mocks.send.mockRejectedValue(new Error("RPC response lost"));
+    await pay();
+    expect(container.textContent).toContain(
+      response === "resolve"
+        ? "Waiting for Solana confirmation"
+        : "Submission is uncertain",
+    );
+    expect(
+      container.querySelector<HTMLButtonElement>(".checkout-pay")!.disabled,
+    ).toBe(true);
+    expect(mocks.journal).not.toBeNull();
+  },
+);
+it("decline does not save or send and allows retry", async () => {
+  mocks.sign.mockRejectedValue({ code: 4001, message: "User rejected" });
+  await pay();
+  expect(mocks.save).not.toHaveBeenCalled();
+  expect(mocks.send).not.toHaveBeenCalled();
+  expect(mocks.notify).not.toHaveBeenCalled();
+  expect(container.textContent).toContain(
+    "Nothing was sent and no funds moved",
+  );
+  expect(
+    container.querySelector<HTMLButtonElement>(".checkout-pay")!.disabled,
+  ).toBe(false);
 });

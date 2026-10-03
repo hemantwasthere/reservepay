@@ -416,9 +416,17 @@ function Checkout({
           preflightCommitment: "confirmed",
           maxRetries: 3,
         });
-        setPhase({ kind: "confirming" });
+        // Polling may have already advanced or settled this payment while
+        // the send request was in flight. A late response must not undo it.
+        setPhase((phase) =>
+          phase.kind === "sending" ? { kind: "confirming" } : phase,
+        );
       } catch {
-        setPhase({ kind: "confirming", uncertain: true });
+        setPhase((phase) =>
+          phase.kind === "sending"
+            ? { kind: "confirming", uncertain: true }
+            : phase,
+        );
       }
     };
     inFlight.current = true;
