@@ -142,8 +142,8 @@ function Queue() {
       )}
       {links?.length === 50 && (
         <p className="mt-4 text-xs text-muted-foreground">
-          Showing 50 pending orders, oldest payment links first. Resolve and
-          refresh to see more.
+          Showing 50 pending orders, soonest protection deadline first. Resolve
+          and refresh to see more.
         </p>
       )}
       {error && (

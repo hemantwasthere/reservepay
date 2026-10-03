@@ -12,10 +12,16 @@ export default defineSchema({
     receipt: v.optional(v.object(receiptFields)),
     refundRequest: v.optional(v.object(refundRequestFields)),
     refundPending: v.optional(v.boolean()),
+    // Recorded when a requested refund resolves, so dispute history can be
+    // built without a backfill. "completed" means the reserve was released
+    // (by the resolver or by anyone after expiry), not that it was rejected.
+    refundOutcome: v.optional(v.union(v.literal("refunded"), v.literal("completed"))),
+    refundResolvedAt: v.optional(v.number()),
     // Not part of the signed terms; the merchant can toggle it any time.
     deactivatedAt: v.optional(v.number()),
   })
     .index("by_refund", ["refundPending"])
+    .index("by_refund_expiry", ["refundPending", "receipt.expiresAt"])
     .index("by_merchant", ["merchant"])
     .index("by_reference", ["merchant", "reference"]),
   usedNonces: defineTable({

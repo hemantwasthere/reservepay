@@ -183,20 +183,38 @@ export const record = internalMutation({
       return link.receipt;
     await ctx.db.patch(id, {
       receipt,
-      ...(receipt.status !== "paid" ? { refundPending: false } : {}),
+      ...(receipt.status !== "paid"
+        ? {
+            refundPending: false,
+            // Only a link with an actual request gets an outcome; anyone can
+            // complete an expired order without one.
+            ...(link.refundRequest
+              ? { refundOutcome: receipt.status, refundResolvedAt: Date.now() }
+              : {}),
+          }
+        : {}),
     });
     return receipt;
   },
 });
 
 // The queue contains public categories only, never customer contact details or evidence.
+// Ordered by protection deadline, soonest first.
 export const refundQueue = query({
   args: {},
   handler: (ctx) =>
     ctx.db
       .query("paymentLinks")
-      .withIndex("by_refund", (q) => q.eq("refundPending", true))
+      .withIndex("by_refund_expiry", (q) => q.eq("refundPending", true))
       .take(50),
+});
+export const refundQueuePage = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: (ctx, { paginationOpts }) =>
+    ctx.db
+      .query("paymentLinks")
+      .withIndex("by_refund_expiry", (q) => q.eq("refundPending", true))
+      .paginate(paginationOpts),
 });
 export const requestRefund = internalMutation({
   args: {

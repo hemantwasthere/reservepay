@@ -299,6 +299,13 @@ export function OrderActions({
     >
       {receipt.status !== "paid" ? (
         <p className="text-sm leading-6 text-muted-foreground" role="status">
+          {link.refundOutcome && (
+            <span className="font-medium text-foreground">
+              {link.refundOutcome === "completed"
+                ? "Completed · no refund. "
+                : "Refunded. "}
+            </span>
+          )}
           {receipt.status === "refunded"
             ? "The full payment has been returned to the original buyer’s token account."
             : "This order is complete. The reserved portion has been released to the merchant and this order can no longer be refunded."}
@@ -380,7 +387,9 @@ export function OrderActions({
                   setDialog("complete");
                 }}
               >
-                Complete order
+                {isResolver && link.refundRequest
+                  ? "Reject refund & complete"
+                  : "Complete order"}
               </Button>
             )}
           </div>

@@ -136,4 +136,68 @@ describe("buyer refund requests", () => {
       t.action(api.paymentActions.requestRefund, sign(request)),
     ).rejects.toThrow("already resolved");
   });
+  it("records the refund outcome only when a request existed", async () => {
+    const { t, id, request, receipt } = await setup();
+    await t.action(api.paymentActions.requestRefund, sign(request));
+    readOrder.mockResolvedValue({ ...receipt, status: "completed" });
+    await t.action(api.paymentActions.sync, { id });
+    const resolved = await t.query(api.payments.get, { id });
+    expect(resolved?.refundOutcome).toBe("completed");
+    expect(typeof resolved?.refundResolvedAt).toBe("number");
+    const plain = await t.mutation(internal.payments.insert, {
+      merchant: merchant.publicKey.toBase58(),
+      reference: "cd".repeat(16),
+      title: "Undisputed order",
+      amount: "1000000",
+      protectionSeconds: 3600,
+      issuedAt: Date.now(),
+    });
+    await t.mutation(internal.payments.record, {
+      id: plain,
+      receipt: { ...receipt, status: "completed" },
+    });
+    const undisputed = await t.query(api.payments.get, { id: plain });
+    expect(undisputed?.refundOutcome).toBeUndefined();
+    expect(undisputed?.refundResolvedAt).toBeUndefined();
+  });
+  it("orders the queue by protection deadline and paginates it", async () => {
+    const t = convexTest(schema, modules);
+    const ids: string[] = [];
+    // Insert out of order: +3h, +1h, +2h deadlines.
+    for (const [index, hours] of [3, 1, 2].entries()) {
+      const id = await t.mutation(internal.payments.insert, {
+        merchant: merchant.publicKey.toBase58(),
+        reference: `${index}f`.repeat(16),
+        title: `Order ${index}`,
+        amount: "1000000",
+        protectionSeconds: 3600,
+        issuedAt: Date.now(),
+      });
+      await t.mutation(internal.payments.requestRefund, {
+        id,
+        receipt: {
+          order: Keypair.generate().publicKey.toBase58(),
+          buyer: buyer.publicKey.toBase58(),
+          reserveAmount: "50000",
+          createdAt: Date.now(),
+          expiresAt: Date.now() + hours * 3600000,
+          status: "paid" as const,
+        },
+        reason: "not_received",
+      });
+      ids.push(id);
+    }
+    const queue = await t.query(api.payments.refundQueue, {});
+    expect(queue.map((link) => link._id)).toEqual([ids[1], ids[2], ids[0]]);
+    const first = await t.query(api.payments.refundQueuePage, {
+      paginationOpts: { numItems: 2, cursor: null },
+    });
+    expect(first.page.map((link) => link._id)).toEqual([ids[1], ids[2]]);
+    expect(first.isDone).toBe(false);
+    const second = await t.query(api.payments.refundQueuePage, {
+      paginationOpts: { numItems: 2, cursor: first.continueCursor },
+    });
+    expect(second.page.map((link) => link._id)).toEqual([ids[0]]);
+    expect(second.isDone).toBe(true);
+  });
 });
