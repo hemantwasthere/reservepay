@@ -38,7 +38,7 @@ Merchants can withdraw only the surplus above locked liability. Reserve checks, 
 | Create links and follow payment history             | Submit a signed refund request before protection expires | Complete an open order, including before expiry    |
 | Complete orders after protection expires            | Follow the order’s final status from the same URL        | Approve every resolution with a wallet transaction |
 
-The app also includes a collapsible sidebar (⌘B), mobile navigation, System/Light/Dark appearance, wallet switching, and recovery for pending transactions after a reload or uncertain network response. Components use Tailwind CSS and locally customized shadcn primitives. The appearance menu is in the header on the landing page, workspace and checkout. Your choice persists across reloads and tabs; System follows changes to your device’s color scheme.
+The app also includes a collapsible sidebar (⌘B), mobile navigation, System/Light/Dark appearance, wallet switching, and recovery for pending transactions after a reload or uncertain network response. Components use Tailwind CSS and locally customized shadcn primitives. The appearance menu is in the header on the landing page, workspace and checkout. Press **Alt + Shift + T** (⌥⇧T on Mac) to cycle System → Light → Dark. Your choice persists across reloads and tabs; System follows changes to your device’s color scheme.
 
 ### Merchant workspace
 

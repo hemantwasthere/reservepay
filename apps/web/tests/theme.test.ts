@@ -84,3 +84,62 @@ it("still changes appearance when local storage is unavailable", async () => {
   await act(async () => current.setTheme("dark"));
   expect(current.resolvedTheme).toBe("dark");
 });
+
+async function shortcut(
+  options: KeyboardEventInit = {},
+  target: EventTarget = window,
+) {
+  const event = new KeyboardEvent("keydown", {
+    code: "KeyT",
+    altKey: true,
+    shiftKey: true,
+    bubbles: true,
+    cancelable: true,
+    ...options,
+  });
+  await act(async () => {
+    target.dispatchEvent(event);
+  });
+  return event.defaultPrevented;
+}
+it("cycles all three appearances once per shortcut and persists the selection", async () => {
+  await mount();
+  for (const next of ["light", "dark", "system"]) {
+    expect(await shortcut()).toBe(true);
+    expect(current.theme).toBe(next);
+    expect(localStorage.getItem("reservepay.theme")).toBe(next);
+  }
+});
+it("leaves typing, dialogs, disabled shortcuts and other key combinations alone", async () => {
+  await mount();
+  for (const options of [
+    { repeat: true },
+    { isComposing: true },
+    { metaKey: true },
+    { ctrlKey: true },
+    { altKey: false },
+    { shiftKey: false },
+    { code: "KeyR" },
+  ]) {
+    expect(await shortcut(options)).toBe(false);
+  }
+  const input = document.createElement("input");
+  container.append(input);
+  expect(await shortcut({}, input)).toBe(false);
+  const editor = document.createElement("div");
+  editor.setAttribute("contenteditable", "");
+  container.append(editor);
+  expect(await shortcut({}, editor)).toBe(false);
+  const dialog = document.createElement("div");
+  dialog.setAttribute("role", "dialog");
+  dialog.dataset.state = "open";
+  container.append(dialog);
+  expect(await shortcut()).toBe(false);
+  dialog.remove();
+  localStorage.setItem("reservepay.shortcuts", "off");
+  expect(await shortcut()).toBe(false);
+  expect(current.theme).toBe("system");
+  localStorage.setItem("reservepay.shortcuts", "on");
+  expect(await shortcut()).toBe(true);
+  expect(current.theme).toBe("light");
+});
