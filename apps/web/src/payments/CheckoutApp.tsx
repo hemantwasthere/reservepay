@@ -316,18 +316,22 @@ function Checkout({
     )
       return;
     const wallet = active;
+    // Re-read the link: a tab loaded before the merchant deactivated or
+    // the link was paid must not pay. The live query usually wins this
+    // race; re-checking closes the rest of it.
+    const requirePayable = async () => {
+      const fresh = await convex.query(api.payments.get, { id });
+      if (!fresh || fresh.deactivatedAt)
+        throw new Error("This payment link is no longer active.");
+      if (fresh.receipt) throw new Error("This link has already been paid.");
+    };
     const execute = async () => {
       const saved = loadPayment(id);
       if (saved) {
         setPending(saved);
         throw new Error("This payment is already awaiting confirmation.");
       }
-      // Re-read just before preparing: a tab loaded before the merchant
-      // deactivated the link must not pay. The live query usually wins
-      // this race; this closes the rest of it.
-      const fresh = await convex.query(api.payments.get, { id });
-      if (!fresh || fresh.deactivatedAt)
-        throw new Error("This payment link is no longer active.");
+      await requirePayable();
       const prepared = await paymentClient(connection).prepare(
         link,
         new PublicKey(wallet.account.address),
@@ -347,6 +351,9 @@ function Checkout({
       if (!isCurrent(wallet))
         throw new Error("Wallet changed. Nothing was submitted.");
       const signed = validateSignedTransaction(prepared.transaction, bytes);
+      // The wallet prompt can stay open for minutes; check again before
+      // anything is persisted or sent.
+      await requirePayable();
       const record = {
         signature: signed.signature,
         lastValidBlockHeight: prepared.lastValidBlockHeight,
@@ -539,7 +546,7 @@ function Checkout({
           Refunds require an authorized resolver’s approval.
         </p>
       </div>
-      {link.deactivatedAt ? (
+      {link.deactivatedAt && !pending ? (
         <div
           className={
             "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
