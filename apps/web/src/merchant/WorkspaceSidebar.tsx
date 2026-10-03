@@ -28,11 +28,13 @@ import {
 
 export type WorkspacePage = "overview" | "payments" | "profile";
 
-// Keep labels at their expanded width so they fade without wrapping as the rail narrows.
-const labelClasses =
-  "shrink-0 whitespace-nowrap transition-[opacity,transform] duration-150 ease-out group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0";
+// Fade content before the rail narrows; reveal it once the opening rail has room.
+// Fixed text widths and icon positions prevent clipping, wrapping, and sideways jumps.
+const fadeClasses =
+  "opacity-100 transition-opacity delay-100 duration-150 ease-out group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:delay-0 group-data-[collapsible=icon]:duration-100 motion-reduce:transition-none";
+const labelClasses = `shrink-0 whitespace-nowrap ${fadeClasses}`;
 const menuClasses =
-  "h-10 gap-3 rounded border border-transparent p-[11px] text-muted-foreground transition-[width,background-color,color,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-accent group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-[11px]";
+  "h-10 gap-3 rounded border border-transparent p-[11px] text-muted-foreground transition-[width,background-color,color,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-accent group-data-[collapsible=icon]:delay-[100ms,0ms,0ms,0ms] group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-[11px] motion-reduce:transition-none [&>span:last-child]:overflow-visible";
 
 export function WorkspaceSidebar({ page }: { page: WorkspacePage }) {
   const { setOpenMobile, isMobile, state } = useSidebar();
@@ -42,7 +44,7 @@ export function WorkspaceSidebar({ page }: { page: WorkspacePage }) {
       className="top-[88px] h-[calc(100svh-88px)] border-line"
       aria-label="Workspace navigation"
     >
-      <SidebarContent className="gap-6 overflow-x-hidden px-3 pt-7 transition-[padding] duration-300 group-data-[collapsible=icon]:px-[11px]">
+      <SidebarContent className="gap-6 overflow-x-hidden px-[11px] pt-7">
         {isMobile && (
           <div className="flex items-center justify-between px-2">
             <span className="text-sm font-medium">Your workspace</span>
@@ -57,7 +59,9 @@ export function WorkspaceSidebar({ page }: { page: WorkspacePage }) {
           </div>
         )}
         <SidebarGroup className="p-0">
-          <SidebarGroupLabel className="mb-4 whitespace-nowrap px-3 font-mono text-[9px] tracking-[1.2px] text-muted-foreground group-data-[collapsible=icon]:mt-0">
+          <SidebarGroupLabel
+            className={`${labelClasses} mb-4 w-[212px] px-3 font-mono text-[9px] tracking-[1.2px] text-muted-foreground group-data-[collapsible=icon]:mt-0`}
+          >
             YOUR WORKSPACE
           </SidebarGroupLabel>
           <SidebarMenu className="gap-2">
@@ -105,9 +109,9 @@ export function WorkspaceSidebar({ page }: { page: WorkspacePage }) {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="gap-6 overflow-hidden px-3 pb-8 transition-[padding] duration-300 group-data-[collapsible=icon]:px-[11px]">
+      <SidebarFooter className="gap-6 overflow-hidden px-[11px] pb-8">
         <div
-          className="max-h-60 overflow-hidden opacity-100 transition-[max-height,opacity] duration-300 ease-out group-data-[collapsible=icon]:max-h-0 group-data-[collapsible=icon]:opacity-0"
+          className={`${fadeClasses} shrink-0`}
           aria-hidden={!isMobile && state === "collapsed"}
         >
           <div className="w-[212px] px-3">
@@ -182,7 +186,7 @@ export function WorkspaceSidebarTrigger() {
           onClick={toggleSidebar}
           aria-label={label}
           aria-expanded={isMobile ? openMobile : state === "expanded"}
-          aria-keyshortcuts="Alt+Shift+B"
+          aria-keyshortcuts="Meta+B"
           className="size-9 shrink-0 rounded-md text-muted-foreground"
         >
           {isMobile ? (
@@ -194,7 +198,7 @@ export function WorkspaceSidebarTrigger() {
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={8}>
         {label}
-        <span className="ml-2 opacity-70">Alt Shift B</span>
+        <span className="ml-2 opacity-70">⌘B</span>
       </TooltipContent>
     </Tooltip>
   );

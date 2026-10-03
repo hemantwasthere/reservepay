@@ -84,7 +84,7 @@ export function KeyboardShortcuts({
             keys: ["Alt", "Shift", "R"],
           },
           { label: "Focus amount", keys: ["Alt", "Shift", "A"] },
-          { label: "Toggle sidebar", keys: ["Alt", "Shift", "B"] },
+          { label: "Toggle sidebar", keys: ["⌘", "B"] },
         ]
       : []),
     { label: "Close a panel", keys: ["Esc"] },
@@ -108,8 +108,8 @@ export function KeyboardShortcuts({
             A few helpful shortcuts
           </DialogTitle>
           <DialogDescription className="text-xs leading-relaxed">
-            Use Alt (⌥ on Mac) + Shift with the keys below. Shortcuts pause
-            while you type.
+            Use the key combinations below (⌘ is Command and ⌥ is Alt on Mac).
+            Shortcuts pause while you type.
           </DialogDescription>
         </DialogHeader>
         <dl className="divide-y divide-border">

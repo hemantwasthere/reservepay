@@ -108,18 +108,19 @@ function SidebarProvider({
       } catch {}
       if (
         event.code === SIDEBAR_KEYBOARD_SHORTCUT &&
-        event.altKey &&
-        event.shiftKey &&
-        !event.metaKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.metaKey &&
         !event.ctrlKey &&
         !event.repeat &&
         !event.defaultPrevented &&
         !event.isComposing &&
         enabled &&
+        !document.querySelector('[role="dialog"][data-state="open"]') &&
         !(
           event.target instanceof Element &&
           event.target.closest(
-            "input, textarea, select, [contenteditable=true], [role=dialog]",
+            "input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox], [role=dialog]",
           )
         )
       ) {
@@ -241,7 +242,7 @@ function Sidebar({
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[collapsible=icon]:delay-100 motion-reduce:transition-none",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -252,7 +253,7 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[collapsible=icon]:delay-100 motion-reduce:transition-none md:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
