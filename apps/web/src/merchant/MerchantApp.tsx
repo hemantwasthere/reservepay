@@ -354,14 +354,20 @@ function MerchantWorkspace({
       titles: undefined,
     });
   }, [session.token]);
-  // Sorted and capped so the query args stay stable between balance polls.
+  // Newest orders first, so the 100-reference cap drops the oldest orders
+  // instead of an arbitrary alphabetical slice. The tiebreak keeps the
+  // query args stable between balance polls.
   const orderReferences = useMemo(
     () =>
-      (orderBook?.orders ?? [])
-        .map((order) => order.reference)
-        .filter((reference) => /^[a-f0-9]{32}$/.test(reference))
-        .sort()
-        .slice(0, 100),
+      [...(orderBook?.orders ?? [])]
+        .filter((order) => /^[a-f0-9]{32}$/.test(order.reference))
+        .sort(
+          (a, b) =>
+            b.createdAt - a.createdAt ||
+            a.reference.localeCompare(b.reference),
+        )
+        .slice(0, 100)
+        .map((order) => order.reference),
     [orderBook],
   );
   const titles = useMemo(
@@ -1315,8 +1321,12 @@ function SessionQueries({
     session: token,
     references,
   });
+  // Keep showing the previous titles while a changed order set reloads,
+  // so orders never flash back to their reference fallback.
+  const cached = useRef(titles);
+  if (titles !== undefined) cached.current = titles;
   useEffect(() => {
-    onData({ profile, titles });
+    onData({ profile, titles: titles ?? cached.current });
   }, [profile, titles, onData]);
   return null;
 }
