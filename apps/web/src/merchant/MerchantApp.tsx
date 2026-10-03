@@ -1,3 +1,4 @@
+import { useWorkspaceNavigation } from "./workspace-navigation";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,14 +72,25 @@ const errorMessage = (error: unknown) =>
     ? error.message
     : "Something went wrong. Refresh and try again.";
 
-export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
+export function MerchantApp({
+  page: initialPage = "overview",
+}: {
+  page?: WorkspacePage;
+}) {
+  const page = useWorkspaceNavigation(initialPage);
   const [active, setActive] = useState<WalletConnection | null>(null);
   const [locked, setLocked] = useState(false);
   const [walletLoading, setWalletLoading] = useState(true);
+  const [account, setAccount] = useState<{
+    state: MerchantState | null;
+    error: string;
+  }>({ state: null, error: "" });
+  const refreshAccount = useRef<() => void>(() => {});
   const activeRef = useRef(active);
   const onChange = useCallback((next: WalletConnection | null) => {
     activeRef.current = next;
     setActive(next);
+    setAccount({ state: null, error: "" });
     setLocked(false);
   }, []);
   const isCurrent = useCallback(
@@ -90,216 +102,226 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
   return (
     <MerchantSessionGate active={active}>
       {(session) => (
-    <SidebarProvider
-      className="min-h-screen flex-col"
-      style={
-        {
-          "--sidebar-width": "15rem",
-          "--sidebar-width-icon": "4rem",
-        } as React.CSSProperties
-      }
-    >
-      <a
-        className={
-          "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-white p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
-        }
-        href="#merchant-main"
-      >
-        Skip to dashboard
-      </a>
-      <header
-        className={
-          "merchant-header min-h-[88px] flex items-center gap-[34px] py-[20px] px-[34px] [border-bottom:1px_solid_var(--line)] bg-card max-[860px]:min-h-[78px] max-[860px]:py-[16px] max-[860px]:px-[24px] max-[640px]:px-3 max-[640px]:py-4 max-[640px]:gap-[8px] max-[640px]:[&_.brand]:text-[17px] max-[380px]:[&_.brand]:text-[14px] max-[380px]:px-2 max-[380px]:[&_.wallet-button]:px-2 max-[640px]:[&_.brand-mark]:w-[24px] max-[640px]:[&_.brand-mark]:h-[24px] max-[640px]:[&_.wallet-button]:min-h-[37px] max-[640px]:[&_.wallet-button]:text-[10px] max-[640px]:[&_.wallet-button]:gap-[6px] max-[640px]:[&_.wallet-button]:py-0 max-[640px]:[&_.wallet-button]:px-[10px] sticky top-0 z-30 h-[88px] shrink-0"
-        }
-      >
-        <div className="flex shrink-0 items-center gap-4 max-[640px]:gap-2">
+        <SidebarProvider
+          className="min-h-screen flex-col"
+          style={
+            {
+              "--sidebar-width": "15rem",
+              "--sidebar-width-icon": "4rem",
+            } as React.CSSProperties
+          }
+        >
           <a
             className={
-              "brand inline-flex items-center text-[22px] tracking-[-1px] font-[650] whitespace-nowrap max-[900px]:text-[20px] max-[700px]:text-[20px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:[transform:skewY(-12deg)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:rounded-[1.5px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:first-child]:[transform:skewY(-12deg)_translateY(-1px)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:last-child]:[transform:skewY(-12deg)_translateY(1px)_scaleX(0.94)] motion-reduce:[&:hover_.brand-mark_span]:[transform:skewY(-24deg)]"
+              "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-white p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
             }
-            href="/"
-            aria-label="ReservePay home"
+            href="#merchant-main"
           >
-            <span
-              className={
-                "brand-mark relative w-[25px] h-[28px] block mr-[10px] [&_span]:absolute [&_span]:left-[1px] [&_span]:w-[22px] [&_span]:h-[6px] [&_span]:bg-primary [&_span]:[transform:skewY(-24deg)] [&_span]:rounded-[1px] [&_span]:[transition:transform_420ms_var(--ease-settle),_border-radius_420ms_ease] [&_span:nth-child(1)]:top-[4px] [&_span:nth-child(2)]:top-[12px] [&_span:nth-child(3)]:top-[20px] max-[700px]:w-[22px] max-[700px]:mr-[7px] max-[700px]:[&_span]:w-[20px]"
-              }
-              aria-hidden="true"
-            >
-              <span />
-              <span />
-              <span />
-            </span>
-            ReservePay<span className={"brand-period text-primary"}>.</span>
+            Skip to dashboard
           </a>
-          <WorkspaceSidebarTrigger />
-        </div>
-        <span
-          className={
-            "workspace-label [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground pl-[28px] [border-left:1px_solid_var(--line)] max-[1100px]:hidden"
-          }
-        >
-          MERCHANT WORKSPACE
-        </span>
-        <div
-          className={
-            "merchant-header-actions ml-auto flex items-center gap-[23px] max-[640px]:gap-[10px]"
-          }
-        >
-          <span
+          <header
             className={
-              "network-badge inline-flex gap-[7px] items-center [font:11px_var(--mono)] [color:var(--info)] [&>span]:w-[6px] [&>span]:h-[6px] [&>span]:rounded-[50%] [&>span]:bg-[#709155] [&>span]:[background:var(--info)] [&>span]:shadow-[0_0_0_3px_var(--info-soft)] max-[640px]:text-[9px] max-[640px]:gap-[4px] max-[640px]:hidden"
+              "merchant-header min-h-[88px] flex items-center gap-[34px] py-[20px] px-[34px] [border-bottom:1px_solid_var(--line)] bg-card max-[860px]:min-h-[78px] max-[860px]:py-[16px] max-[860px]:px-[24px] max-[640px]:px-3 max-[640px]:py-4 max-[640px]:gap-[8px] max-[640px]:[&_.brand]:text-[17px] max-[380px]:[&_.brand]:text-[14px] max-[380px]:px-2 max-[380px]:[&_.wallet-button]:px-2 max-[640px]:[&_.brand-mark]:w-[24px] max-[640px]:[&_.brand-mark]:h-[24px] max-[640px]:[&_.wallet-button]:min-h-[37px] max-[640px]:[&_.wallet-button]:text-[10px] max-[640px]:[&_.wallet-button]:gap-[6px] max-[640px]:[&_.wallet-button]:py-0 max-[640px]:[&_.wallet-button]:px-[10px] sticky top-0 z-30 h-[88px] shrink-0"
             }
           >
-            <span /> Devnet
-          </span>
-          <WalletControl
-            onChange={onChange}
-            onLoadingChange={setWalletLoading}
-            onSignOut={() => void session.signOut()}
-            locked={locked}
-          />
-        </div>
-      </header>
-      <div className={"flex min-h-[calc(100svh-88px)]"}>
-        <WorkspaceSidebar page={page} />
-        <main
-          id="merchant-main"
-          className={
-            "merchant-main min-w-[0] [padding:42px_clamp(24px,_3.5vw,_56px)_0] min-[1600px]:pt-[52px] max-[1100px]:[padding:30px_24px_0] max-[860px]:max-w-[800px] max-[860px]:my-0 max-[860px]:mx-auto max-[860px]:w-[100%] max-[640px]:[padding:27px_16px_0] motion-reduce:[&>*]:animate-[none] flex-1"
-          }
-          tabIndex={-1}
-        >
-          <div
-            className={
-              "merchant-page-heading flex items-center justify-between gap-[16px] mb-[28px] [&_h1]:text-[clamp(27px,_3vw,_39px)] [&_h1]:leading-[1.2] [&_h1]:tracking-[-1.4px] [&_h1]:[margin:14px_0_12px] [&_h1_em]:text-primary [&_p]:text-[12px] [&_p]:text-muted-foreground max-[640px]:[&_h1]:text-[30px] max-[640px]:[&_h1]:tracking-[-1px] max-[640px]:[&_p]:text-[11px]"
-            }
-          >
-            <div>
-              <div
+            <div className="flex shrink-0 items-center gap-4 max-[640px]:gap-2">
+              <a
                 className={
-                  "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+                  "brand inline-flex items-center text-[22px] tracking-[-1px] font-[650] whitespace-nowrap max-[900px]:text-[20px] max-[700px]:text-[20px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:[transform:skewY(-12deg)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:rounded-[1.5px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:first-child]:[transform:skewY(-12deg)_translateY(-1px)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:last-child]:[transform:skewY(-12deg)_translateY(1px)_scaleX(0.94)] motion-reduce:[&:hover_.brand-mark_span]:[transform:skewY(-24deg)]"
                 }
+                href="/"
+                aria-label="ReservePay home"
               >
-                {page === "payments"
-                  ? "PAYMENTS / PAYMENT LINKS"
-                  : page === "profile"
-                    ? "MERCHANT / PROFILE"
-                    : "RESERVE / OVERVIEW"}
-              </div>
-              <h1>
-                {page === "payments" ? (
-                  <>
-                    Your next payment, <em>one link away.</em>
-                  </>
-                ) : page === "profile" ? (
-                  <>
-                    Your name, <em>on every checkout.</em>
-                  </>
-                ) : (
-                  <>
-                    Your reserve, <em>in balance.</em>
-                  </>
-                )}
-              </h1>
-              <p>
-                {page === "payments"
-                  ? "Create a checkout, share it, and follow every protected payment."
-                  : page === "profile"
-                    ? "Tell buyers who they are paying. Only your name and website are public."
-                    : "The foundation for protected payments. Yours to manage."}
-              </p>
+                <span
+                  className={
+                    "brand-mark relative w-[25px] h-[28px] block mr-[10px] [&_span]:absolute [&_span]:left-[1px] [&_span]:w-[22px] [&_span]:h-[6px] [&_span]:bg-primary [&_span]:[transform:skewY(-24deg)] [&_span]:rounded-[1px] [&_span]:[transition:transform_420ms_var(--ease-settle),_border-radius_420ms_ease] [&_span:nth-child(1)]:top-[4px] [&_span:nth-child(2)]:top-[12px] [&_span:nth-child(3)]:top-[20px] max-[700px]:w-[22px] max-[700px]:mr-[7px] max-[700px]:[&_span]:w-[20px]"
+                  }
+                  aria-hidden="true"
+                >
+                  <span />
+                  <span />
+                  <span />
+                </span>
+                ReservePay<span className={"brand-period text-primary"}>.</span>
+              </a>
+              <WorkspaceSidebarTrigger />
             </div>
             <span
               className={
-                "pilot-tag py-[8px] px-[10px] [border:1px_dashed_#becbb2] [font:9px_var(--mono)] tracking-[1px] text-primary whitespace-nowrap max-[1100px]:hidden"
+                "workspace-label [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground pl-[28px] [border-left:1px_solid_var(--line)] max-[1100px]:hidden"
               }
             >
-              DEVNET PREVIEW
-            </span>
-          </div>
-          <div
-            className={
-              "devnet-notice flex gap-[10px] py-[13px] px-[16px] [border:1px_solid_#dce5d3] bg-[#edf2e7] rounded-[3px] mb-[29px] [background:var(--info-soft)] border-[#d5e0e7] [&_p]:text-[11px] [&_p]:text-[#626e57] [&_p]:leading-[1.6] [&_p]:[color:var(--info)] [&_strong]:font-[500] [&_strong]:text-[#3e5133] [&_strong]:[color:var(--info)] max-[640px]:p-[12px] max-[640px]:mb-[22px] max-[640px]:items-start"
-            }
-          >
-            <span
-              className={
-                "notice-icon flex items-center text-[#7a8e6c] [color:var(--info)] max-[640px]:pt-[2px]"
-              }
-            >
-              <CircleHelp size={15} />
-            </span>
-            <p>
-              This workspace uses <strong>test USDC on Solana devnet</strong>.
-              Tokens have no monetary value. Each action asks for your wallet’s
-              approval.
-            </p>
-          </div>
-          {page === "payments" ? (
-            <MerchantPayments
-              key={active?.account.address ?? "disconnected"}
-              active={active}
-              session={session}
-              walletLoading={walletLoading}
-              locked={locked}
-              isCurrent={isCurrent}
-              setLocked={setLocked}
-            />
-          ) : page === "profile" ? (
-            <MerchantProfile
-              key={active?.account.address ?? "disconnected"}
-              active={active}
-              session={session}
-              walletLoading={walletLoading}
-            />
-          ) : (
-            <MerchantWorkspace
-              key={active?.account.address ?? "disconnected"}
-              active={active}
-              session={session}
-              walletLoading={walletLoading}
-              isCurrent={isCurrent}
-              setLocked={setLocked}
-            />
-          )}
-          <footer
-            className={
-              "merchant-footer flex justify-between gap-[14px] py-[23px] px-0 [border-top:1px_solid_var(--line)] mt-[29px] [font:9px_var(--mono)] text-muted-foreground items-center flex-wrap [&_span]:inline-flex [&_span]:gap-[7px] [&_span]:items-center [&_a]:inline-flex [&_a]:gap-[7px] [&_a]:items-center max-[640px]:text-[8px] max-[640px]:gap-[8px]"
-            }
-          >
-            <span>
-              <span
-                className={
-                  'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
-                }
-              />{" "}
-              Built on Solana · Devnet only
+              MERCHANT WORKSPACE
             </span>
             <div
               className={
-                "merchant-footer-actions flex items-center gap-[20px] ml-auto [&>a]:min-h-[30px]"
+                "merchant-header-actions ml-auto flex items-center gap-[23px] max-[640px]:gap-[10px]"
               }
             >
-              <a
-                href={explorer(PROGRAM_ID.toBase58())}
-                target="_blank"
-                rel="noreferrer"
+              <span
+                className={
+                  "network-badge inline-flex gap-[7px] items-center [font:11px_var(--mono)] [color:var(--info)] [&>span]:w-[6px] [&>span]:h-[6px] [&>span]:rounded-[50%] [&>span]:bg-[#709155] [&>span]:[background:var(--info)] [&>span]:shadow-[0_0_0_3px_var(--info-soft)] max-[640px]:text-[9px] max-[640px]:gap-[4px] max-[640px]:hidden"
+                }
               >
-                View program <ExternalLink size={12} />
-              </a>
-              <KeyboardShortcuts dashboard payments={page === "payments"} />
+                <span /> Devnet
+              </span>
+              <WalletControl
+                onChange={onChange}
+                onLoadingChange={setWalletLoading}
+                onSignOut={() => void session.signOut()}
+                locked={locked}
+              />
             </div>
-          </footer>
-        </main>
-      </div>
-    </SidebarProvider>
+          </header>
+          <div className={"flex min-h-[calc(100svh-88px)]"}>
+            <WorkspaceSidebar page={page} />
+            <main
+              id="merchant-main"
+              className={
+                "merchant-main min-w-[0] [padding:42px_clamp(24px,_3.5vw,_56px)_0] min-[1600px]:pt-[52px] max-[1100px]:[padding:30px_24px_0] max-[860px]:max-w-[800px] max-[860px]:my-0 max-[860px]:mx-auto max-[860px]:w-[100%] max-[640px]:[padding:27px_16px_0] motion-reduce:[&>*]:animate-[none] flex-1"
+              }
+              tabIndex={-1}
+            >
+              <div
+                className={
+                  "merchant-page-heading flex items-center justify-between gap-[16px] mb-[28px] [&_h1]:text-[clamp(27px,_3vw,_39px)] [&_h1]:leading-[1.2] [&_h1]:tracking-[-1.4px] [&_h1]:[margin:14px_0_12px] [&_h1_em]:text-primary [&_p]:text-[12px] [&_p]:text-muted-foreground max-[640px]:[&_h1]:text-[30px] max-[640px]:[&_h1]:tracking-[-1px] max-[640px]:[&_p]:text-[11px]"
+                }
+              >
+                <div>
+                  <div
+                    className={
+                      "merchant-eyebrow [font:10px_var(--mono)] tracking-[1.2px] text-muted-foreground"
+                    }
+                  >
+                    {page === "payments"
+                      ? "PAYMENTS / PAYMENT LINKS"
+                      : page === "profile"
+                        ? "MERCHANT / PROFILE"
+                        : "RESERVE / OVERVIEW"}
+                  </div>
+                  <h1>
+                    {page === "payments" ? (
+                      <>
+                        Your next payment, <em>one link away.</em>
+                      </>
+                    ) : page === "profile" ? (
+                      <>
+                        Your name, <em>on every checkout.</em>
+                      </>
+                    ) : (
+                      <>
+                        Your reserve, <em>in balance.</em>
+                      </>
+                    )}
+                  </h1>
+                  <p>
+                    {page === "payments"
+                      ? "Create a checkout, share it, and follow every protected payment."
+                      : page === "profile"
+                        ? "Tell buyers who they are paying. Your name, image and website are public."
+                        : "The foundation for protected payments. Yours to manage."}
+                  </p>
+                </div>
+                <span
+                  className={
+                    "pilot-tag py-[8px] px-[10px] [border:1px_dashed_#becbb2] [font:9px_var(--mono)] tracking-[1px] text-primary whitespace-nowrap max-[1100px]:hidden"
+                  }
+                >
+                  DEVNET PREVIEW
+                </span>
+              </div>
+              <div
+                className={
+                  "devnet-notice flex gap-[10px] py-[13px] px-[16px] [border:1px_solid_#dce5d3] bg-[#edf2e7] rounded-[3px] mb-[29px] [background:var(--info-soft)] border-[#d5e0e7] [&_p]:text-[11px] [&_p]:text-[#626e57] [&_p]:leading-[1.6] [&_p]:[color:var(--info)] [&_strong]:font-[500] [&_strong]:text-[#3e5133] [&_strong]:[color:var(--info)] max-[640px]:p-[12px] max-[640px]:mb-[22px] max-[640px]:items-start"
+                }
+              >
+                <span
+                  className={
+                    "notice-icon flex items-center text-[#7a8e6c] [color:var(--info)] max-[640px]:pt-[2px]"
+                  }
+                >
+                  <CircleHelp size={15} />
+                </span>
+                <p>
+                  This workspace uses{" "}
+                  <strong>test USDC on Solana devnet</strong>. Tokens have no
+                  monetary value. Each action asks for your wallet’s approval.
+                </p>
+              </div>
+              {/* Keep each workspace view mounted so its queries and form state survive navigation. */}
+              <div hidden={page !== "payments"}>
+                <MerchantPayments
+                  state={account.state}
+                  error={account.error}
+                  refresh={() => refreshAccount.current()}
+                  key={active?.account.address ?? "disconnected"}
+                  active={active}
+                  session={session}
+                  walletLoading={walletLoading}
+                  locked={locked}
+                  isCurrent={isCurrent}
+                  setLocked={setLocked}
+                />
+              </div>
+              <div hidden={page !== "profile"}>
+                <MerchantProfile
+                  key={active?.account.address ?? "disconnected"}
+                  active={active}
+                  session={session}
+                  walletLoading={walletLoading}
+                />
+              </div>
+              <div hidden={page !== "overview"}>
+                <MerchantWorkspace
+                  onAccount={setAccount}
+                  refreshAccount={refreshAccount}
+                  key={active?.account.address ?? "disconnected"}
+                  active={active}
+                  session={session}
+                  walletLoading={walletLoading}
+                  isCurrent={isCurrent}
+                  setLocked={setLocked}
+                />
+              </div>
+              <footer
+                className={
+                  "merchant-footer flex justify-between gap-[14px] py-[23px] px-0 [border-top:1px_solid_var(--line)] mt-[29px] [font:9px_var(--mono)] text-muted-foreground items-center flex-wrap [&_span]:inline-flex [&_span]:gap-[7px] [&_span]:items-center [&_a]:inline-flex [&_a]:gap-[7px] [&_a]:items-center max-[640px]:text-[8px] max-[640px]:gap-[8px]"
+                }
+              >
+                <span>
+                  <span
+                    className={
+                      'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+                    }
+                  />{" "}
+                  Built on Solana · Devnet only
+                </span>
+                <div
+                  className={
+                    "merchant-footer-actions flex items-center gap-[20px] ml-auto [&>a]:min-h-[30px]"
+                  }
+                >
+                  <a
+                    href={explorer(PROGRAM_ID.toBase58())}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View program <ExternalLink size={12} />
+                  </a>
+                  <KeyboardShortcuts dashboard payments={page === "payments"} />
+                </div>
+              </footer>
+            </main>
+          </div>
+        </SidebarProvider>
       )}
     </MerchantSessionGate>
   );
 }
 
 function MerchantWorkspace({
+  onAccount,
+  refreshAccount,
   active,
   session,
   walletLoading,
@@ -311,6 +333,8 @@ function MerchantWorkspace({
   walletLoading: boolean;
   isCurrent: (value: WalletConnection) => boolean;
   setLocked: (locked: boolean) => void;
+  onAccount: (account: { state: MerchantState | null; error: string }) => void;
+  refreshAccount: React.RefObject<() => void>;
 }) {
   const { notify, dismiss } = useToast();
   const [state, setState] = useState<MerchantState | null>(null);
@@ -364,6 +388,11 @@ function MerchantWorkspace({
       try {
         const authority = new PublicKey(active.account.address);
         const next = await client.read(authority);
+        if (mounted.current && isCurrent(active)) {
+          setState(next);
+          onAccount({ state: next, error: "" });
+          setReadError("");
+        }
         // A failed orders read clears the list instead of leaving stale
         // orders (and a stale mismatch check) on screen.
         let book: { orders: MerchantOrder[]; mismatch: boolean } | null = null;
@@ -371,7 +400,6 @@ function MerchantWorkspace({
           book = await client.readOrders(authority, next.locked);
         } catch {}
         if (mounted.current && isCurrent(active)) {
-          setState(next);
           setOrderBook(book);
           setReadError("");
           dismiss("balance-refresh");
@@ -381,6 +409,10 @@ function MerchantWorkspace({
           // Stale orders may already be resolved; drop them with the balances.
           setOrderBook(null);
           setReadError(`Could not refresh balances. ${errorMessage(error)}`);
+          onAccount({
+            state: null,
+            error: `Could not refresh balances. ${errorMessage(error)}`,
+          });
           if (manual)
             notify({
               id: "balance-refresh",
@@ -394,8 +426,17 @@ function MerchantWorkspace({
         if (mounted.current) setRefreshing(false);
       }
     },
-    [active, isCurrent, notify, dismiss],
+    [active, isCurrent, notify, dismiss, onAccount],
   );
+
+  useEffect(() => {
+    refreshAccount.current = () => {
+      void refresh(true);
+    };
+    return () => {
+      refreshAccount.current = () => {};
+    };
+  }, [refresh, refreshAccount]);
 
   useEffect(() => {
     mounted.current = true;
@@ -795,7 +836,9 @@ function MerchantWorkspace({
             <SetupStep
               number="02"
               done={Boolean(profile)}
-              active={Boolean(session.status === "signed-in" && profile === null)}
+              active={Boolean(
+                session.status === "signed-in" && profile === null,
+              )}
               title="Create your profile"
               description={
                 profile ? (

@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { MerchantAvatar } from "./MerchantAvatar";
+import { prepareMerchantImage } from "./merchant-image";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
-import { Store, LoaderCircle, Check } from "lucide-react";
+import { Store, LoaderCircle, Check, Upload, X } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +68,11 @@ export function MerchantProfile({
         </Card>
       )}
     >
-      <ProfileForm token={session.token} onExpire={session.expire} />
+      <ProfileForm
+        key={session.token}
+        token={session.token}
+        onExpire={session.expire}
+      />
     </SessionErrorBoundary>
   );
 }
@@ -80,6 +86,7 @@ function ProfileForm({
 }) {
   const { notify } = useToast();
   const save = useMutation(api.merchants.save);
+  const saveImage = useAction(api.merchantImages.save);
   const profile = useQuery(api.merchants.me, { session: token });
   const [displayName, setDisplayName] = useState("");
   const [website, setWebsite] = useState("");
@@ -87,19 +94,62 @@ function ProfileForm({
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const filled = useRef(false);
+  const dirty = useRef(false);
+  const mounted = useRef(true);
+  const imageAttempt = useRef(0);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [image, setImage] = useState<Blob | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const preview = useMemo(
+    () => (image ? URL.createObjectURL(image) : null),
+    [image],
+  );
+  useEffect(
+    () => () => {
+      if (preview) URL.revokeObjectURL(preview);
+    },
+    [preview],
+  );
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      imageAttempt.current++;
+    };
+  }, []);
+  const chooseImage = async (file?: File) => {
+    if (!file) return;
+    const attempt = ++imageAttempt.current;
+    setPreparing(true);
+    setError("");
+    try {
+      const prepared = await prepareMerchantImage(file);
+      if (!mounted.current || imageAttempt.current !== attempt) return;
+      dirty.current = true;
+      setImage(prepared);
+      setRemoveImage(false);
+    } catch (cause) {
+      if (mounted.current && imageAttempt.current === attempt)
+        setError(
+          cause instanceof Error ? cause.message : "Could not open this image.",
+        );
+    } finally {
+      if (mounted.current && imageAttempt.current === attempt)
+        setPreparing(false);
+    }
+  };
 
   useEffect(() => {
-    if (filled.current || profile === undefined || profile === null) return;
-    filled.current = true;
-    setDisplayName(profile.displayName);
-    setWebsite(profile.website ?? "");
-    setContactEmail(profile.contactEmail ?? "");
-    setDescription(profile.description ?? "");
+    if (dirty.current || profile === undefined) return;
+    setDisplayName(profile?.displayName ?? "");
+    setWebsite(profile?.website ?? "");
+    setContactEmail(profile?.contactEmail ?? "");
+    setDescription(profile?.description ?? "");
   }, [profile]);
 
   const submit = async () => {
-    if (busy) return;
+    if (busy || preparing) return;
     setBusy(true);
     setError("");
     try {
@@ -109,13 +159,25 @@ function ProfileForm({
         contactEmail,
         description,
       });
-      await save({ session: token, profile: clean });
+      if (image)
+        await saveImage({
+          session: token,
+          profile: clean,
+          image: await image.arrayBuffer(),
+          contentType: image.type,
+        });
+      else await save({ session: token, profile: clean, removeImage });
+      if (!mounted.current) return;
+      dirty.current = false;
+      setImage(null);
+      setRemoveImage(false);
       notify({
         title: "Profile saved",
-        description: "Buyers now see your name on checkout.",
+        description: "Your merchant details are now live on checkout.",
         tone: "success",
       });
     } catch (cause) {
+      if (!mounted.current) return;
       const message =
         cause instanceof ConvexError && typeof cause.data === "string"
           ? cause.data
@@ -125,7 +187,7 @@ function ProfileForm({
       if (message.includes("Sign in again")) onExpire();
       setError(message);
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 
@@ -159,7 +221,7 @@ function ProfileForm({
           "payment-intro text-muted-foreground text-[12px] leading-[1.7] [margin:10px_0_24px]"
         }
       >
-        Your display name and website appear on every checkout. Your contact
+        Your name, image and website appear on every checkout. Your contact
         email stays private.
       </p>
       {profile === undefined ? (
@@ -176,12 +238,88 @@ function ProfileForm({
           className={
             "profile-form grid gap-[16px] [&_label]:flex [&_label]:flex-col [&_label]:gap-[9px] [&_label]:text-[12px] [&_label]:text-muted-foreground [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:min-h-[44px] [&_input]:py-[11px] [&_input]:px-[12px] [&_input]:[border:1px_solid_var(--line)] [&_input]:rounded-[4px] [&_input]:bg-card [&_input]:text-foreground [&_input]:[font:inherit] [&_textarea]:w-[100%] [&_textarea]:min-w-[0] [&_textarea]:py-[11px] [&_textarea]:px-[12px] [&_textarea]:[border:1px_solid_var(--line)] [&_textarea]:rounded-[4px] [&_textarea]:bg-card [&_textarea]:text-foreground [&_textarea]:[font:inherit] [&_input:focus]:border-primary [&_textarea:focus]:border-primary [&>button]:justify-self-start max-[640px]:[&>button]:justify-self-stretch max-[640px]:[&>button]:justify-center"
           }
-          aria-busy={busy}
+          aria-busy={busy || preparing}
+          onChange={() => {
+            dirty.current = true;
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             void submit();
           }}
         >
+          <div className="flex flex-wrap items-center gap-4 rounded border border-border bg-background p-4">
+            <MerchantAvatar
+              url={preview ?? (removeImage ? null : profile?.imageUrl)}
+              name={displayName}
+              className="size-16 rounded-lg [&_[data-slot=avatar-fallback]]:rounded-lg"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-xs font-medium">
+                Merchant image{" "}
+                <span className="text-[10px] font-normal text-muted-foreground">
+                  optional · public
+                </span>
+              </p>
+              <p
+                id="merchant-image-help"
+                className="text-[11px] leading-relaxed text-muted-foreground"
+              >
+                PNG, JPG or WebP, up to 2 MB. Shown on your checkout.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy || preparing}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  {preparing ? (
+                    <LoaderCircle className="size-3 animate-spin" />
+                  ) : (
+                    <Upload className="size-3" />
+                  )}
+                  {preparing
+                    ? "Preparing image…"
+                    : preview || (!removeImage && profile?.imageUrl)
+                      ? "Change image"
+                      : "Upload image"}
+                </Button>
+                {(preview || (!removeImage && profile?.imageUrl)) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy || preparing}
+                    onClick={() => {
+                      dirty.current = true;
+                      setImage(null);
+                      setRemoveImage(true);
+                    }}
+                  >
+                    <X className="size-3" />
+                    Remove image
+                  </Button>
+                )}
+              </div>
+              {(image || removeImage) && (
+                <p className="mt-2 text-[11px] text-primary" role="status">
+                  Save your profile to apply this change.
+                </p>
+              )}
+            </div>
+            <Input
+              ref={fileInput}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              aria-label="Merchant image"
+              aria-describedby="merchant-image-help"
+              disabled={busy || preparing}
+              onChange={(event) => {
+                void chooseImage(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
+          </div>
           <Label className="items-start">
             Display name
             <Input
@@ -189,7 +327,7 @@ function ProfileForm({
               minLength={2}
               maxLength={60}
               value={displayName}
-              disabled={busy}
+              disabled={busy || preparing}
               onChange={(event) => setDisplayName(event.target.value)}
               placeholder="e.g. Northstar Studio"
               autoComplete="organization"
@@ -203,7 +341,7 @@ function ProfileForm({
               type="url"
               maxLength={200}
               value={website}
-              disabled={busy}
+              disabled={busy || preparing}
               onChange={(event) => setWebsite(event.target.value)}
               placeholder="https://yourstudio.com"
               autoComplete="url"
@@ -218,7 +356,7 @@ function ProfileForm({
               type="email"
               maxLength={120}
               value={contactEmail}
-              disabled={busy}
+              disabled={busy || preparing}
               onChange={(event) => setContactEmail(event.target.value)}
               placeholder="you@yourstudio.com"
               autoComplete="email"
@@ -233,7 +371,7 @@ function ProfileForm({
               rows={3}
               maxLength={280}
               value={description}
-              disabled={busy}
+              disabled={busy || preparing}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="What do you sell?"
             />
@@ -242,7 +380,7 @@ function ProfileForm({
             variant="brand"
             size="unstyled"
             className={"button button-green"}
-            disabled={busy}
+            disabled={busy || preparing}
             type="submit"
           >
             {busy ? (

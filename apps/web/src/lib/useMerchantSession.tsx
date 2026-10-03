@@ -115,6 +115,21 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
     }
   }, [address, token, me]);
 
+  // Convex pushes revocations immediately; expiration itself needs a timer
+  // because passing time does not invalidate a database subscription.
+  useEffect(() => {
+    if (!address || !token || !me?.expiresAt) return;
+    const expireAtDeadline = () => {
+      rememberSession(address, null);
+      setStored(null);
+    };
+    const timer = setTimeout(
+      expireAtDeadline,
+      Math.max(0, me.expiresAt - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [address, token, me?.expiresAt]);
+
   const status: MerchantSessionStatus =
     !address || !token ? "signed-out" : me ? "signed-in" : "checking";
 

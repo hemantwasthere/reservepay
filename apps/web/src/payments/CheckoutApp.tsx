@@ -1,3 +1,5 @@
+import type { FunctionReturnType } from "convex/server";
+import { MerchantAvatar } from "../merchant/MerchantAvatar";
 import { OrderActions } from "./OrderActions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -421,6 +423,7 @@ function Checkout({
   if (link.receipt)
     return (
       <Receipt
+        merchantProfile={merchantProfile}
         link={link}
         active={active}
         setLocked={setLocked}
@@ -444,21 +447,32 @@ function Checkout({
       </span>
       <h2>{link.title}</h2>
       {merchantProfile && (
-        <p
-          className={
-            "checkout-merchant text-[13px] text-muted-foreground [margin:0_0_4px] [&_strong]:text-foreground [&_strong]:font-[500] [&_a]:text-primary"
-          }
-        >
-          Pay <strong>{merchantProfile.displayName}</strong>
-          {merchantProfile.website && (
-            <>
-              {" · "}
-              <a href={merchantProfile.website} target="_blank" rel="noreferrer">
-                {merchantProfile.website.replace(/^https:\/\//, "")}
-              </a>
-            </>
-          )}
-        </p>
+        <div className="mb-3 flex items-center gap-3">
+          <MerchantAvatar
+            url={merchantProfile.imageUrl}
+            name={merchantProfile.displayName}
+            className="size-11"
+          />
+          <p
+            className={
+              "checkout-merchant min-w-0 break-words text-[13px] text-muted-foreground [margin:0_0_4px] [&_strong]:text-foreground [&_strong]:font-[500] [&_a]:text-primary"
+            }
+          >
+            Pay <strong>{merchantProfile.displayName}</strong>
+            {merchantProfile.website && (
+              <>
+                {" · "}
+                <a
+                  href={merchantProfile.website}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {merchantProfile.website.replace(/^https:\/\//, "")}
+                </a>
+              </>
+            )}
+          </p>
+        </div>
       )}
       <div
         className={
@@ -610,11 +624,15 @@ function Checkout({
   );
 }
 function Receipt({
+  merchantProfile,
   link,
   active,
   setLocked,
   isCurrent,
 }: {
+  merchantProfile:
+    | FunctionReturnType<typeof api.merchants.publicProfile>
+    | undefined;
   link: Doc<"paymentLinks">;
   active: WalletConnection | null;
   setLocked: (value: boolean) => void;
@@ -651,6 +669,17 @@ function Receipt({
             : "Payment received."}
       </h2>
       <p>{link.title}</p>
+      {merchantProfile && (
+        <div className="mt-3 flex items-center gap-3 text-sm">
+          <MerchantAvatar
+            url={merchantProfile.imageUrl}
+            name={merchantProfile.displayName}
+          />
+          <span className="min-w-0 break-words">
+            {merchantProfile.displayName}
+          </span>
+        </div>
+      )}
       <div
         className={
           "checkout-amount text-[clamp(32px,_7vw,_46px)] tracking-[-1.8px] font-[500] my-[24px] mx-0 [overflow-wrap:anywhere] [&>span]:[font:12px_var(--mono)] [&>span]:text-muted-foreground [&>span]:ml-[10px] [&>span]:tracking-[0]"

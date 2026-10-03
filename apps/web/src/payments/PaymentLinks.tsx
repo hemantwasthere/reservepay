@@ -1,3 +1,4 @@
+import { PaymentStatus } from "./PaymentStatus";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -416,15 +417,7 @@ function LinkManager({
                 <strong>
                   {exactAmount(BigInt(link.amount))} <small>USDC</small>
                 </strong>
-                <span
-                  className={`link-payment-status text-[#805e2e] bg-[#f8f0df] py-[5px] px-[7px] rounded-[3px] [font:9px_var(--mono)] whitespace-nowrap ${link.receipt ? "link-payment-status-paid text-[#476238] bg-[#eaf0e2]" : ""}`}
-                >
-                  {link.receipt?.status === "paid"
-                    ? link.receipt.expiresAt > Date.now()
-                      ? "Paid · protected"
-                      : "Paid · period ended"
-                    : (link.receipt?.status ?? "Awaiting payment")}
-                </span>
+                <PaymentStatus receipt={link.receipt} />
               </div>
               <Button
                 variant="unstyled"

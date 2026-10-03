@@ -6,7 +6,7 @@ Pending logins are canceled on disconnect, explicit sign-out, wallet switch, or 
 
 ## Public and private data
 
-- Merchant display name and website are public through `merchants.publicProfile`.
+- Merchant display name, image and website are public through `merchants.publicProfile`.
 - Contact email and description require the merchant's session. They are not returned by checkout's profile query.
 - Payment terms, wallet addresses, on-chain receipts, and refund reason categories remain public.
 - New frontend link-history queries use `payments.listForSession`, which derives the merchant from the session rather than trusting a wallet argument.
@@ -22,3 +22,13 @@ Pending logins are canceled on disconnect, explicit sign-out, wallet switch, or 
 6. Publish the frontend and check `/`, `/app`, `/app/payments`, `/app/profile`, and a valid `/pay/:id` page. Verify CI and the hosting deployment correspond to the published commit.
 
 A frontend rollback can use the previous frontend with this backend because its public APIs remain compatible. Leave the additive backend deployed during that rollback. Removing the new functions while a new frontend is still in use would break checkout and login.
+
+## Workspace navigation and merchant images
+
+Sidebar links use browser history within the workspace. The wallet/session provider and all three views stay mounted, keeping Convex subscriptions and form drafts alive. Back/forward, direct URLs, reloads, and modifier-clicks still work. Hidden views are excluded from keyboard shortcuts. Wallet changes reset view data; session expiry and server revocation still end access.
+
+Overview and Payment Links share one reserve-account result. Balances and on-chain orders refresh through Solana RPC every 20 seconds while the document is visible and on window focus. Convex profile/link updates remain reactive; they do not require a reload. Clean profile forms follow incoming changes, while unsaved edits remain intact.
+
+The uploader accepts PNG/JPG/WebP source files up to 2 MB, decodes and resizes them to at most 512 pixels per side, and produces an optimized raster image. Backend uploads are limited to 256 KB and verify the raster signature and content type. SVG/HTML uploads are rejected. Images are public branding, with bearer URLs from [Convex file storage](https://docs.convex.dev/file-storage/overview).
+
+The upload action authenticates before storing bytes and checks the session again when saving the profile. Only an internal mutation can attach a storage ID, preventing clients from attaching or deleting somebody else's file. Replacements/removals delete the previous file; rejected saves delete the newly uploaded file. Removing an image or changing it takes effect when the merchant saves the profile. Public profile queries expose the image URL, name and website only; contact email and description stay private.

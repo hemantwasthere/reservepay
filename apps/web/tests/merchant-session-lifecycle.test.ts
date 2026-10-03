@@ -7,6 +7,7 @@ import type { WalletConnection } from "../src/lib/WalletControl";
 import { readSession } from "../src/lib/merchant-session";
 
 const mocks = vi.hoisted(() => ({
+  expiresAt: undefined as number | undefined,
   nonce: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
@@ -19,7 +20,9 @@ vi.mock("convex/react", () => ({
       : mocks.signIn,
   useMutation: () => mocks.signOut,
   useQuery: (_ref: unknown, args: unknown) =>
-    args === "skip" ? undefined : { wallet: "signed-in" },
+    args === "skip"
+      ? undefined
+      : { wallet: "signed-in", expiresAt: mocks.expiresAt },
 }));
 vi.mock("../src/lib/Toast", () => ({
   useToast: () => ({ notify: mocks.notify }),
@@ -75,6 +78,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   localStorage.clear();
   vi.clearAllMocks();
+  mocks.expiresAt = undefined;
   mocks.nonce.mockResolvedValue({
     nonce: "c".repeat(96),
     issuedAt: Date.now(),
@@ -91,6 +95,29 @@ afterEach(async () => {
 });
 
 describe("merchant session lifecycle", () => {
+  it("expires a session on time even while the workspace stays mounted", async () => {
+    vi.useFakeTimers();
+    try {
+      const active = wallet();
+      mocks.expiresAt = Date.now() + 10_000;
+      mocks.signIn.mockResolvedValueOnce({
+        ...session(),
+        expiresAt: mocks.expiresAt,
+      });
+      await render(active);
+      await act(async () => {
+        await current.signIn();
+      });
+      expect(current.status).toBe("signed-in");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_001);
+      });
+      expect(current.status).toBe("signed-out");
+      expect(readSession(active.account.address)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("revokes a late login after disconnect and stays signed out on reconnect", async () => {
     const active = wallet(),
       late = deferred<ReturnType<typeof session>>();

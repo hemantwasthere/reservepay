@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { PublicKey } from "@solana/web3.js";
 import { LoaderCircle, ArrowUpRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +6,11 @@ import { PaymentLinks } from "../payments/PaymentLinks";
 import { SignInCard } from "./SignInCard";
 import type { WalletConnection } from "../lib/WalletControl";
 import type { MerchantSession } from "../lib/useMerchantSession";
-import { client, type MerchantState } from "./client";
+import { type MerchantState } from "./client";
 export function MerchantPayments({
+  state,
+  error,
+  refresh,
   active,
   session,
   walletLoading,
@@ -17,6 +18,9 @@ export function MerchantPayments({
   setLocked,
   isCurrent,
 }: {
+  state: MerchantState | null;
+  error: string;
+  refresh: () => void;
   active: WalletConnection | null;
   session: MerchantSession;
   walletLoading: boolean;
@@ -24,29 +28,6 @@ export function MerchantPayments({
   setLocked: (value: boolean) => void;
   isCurrent: (value: WalletConnection) => boolean;
 }) {
-  const [state, setState] = useState<MerchantState | null>(null);
-  const [error, setError] = useState("");
-  const mounted = useRef(true);
-  const refresh = useCallback(async () => {
-    if (!active) return;
-    try {
-      const next = await client.read(new PublicKey(active.account.address));
-      if (mounted.current && isCurrent(active)) {
-        setState(next);
-        setError("");
-      }
-    } catch {
-      if (mounted.current && isCurrent(active))
-        setError("Could not load your merchant account. Please try again.");
-    }
-  }, [active, isCurrent]);
-  useEffect(() => {
-    mounted.current = true;
-    void refresh();
-    return () => {
-      mounted.current = false;
-    };
-  }, [refresh]);
   if (walletLoading || (active && !state && !error))
     return (
       <Card className={"p-8"} role="status">

@@ -66,7 +66,7 @@ export function KeyboardShortcuts({
       const el = selector
         ? document.querySelector<HTMLButtonElement | HTMLInputElement>(selector)
         : null;
-      if (!el || el.disabled) return;
+      if (!el || el.disabled || el.closest("[hidden]")) return;
       event.preventDefault();
       el.focus();
       if (event.code !== "KeyA") el.click();

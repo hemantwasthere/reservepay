@@ -44,6 +44,7 @@ export default defineSchema({
   merchants: defineTable({
     wallet: v.string(),
     displayName: v.string(),
+    imageId: v.optional(v.id("_storage")),
     website: v.optional(v.string()),
     contactEmail: v.optional(v.string()),
     description: v.optional(v.string()),

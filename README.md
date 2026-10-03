@@ -44,7 +44,7 @@ The app also includes a collapsible sidebar, mobile navigation, wallet switching
 
 The overview separates total reserve, funds backing open orders, and funds available to withdraw, with an on-chain order list filtered by open, completed, or refunded status. Payment links live on their own page. Sign a wallet message to access your link history and merchant profile; this login does not transfer funds.
 
-At `/app/profile`, save a merchant name and website for buyers to see at checkout. Contact email and description stay private to your signed-in wallet. Sessions last up to seven days; disconnecting signs out and cancels any pending login.
+At `/app/profile`, save a merchant name, image and website for buyers to see at checkout. Upload a PNG, JPG or WebP image (up to 2 MB); the app optimizes it before storing it in Convex. Images also appear on payment receipts. Contact email and description stay private to your signed-in wallet. Sessions last up to seven days; disconnecting signs out and cancels any pending login. Sidebar navigation keeps the workspace, session and Convex subscriptions mounted, so switching sections preserves loaded data and unsaved profile edits. Profile and payment-link updates arrive through Convex subscriptions. Solana balances and order accounts share a background RPC refresh; there is no chain indexer yet.
 
 ![Merchant overview with reserve balances, setup steps, and collateral controls in the disconnected-wallet state](docs/images/overview.png)
 

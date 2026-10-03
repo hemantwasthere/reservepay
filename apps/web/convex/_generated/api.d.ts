@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as authActions from "../authActions.js";
 import type * as crons from "../crons.js";
 import type * as demoOrders from "../demoOrders.js";
+import type * as merchantImages from "../merchantImages.js";
 import type * as merchants from "../merchants.js";
 import type * as paymentActions from "../paymentActions.js";
 import type * as paymentValidators from "../paymentValidators.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   authActions: typeof authActions;
   crons: typeof crons;
   demoOrders: typeof demoOrders;
+  merchantImages: typeof merchantImages;
   merchants: typeof merchants;
   paymentActions: typeof paymentActions;
   paymentValidators: typeof paymentValidators;
