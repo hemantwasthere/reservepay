@@ -11,6 +11,7 @@ export {
   reservePosition,
 } from "./settlement.js";
 export type { Settlement, ReservePosition } from "./settlement.js";
+export * from "./protocol-setup.js";
 
 export function createReference(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(16));
