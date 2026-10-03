@@ -1,3 +1,4 @@
+import { ThemeControl } from "@/lib/Theme";
 import type { FunctionReturnType } from "convex/server";
 import { MerchantAvatar } from "../merchant/MerchantAvatar";
 import { OrderActions } from "./OrderActions";
@@ -60,7 +61,7 @@ export function CheckoutApp() {
     >
       <a
         className={
-          "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-white p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
+          "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-background p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
         }
         href="#checkout-main"
       >
@@ -97,12 +98,13 @@ export function CheckoutApp() {
         >
           <span
             className={
-              "network-badge inline-flex gap-[7px] items-center [font:11px_var(--mono)] [color:var(--info)] [&>span]:w-[6px] [&>span]:h-[6px] [&>span]:rounded-[50%] [&>span]:bg-[#709155] [&>span]:[background:var(--info)] [&>span]:shadow-[0_0_0_3px_var(--info-soft)] max-[640px]:text-[9px] max-[640px]:gap-[4px] max-[370px]:hidden"
+              "network-badge inline-flex gap-[7px] items-center [font:11px_var(--mono)] [color:var(--info)] [&>span]:w-[6px] [&>span]:h-[6px] [&>span]:rounded-[50%] [&>span]:bg-[light-dark(#709155,var(--primary))] [&>span]:[background:var(--info)] [&>span]:shadow-[0_0_0_3px_var(--info-soft)] max-[640px]:text-[9px] max-[640px]:gap-[4px] max-[370px]:hidden"
             }
           >
             <span />
             Devnet
           </span>
+          <ThemeControl />
           <WalletControl onChange={onChange} locked={locked} />
         </div>
       </header>
@@ -115,7 +117,7 @@ export function CheckoutApp() {
       >
         <div
           className={
-            "checkout-heading mb-[24px] [&_h1]:text-[clamp(28px,_5vw,_38px)] [&_h1]:tracking-[-1.5px] [&_h1]:font-[500] [&_h1]:leading-[1.18] [&_h1]:my-[14px] [&_h1]:mx-0 [&_h1_em]:not-italic [&_h1_em]:text-[#6d8254] [&_p]:text-muted-foreground [&_p]:text-[13px] [&_p]:leading-[1.6]"
+            "checkout-heading mb-[24px] [&_h1]:text-[clamp(28px,_5vw,_38px)] [&_h1]:tracking-[-1.5px] [&_h1]:font-[500] [&_h1]:leading-[1.18] [&_h1]:my-[14px] [&_h1]:mx-0 [&_h1_em]:not-italic [&_h1_em]:text-[light-dark(#6d8254,var(--primary))] [&_p]:text-muted-foreground [&_p]:text-[13px] [&_p]:leading-[1.6]"
           }
         >
           <span
@@ -132,7 +134,7 @@ export function CheckoutApp() {
         </div>
         <div
           className={
-            "devnet-notice flex gap-[10px] py-[13px] px-[16px] [border:1px_solid_#dce5d3] bg-[#edf2e7] rounded-[3px] mb-[29px] [background:var(--info-soft)] border-[#d5e0e7] [&_p]:text-[11px] [&_p]:text-[#626e57] [&_p]:leading-[1.6] [&_p]:[color:var(--info)] [&_strong]:font-[500] [&_strong]:text-[#3e5133] [&_strong]:[color:var(--info)] max-[640px]:p-[12px] max-[640px]:mb-[22px] max-[640px]:items-start"
+            "devnet-notice flex gap-[10px] py-[13px] px-[16px] [border:1px_solid_light-dark(#dce5d3,var(--border))] bg-[light-dark(#edf2e7,var(--secondary))] rounded-[3px] mb-[29px] [background:var(--info-soft)] border-[light-dark(#d5e0e7,var(--border))] [&_p]:text-[11px] [&_p]:text-[light-dark(#626e57,var(--muted-foreground))] [&_p]:leading-[1.6] [&_p]:[color:var(--info)] [&_strong]:font-[500] [&_strong]:text-[light-dark(#3e5133,var(--primary))] [&_strong]:[color:var(--info)] max-[640px]:p-[12px] max-[640px]:mb-[22px] max-[640px]:items-start"
           }
         >
           <ShieldCheck size={18} />
@@ -181,7 +183,7 @@ export function CheckoutApp() {
           <span>
             <span
               className={
-                'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+                'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[light-dark(#608a4b,var(--primary))] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[light-dark(#8c9185,var(--primary))]'
               }
             />
             On-chain payments · Solana devnet
@@ -514,7 +516,7 @@ function Checkout({
       </dl>
       <div
         className={
-          "checkout-protection flex gap-[12px] p-[16px] bg-[#edf1e7] text-[#4b653c] rounded-[4px] mb-[24px] [&_svg]:shrink-[0] [&_svg]:mt-[2px] [&_p]:text-[11px] [&_p]:leading-[1.8] [&_p]:m-0"
+          "checkout-protection flex gap-[12px] p-[16px] bg-[light-dark(#edf1e7,var(--secondary))] text-[light-dark(#4b653c,var(--primary))] rounded-[4px] mb-[24px] [&_svg]:shrink-[0] [&_svg]:mt-[2px] [&_p]:text-[11px] [&_p]:leading-[1.8] [&_p]:m-0"
         }
       >
         <ShieldCheck size={20} />
@@ -527,7 +529,7 @@ function Checkout({
       {!active && (
         <p
           className={
-            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
           }
         >
           Connect your wallet above to continue.
@@ -536,7 +538,7 @@ function Checkout({
       {active && !active.wallet.signTransaction && (
         <p
           className={
-            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+            "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
           }
         >
           This wallet does not support devnet transaction signing. Switch
@@ -592,7 +594,7 @@ function Checkout({
         <p
           role="alert"
           className={
-            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+            "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
           }
         >
           {error || journalError}
@@ -611,7 +613,7 @@ function Checkout({
       {pending && (
         <a
           className={
-            "payment-order-link inline-flex gap-[5px] items-center text-[#476238] text-[11px]"
+            "payment-order-link inline-flex gap-[5px] items-center text-[light-dark(#476238,var(--primary))] text-[11px]"
           }
           href={explorer(pending.signature, "tx")}
           target="_blank"
@@ -649,7 +651,7 @@ function Receipt({
     >
       <span
         className={
-          "receipt-check grid place-items-center w-[54px] h-[54px] bg-[#eaf0e2] text-[#476238] rounded-[50%]"
+          "receipt-check grid place-items-center w-[54px] h-[54px] bg-[light-dark(#eaf0e2,var(--secondary))] text-[light-dark(#476238,var(--primary))] rounded-[50%]"
         }
       >
         <Check size={28} />

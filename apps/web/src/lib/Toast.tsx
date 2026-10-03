@@ -57,9 +57,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             closeButton:
               "absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground",
             actionButton: "rounded bg-secondary px-2 py-1 text-xs text-primary",
-            success: "border-[#b9cdb0] [&_[data-icon]]:text-primary",
-            error: "border-[#e0b7a9] [&_[data-icon]]:text-destructive",
-            info: "border-[#c5d9e5] [&_[data-icon]]:text-[#406984]",
+            success: "border-[light-dark(#b9cdb0,var(--border))] [&_[data-icon]]:text-primary",
+            error: "border-[light-dark(#e0b7a9,var(--border))] [&_[data-icon]]:text-destructive",
+            info: "border-[light-dark(#c5d9e5,var(--border))] [&_[data-icon]]:text-[light-dark(#406984,var(--info))]",
             loading: "[&_[data-icon]]:text-primary",
           },
         }}

@@ -1,4 +1,4 @@
-import { useWorkspaceNavigation } from "./workspace-navigation";
+import { ThemeControl } from "@/lib/Theme";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -72,12 +72,12 @@ const errorMessage = (error: unknown) =>
     ? error.message
     : "Something went wrong. Refresh and try again.";
 
-export function MerchantApp({
-  page: initialPage = "overview",
-}: {
-  page?: WorkspacePage;
-}) {
-  const page = useWorkspaceNavigation(initialPage);
+export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
+  useEffect(() => {
+    // The first landing-to-workspace visit may finish loading after route focus.
+    if (window.location.pathname.startsWith("/app"))
+      document.getElementById("merchant-main")?.focus({ preventScroll: true });
+  }, []);
   const [active, setActive] = useState<WalletConnection | null>(null);
   const [locked, setLocked] = useState(false);
   const [walletLoading, setWalletLoading] = useState(true);
@@ -113,7 +113,7 @@ export function MerchantApp({
         >
           <a
             className={
-              "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-white p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
+              "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-background p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
             }
             href="#merchant-main"
           >
@@ -121,10 +121,10 @@ export function MerchantApp({
           </a>
           <header
             className={
-              "merchant-header min-h-[88px] flex items-center gap-[34px] py-[20px] px-[34px] [border-bottom:1px_solid_var(--line)] bg-card max-[860px]:min-h-[78px] max-[860px]:py-[16px] max-[860px]:px-[24px] max-[640px]:px-3 max-[640px]:py-4 max-[640px]:gap-[8px] max-[640px]:[&_.brand]:text-[17px] max-[380px]:[&_.brand]:text-[14px] max-[380px]:px-2 max-[380px]:[&_.wallet-button]:px-2 max-[640px]:[&_.brand-mark]:w-[24px] max-[640px]:[&_.brand-mark]:h-[24px] max-[640px]:[&_.wallet-button]:min-h-[37px] max-[640px]:[&_.wallet-button]:text-[10px] max-[640px]:[&_.wallet-button]:gap-[6px] max-[640px]:[&_.wallet-button]:py-0 max-[640px]:[&_.wallet-button]:px-[10px] sticky top-0 z-30 h-[88px] shrink-0"
+              "merchant-header max-[380px]:gap-1 min-h-[88px] flex items-center gap-[34px] py-[20px] px-[34px] [border-bottom:1px_solid_var(--line)] bg-card max-[860px]:min-h-[78px] max-[860px]:py-[16px] max-[860px]:px-[24px] max-[640px]:px-3 max-[640px]:py-4 max-[640px]:gap-[8px] max-[640px]:[&_.brand]:text-[17px] max-[380px]:[&_.brand]:text-[14px] max-[380px]:px-2 max-[380px]:[&_.wallet-button]:px-2 max-[640px]:[&_.brand-mark]:w-[24px] max-[640px]:[&_.brand-mark]:h-[24px] max-[640px]:[&_.wallet-button]:min-h-[37px] max-[640px]:[&_.wallet-button]:text-[10px] max-[640px]:[&_.wallet-button]:gap-[6px] max-[640px]:[&_.wallet-button]:py-0 max-[640px]:[&_.wallet-button]:px-[10px] sticky top-0 z-30 h-[88px] shrink-0"
             }
           >
-            <div className="flex shrink-0 items-center gap-4 max-[640px]:gap-2">
+            <div className="flex shrink-0 items-center gap-4 max-[640px]:gap-2 max-[380px]:gap-1">
               <a
                 className={
                   "brand inline-flex items-center text-[22px] tracking-[-1px] font-[650] whitespace-nowrap max-[900px]:text-[20px] max-[700px]:text-[20px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:[transform:skewY(-12deg)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span]:rounded-[1.5px] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:first-child]:[transform:skewY(-12deg)_translateY(-1px)_scaleX(0.94)] [@media((hover:_hover)_and_(pointer:_fine))]:[&:hover_.brand-mark_span:last-child]:[transform:skewY(-12deg)_translateY(1px)_scaleX(0.94)] motion-reduce:[&:hover_.brand-mark_span]:[transform:skewY(-24deg)]"
@@ -155,16 +155,17 @@ export function MerchantApp({
             </span>
             <div
               className={
-                "merchant-header-actions ml-auto flex items-center gap-[23px] max-[640px]:gap-[10px]"
+                "merchant-header-actions ml-auto flex items-center gap-[23px] max-[640px]:gap-[10px] max-[380px]:gap-1"
               }
             >
               <span
                 className={
-                  "network-badge inline-flex gap-[7px] items-center [font:11px_var(--mono)] [color:var(--info)] [&>span]:w-[6px] [&>span]:h-[6px] [&>span]:rounded-[50%] [&>span]:bg-[#709155] [&>span]:[background:var(--info)] [&>span]:shadow-[0_0_0_3px_var(--info-soft)] max-[640px]:text-[9px] max-[640px]:gap-[4px] max-[640px]:hidden"
+                  "network-badge inline-flex gap-[7px] items-center [font:11px_var(--mono)] [color:var(--info)] [&>span]:w-[6px] [&>span]:h-[6px] [&>span]:rounded-[50%] [&>span]:bg-[light-dark(#709155,var(--primary))] [&>span]:[background:var(--info)] [&>span]:shadow-[0_0_0_3px_var(--info-soft)] max-[640px]:text-[9px] max-[640px]:gap-[4px] max-[640px]:hidden"
                 }
               >
                 <span /> Devnet
               </span>
+              <ThemeControl />
               <WalletControl
                 onChange={onChange}
                 onLoadingChange={setWalletLoading}
@@ -224,7 +225,7 @@ export function MerchantApp({
                 </div>
                 <span
                   className={
-                    "pilot-tag py-[8px] px-[10px] [border:1px_dashed_#becbb2] [font:9px_var(--mono)] tracking-[1px] text-primary whitespace-nowrap max-[1100px]:hidden"
+                    "pilot-tag py-[8px] px-[10px] [border:1px_dashed_light-dark(#becbb2,var(--border))] [font:9px_var(--mono)] tracking-[1px] text-primary whitespace-nowrap max-[1100px]:hidden"
                   }
                 >
                   DEVNET PREVIEW
@@ -232,12 +233,12 @@ export function MerchantApp({
               </div>
               <div
                 className={
-                  "devnet-notice flex gap-[10px] py-[13px] px-[16px] [border:1px_solid_#dce5d3] bg-[#edf2e7] rounded-[3px] mb-[29px] [background:var(--info-soft)] border-[#d5e0e7] [&_p]:text-[11px] [&_p]:text-[#626e57] [&_p]:leading-[1.6] [&_p]:[color:var(--info)] [&_strong]:font-[500] [&_strong]:text-[#3e5133] [&_strong]:[color:var(--info)] max-[640px]:p-[12px] max-[640px]:mb-[22px] max-[640px]:items-start"
+                  "devnet-notice flex gap-[10px] py-[13px] px-[16px] [border:1px_solid_light-dark(#dce5d3,var(--border))] bg-[light-dark(#edf2e7,var(--secondary))] rounded-[3px] mb-[29px] [background:var(--info-soft)] border-[light-dark(#d5e0e7,var(--border))] [&_p]:text-[11px] [&_p]:text-[light-dark(#626e57,var(--muted-foreground))] [&_p]:leading-[1.6] [&_p]:[color:var(--info)] [&_strong]:font-[500] [&_strong]:text-[light-dark(#3e5133,var(--primary))] [&_strong]:[color:var(--info)] max-[640px]:p-[12px] max-[640px]:mb-[22px] max-[640px]:items-start"
                 }
               >
                 <span
                   className={
-                    "notice-icon flex items-center text-[#7a8e6c] [color:var(--info)] max-[640px]:pt-[2px]"
+                    "notice-icon flex items-center text-[light-dark(#7a8e6c,var(--muted-foreground))] [color:var(--info)] max-[640px]:pt-[2px]"
                   }
                 >
                   <CircleHelp size={15} />
@@ -291,7 +292,7 @@ export function MerchantApp({
                 <span>
                   <span
                     className={
-                      'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[#608a4b] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[#8c9185]'
+                      'status-dot inline-flex items-center gap-[6px] [&::before]:[content:""] [&::before]:w-[5px] [&::before]:h-[5px] [&::before]:bg-[light-dark(#608a4b,var(--primary))] [&::before]:rounded-[50%] [&::before]:inline-block [&::before]:shadow-[0_0_0_3px_#608a4b0c] [&::before]:shrink-[0] [&.neutral::before]:bg-[light-dark(#8c9185,var(--primary))]'
                     }
                   />{" "}
                   Built on Solana · Devnet only
@@ -652,7 +653,7 @@ function MerchantWorkspace({
           fallback={(error, retry) => (
             <div
               className={
-                "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere] [&_button]:underline [&_button]:[font:inherit]"
+                "merchant-alert [border:1px_solid_light-dark(#e6d9b6,var(--border))] bg-[light-dark(#f9f5e8,var(--warning-soft))] text-[light-dark(#78623b,var(--warning))] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere] [&_button]:underline [&_button]:[font:inherit]"
               }
               role="alert"
             >
@@ -739,7 +740,7 @@ function MerchantWorkspace({
       {readError && (
         <div
           className={
-            "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
+            "merchant-alert [border:1px_solid_light-dark(#e6d9b6,var(--border))] bg-[light-dark(#f9f5e8,var(--warning-soft))] text-[light-dark(#78623b,var(--warning))] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
           }
           role="alert"
         >
@@ -750,7 +751,7 @@ function MerchantWorkspace({
       {journalError && (
         <div
           className={
-            "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
+            "merchant-alert [border:1px_solid_light-dark(#e6d9b6,var(--border))] bg-[light-dark(#f9f5e8,var(--warning-soft))] text-[light-dark(#78623b,var(--warning))] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
           }
           role="alert"
         >
@@ -760,7 +761,7 @@ function MerchantWorkspace({
       {active && state && !state.ready && (
         <div
           className={
-            "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
+            "merchant-alert [border:1px_solid_light-dark(#e6d9b6,var(--border))] bg-[light-dark(#f9f5e8,var(--warning-soft))] text-[light-dark(#78623b,var(--warning))] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
           }
           role="status"
         >
@@ -771,7 +772,7 @@ function MerchantWorkspace({
       {active && !active.wallet.signTransaction && (
         <div
           className={
-            "merchant-alert [border:1px_solid_#e6d9b6] bg-[#f9f5e8] text-[#78623b] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
+            "merchant-alert [border:1px_solid_light-dark(#e6d9b6,var(--border))] bg-[light-dark(#f9f5e8,var(--warning-soft))] text-[light-dark(#78623b,var(--warning))] text-[12px] leading-[1.7] py-[15px] px-[18px] rounded-[3px] mb-[20px] [overflow-wrap:anywhere]"
           }
           role="alert"
         >
@@ -800,7 +801,7 @@ function MerchantWorkspace({
         >
           <CardHeader
             className={
-              "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+              "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[light-dark(#91a481,var(--primary))]"
             }
           >
             <div>
@@ -952,7 +953,7 @@ function MerchantWorkspace({
         >
           <CardHeader
             className={
-              "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+              "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[light-dark(#91a481,var(--primary))]"
             }
           >
             <div>
@@ -969,7 +970,7 @@ function MerchantWorkspace({
           </CardHeader>
           <div
             className={
-              'transfer-tabs flex bg-[#f0f2eb] p-[4px] rounded-[4px] my-[21px] mx-0 gap-[4px] [&_button]:flex-[1] [&_button]:[border:1px_solid_transparent] [&_button]:bg-transparent [&_button]:text-[11px] [&_button]:p-[8px] [&_button]:rounded-[3px] [&_button]:text-muted-foreground [&_button]:[transition:background_0.2s,_box-shadow_0.2s] [&_button[aria-pressed="true"]]:bg-card [&_button[aria-pressed="true"]]:border-[#dce2d3] [&_button[aria-pressed="true"]]:shadow-[0_1px_3px_#24282008] [&_button[aria-pressed="true"]]:text-foreground'
+              'transfer-tabs flex bg-[light-dark(#f0f2eb,var(--secondary))] p-[4px] rounded-[4px] my-[21px] mx-0 gap-[4px] [&_button]:flex-[1] [&_button]:[border:1px_solid_transparent] [&_button]:bg-transparent [&_button]:text-[11px] [&_button]:p-[8px] [&_button]:rounded-[3px] [&_button]:text-muted-foreground [&_button]:[transition:background_0.2s,_box-shadow_0.2s] [&_button[aria-pressed="true"]]:bg-card [&_button[aria-pressed="true"]]:border-[light-dark(#dce2d3,var(--border))] [&_button[aria-pressed="true"]]:shadow-[0_1px_3px_#24282008] [&_button[aria-pressed="true"]]:text-foreground'
             }
             role="group"
             aria-label="Reserve action"
@@ -1011,7 +1012,7 @@ function MerchantWorkspace({
             </label>
             <div
               className={
-                'reserve-amount [border:1px_solid_#d4dccb] flex items-center py-[15px] px-[13px] [margin:9px_0_12px] rounded-[3px] [&:focus-within]:border-[var(--green)] [&_input]:[border:0] [&_input]:bg-transparent [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:[font:24px_var(--mono)] [&_input]:text-foreground [&_input]:[outline:0] [&_input::placeholder]:text-[#b9c1b1] [&_button]:bg-[#eef3e7] [&_button]:[border:1px_solid_#dce5d2] [&_button]:rounded-[3px] [&_button]:[font:9px_var(--mono)] [&_button]:py-[5px] [&_button]:px-[7px] [&_button]:text-primary [&_input[aria-invalid="true"]]:[color:var(--danger)] [&:has(input[aria-invalid="true"])]:border-[var(--danger)]'
+                'reserve-amount [border:1px_solid_light-dark(#d4dccb,var(--border))] flex items-center py-[15px] px-[13px] [margin:9px_0_12px] rounded-[3px] [&:focus-within]:border-[var(--green)] [&_input]:[border:0] [&_input]:bg-transparent [&_input]:w-[100%] [&_input]:min-w-[0] [&_input]:[font:24px_var(--mono)] [&_input]:text-foreground [&_input]:[outline:0] [&_input::placeholder]:text-[light-dark(#b9c1b1,var(--muted-foreground))] [&_button]:bg-[light-dark(#eef3e7,var(--secondary))] [&_button]:[border:1px_solid_light-dark(#dce5d2,var(--border))] [&_button]:rounded-[3px] [&_button]:[font:9px_var(--mono)] [&_button]:py-[5px] [&_button]:px-[7px] [&_button]:text-primary [&_input[aria-invalid="true"]]:[color:var(--danger)] [&:has(input[aria-invalid="true"])]:border-[var(--danger)]'
               }
             >
               <Input
@@ -1055,7 +1056,7 @@ function MerchantWorkspace({
             </div>
             <p
               id="amount-help"
-              className={`transfer-help text-[10px] text-muted-foreground mt-[17px] min-h-[36px] [&.amount-error]:text-[#a04531] max-[640px]:min-h-[0] ${amount && !amountValid ? "amount-error" : ""}`}
+              className={`transfer-help text-[10px] text-muted-foreground mt-[17px] min-h-[36px] [&.amount-error]:text-[light-dark(#a04531,var(--danger))] max-[640px]:min-h-[0] ${amount && !amountValid ? "amount-error" : ""}`}
             >
               {amount && !amountValid
                 ? parsed > maxAmount
@@ -1101,7 +1102,7 @@ function MerchantWorkspace({
       </div>
       {(pending || message) && (
         <div
-          className={`transaction-notice flex justify-between gap-[14px] flex-wrap [border:1px_solid_#d9dfcf] bg-[#eef2e7] py-[16px] px-[20px] [margin:0_0_20px] rounded-[3px] text-[11px] [&>div]:flex [&>div]:gap-[10px] [&>div]:items-center [&>div]:flex-[1] [&>div]:min-w-[220px] [&_svg]:flex-[0_0_auto] [&_p]:[overflow-wrap:anywhere] [&_a]:flex [&_a]:items-center [&_a]:gap-[6px] [&_a]:text-primary ${receipt?.result === "confirmed" ? "transaction-confirmed border-[#c9dcb9] bg-[#edf6e7]" : ""}`}
+          className={`transaction-notice flex justify-between gap-[14px] flex-wrap [border:1px_solid_light-dark(#d9dfcf,var(--border))] bg-[light-dark(#eef2e7,var(--secondary))] py-[16px] px-[20px] [margin:0_0_20px] rounded-[3px] text-[11px] [&>div]:flex [&>div]:gap-[10px] [&>div]:items-center [&>div]:flex-[1] [&>div]:min-w-[220px] [&_svg]:flex-[0_0_auto] [&_p]:[overflow-wrap:anywhere] [&_a]:flex [&_a]:items-center [&_a]:gap-[6px] [&_a]:text-primary ${receipt?.result === "confirmed" ? "transaction-confirmed border-[light-dark(#c9dcb9,var(--border))] bg-[light-dark(#edf6e7,var(--secondary))]" : ""}`}
         >
           <div>
             {pending ? (
@@ -1146,7 +1147,7 @@ function MerchantWorkspace({
         >
           <CardHeader
             className={
-              "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+              "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[light-dark(#91a481,var(--primary))]"
             }
           >
             <div>
@@ -1161,7 +1162,7 @@ function MerchantWorkspace({
             </div>
             <span
               className={
-                "rate-badge [font:9px_var(--mono)] py-[6px] px-[8px] bg-[#eff4e9] text-primary [border:1px_solid_#dbe5d1] rounded-[3px] whitespace-nowrap max-[1100px]:text-[8px] max-[1100px]:p-[5px]"
+                "rate-badge [font:9px_var(--mono)] py-[6px] px-[8px] bg-[light-dark(#eff4e9,var(--secondary))] text-primary [border:1px_solid_light-dark(#dbe5d1,var(--border))] rounded-[3px] whitespace-nowrap max-[1100px]:text-[8px] max-[1100px]:p-[5px]"
               }
             >
               {state ? `${state.reserveBps / 100}%` : "5%"} reserve rate
@@ -1170,7 +1171,7 @@ function MerchantWorkspace({
           <div
             role="img"
             className={
-              "reserve-allocation h-[25px] [border:1px_solid_#d3dec7] [background:repeating-linear-gradient(_125deg,_#e8f0df_0,_#e8f0df_6px,_#f4f7ee_6px,_#f4f7ee_9px_)] bg-size-[33px_42px] rounded-[3px] [margin:23px_0_12px] overflow-hidden [&>span]:block [&>span]:h-[100%] [&>span]:[transition:width_0.6s_ease] [&>span]:bg-[#a7884c] motion-reduce:[&>span]:transition-[none]"
+              "reserve-allocation h-[25px] [border:1px_solid_light-dark(#d3dec7,var(--border))] [background:repeating-linear-gradient(_125deg,_light-dark(#e8f0df,var(--secondary))_0,_light-dark(#e8f0df,var(--secondary))_6px,_light-dark(#f4f7ee,var(--secondary))_6px,_light-dark(#f4f7ee,var(--border))_9px_)] bg-size-[33px_42px] rounded-[3px] [margin:23px_0_12px] overflow-hidden [&>span]:block [&>span]:h-[100%] [&>span]:[transition:width_0.6s_ease] [&>span]:bg-[light-dark(#a7884c,var(--warning-soft))] motion-reduce:[&>span]:transition-[none]"
             }
             aria-label={
               state
@@ -1186,7 +1187,7 @@ function MerchantWorkspace({
           </div>
           <div
             className={
-              "allocation-legend flex justify-between gap-[10px] text-[9px] text-muted-foreground [&_span]:flex [&_span]:items-center [&_span]:gap-[6px] [&_i]:bg-[#76945f] [&_i]:w-[7px] [&_i]:h-[7px] [&_i]:rounded-[2px] [&_span:last-child_i]:bg-[#e8f0df] [&_span:last-child_i]:[border:1px_solid_#c6d4b8] [&_span:first-child_i]:bg-[#a7884c]"
+              "allocation-legend flex justify-between gap-[10px] text-[9px] text-muted-foreground [&_span]:flex [&_span]:items-center [&_span]:gap-[6px] [&_i]:bg-[light-dark(#76945f,var(--primary))] [&_i]:w-[7px] [&_i]:h-[7px] [&_i]:rounded-[2px] [&_span:last-child_i]:bg-[light-dark(#e8f0df,var(--secondary))] [&_span:last-child_i]:[border:1px_solid_light-dark(#c6d4b8,var(--border))] [&_span:first-child_i]:bg-[light-dark(#a7884c,var(--warning-soft))]"
             }
           >
             <span>
@@ -1223,7 +1224,7 @@ function MerchantWorkspace({
         <Card
           as="section"
           className={
-            "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] p-[25px] [&_h2]:tracking-[-0.4px] [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] faucet-card bg-[#f0f3e9] [&_h2]:mt-[8px] [&_h2]:text-[18px] [&_p]:text-[11px] [&_p]:text-muted-foreground [&_p]:[margin:9px_0_17px] [&>a]:flex [&>a]:items-center [&>a]:justify-between [&>a]:py-[10px] [&>a]:px-0 [&>a]:[border-top:1px_solid_#dae2d0] [&>a]:text-[11px] [&>a:hover]:text-primary [&>a_svg]:[transition:transform_0.2s] [&>a:hover_svg]:[transform:translate(2px,_-2px)] motion-reduce:[&>a_svg]:transition-[none]"
+            "reserve-card min-w-[0] [border:1px_solid_var(--line)] rounded-[4px] p-[25px] [&_h2]:tracking-[-0.4px] [&_h2]:[margin:9px_0_0] [&_h2]:max-w-[300px] max-[1100px]:p-[20px] max-[640px]:p-[22px] max-[640px]:[&_h2]:text-[18px] max-[640px]:[&_h2]:max-w-[260px] faucet-card bg-[light-dark(#f0f3e9,var(--secondary))] [&_h2]:mt-[8px] [&_h2]:text-[18px] [&_p]:text-[11px] [&_p]:text-muted-foreground [&_p]:[margin:9px_0_17px] [&>a]:flex [&>a]:items-center [&>a]:justify-between [&>a]:py-[10px] [&>a]:px-0 [&>a]:[border-top:1px_solid_light-dark(#dae2d0,var(--border))] [&>a]:text-[11px] [&>a:hover]:text-primary [&>a_svg]:[transition:transform_0.2s] [&>a:hover_svg]:[transform:translate(2px,_-2px)] motion-reduce:[&>a_svg]:transition-[none]"
           }
         >
           <span
@@ -1318,7 +1319,7 @@ function Stat({
   return (
     <Card
       as="section"
-      className={`reserve-stat [border:1px_solid_var(--line)] bg-card py-[21px] px-[22px] rounded-[4px] [transition:border-color_0.2s,_transform_0.2s] [&:hover]:border-[#b4c5a4] [&:hover]:[transform:translateY(-2px)] [&>div]:flex [&>div]:justify-between [&>div]:gap-[8px] [&>div]:text-muted-foreground [&>div]:text-[11px] [&>div_svg]:text-[#7d8d70] [&>strong]:flex [&>strong]:gap-[9px] [&>strong]:items-baseline [&>strong]:[font:30px_var(--mono)] [&>strong]:tracking-[-1px] [&>strong]:[margin:22px_0_9px] [&>strong]:[overflow-wrap:anywhere] [&_strong_small]:[font:10px_var(--mono)] [&_strong_small]:tracking-[0] [&_strong_small]:text-muted-foreground [&_p]:text-[10px] [&_p]:text-muted-foreground max-[1100px]:py-[18px] max-[1100px]:px-[15px] max-[1100px]:[&>strong]:text-[25px] max-[640px]:p-[18px] max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:[gap:5px_15px] max-[640px]:[&>div]:justify-start max-[640px]:[&>div]:flex-row max-[640px]:[&>div]:[grid-column:1] max-[640px]:[&>div]:items-center max-[640px]:[&>div]:text-[11px] max-[640px]:[&>strong]:[grid-column:2] max-[640px]:[&>strong]:[grid-row:1_/_3] max-[640px]:[&>strong]:self-center max-[640px]:[&>strong]:m-0 max-[640px]:[&>strong]:text-[25px] max-[640px]:[&>strong_small]:text-[8px] max-[640px]:[&>div_svg]:order-[-1] max-[640px]:[&_p]:pl-[25px] max-[640px]:[&_p]:text-[9px] max-[370px]:[&>strong]:text-[20px] max-[370px]:[&>div]:text-[10px] motion-reduce:transition-[none] ${accent ? "reserve-stat-accent bg-[#edf2e5] border-[#d5dfc9] [&>strong]:text-primary" : ""}  ${tone ? `reserve-stat-${tone}` : ""}`}
+      className={`reserve-stat [border:1px_solid_var(--line)] bg-card py-[21px] px-[22px] rounded-[4px] [transition:border-color_0.2s,_transform_0.2s] [&:hover]:border-[light-dark(#b4c5a4,var(--border))] [&:hover]:[transform:translateY(-2px)] [&>div]:flex [&>div]:justify-between [&>div]:gap-[8px] [&>div]:text-muted-foreground [&>div]:text-[11px] [&>div_svg]:text-[light-dark(#7d8d70,var(--muted-foreground))] [&>strong]:flex [&>strong]:gap-[9px] [&>strong]:items-baseline [&>strong]:[font:30px_var(--mono)] [&>strong]:tracking-[-1px] [&>strong]:[margin:22px_0_9px] [&>strong]:[overflow-wrap:anywhere] [&_strong_small]:[font:10px_var(--mono)] [&_strong_small]:tracking-[0] [&_strong_small]:text-muted-foreground [&_p]:text-[10px] [&_p]:text-muted-foreground max-[1100px]:py-[18px] max-[1100px]:px-[15px] max-[1100px]:[&>strong]:text-[25px] max-[640px]:p-[18px] max-[640px]:grid max-[640px]:grid-cols-[1fr_auto] max-[640px]:[gap:5px_15px] max-[640px]:[&>div]:justify-start max-[640px]:[&>div]:flex-row max-[640px]:[&>div]:[grid-column:1] max-[640px]:[&>div]:items-center max-[640px]:[&>div]:text-[11px] max-[640px]:[&>strong]:[grid-column:2] max-[640px]:[&>strong]:[grid-row:1_/_3] max-[640px]:[&>strong]:self-center max-[640px]:[&>strong]:m-0 max-[640px]:[&>strong]:text-[25px] max-[640px]:[&>strong_small]:text-[8px] max-[640px]:[&>div_svg]:order-[-1] max-[640px]:[&_p]:pl-[25px] max-[640px]:[&_p]:text-[9px] max-[370px]:[&>strong]:text-[20px] max-[370px]:[&>div]:text-[10px] motion-reduce:transition-[none] ${accent ? "reserve-stat-accent bg-[light-dark(#edf2e5,var(--secondary))] border-[light-dark(#d5dfc9,var(--border))] [&>strong]:text-primary" : ""}  ${tone ? `reserve-stat-${tone}` : ""}`}
     >
       <div>
         <span>{label}</span>
@@ -1331,7 +1332,7 @@ function Stat({
           <>
             <span
               className={
-                "balance-skeleton inline-block w-[86px] h-[30px] rounded-[3px] [background:linear-gradient(_100deg,_#dce2d580_25%,_#f4f6ee_50%,_#dce2d580_75%_)] bg-size-[200%_100%] animate-[balance-shimmer_1.8s_ease-in-out_infinite] motion-reduce:animate-[none]"
+                "balance-skeleton inline-block w-[86px] h-[30px] rounded-[3px] [background:linear-gradient(_100deg,_light-dark(#dce2d580,var(--border))_25%,_light-dark(#f4f6ee,var(--secondary))_50%,_light-dark(#dce2d580,var(--border))_75%_)] bg-size-[200%_100%] animate-[balance-shimmer_1.8s_ease-in-out_infinite] motion-reduce:animate-[none]"
               }
               aria-hidden="true"
             />
@@ -1370,7 +1371,7 @@ function SetupStep({
 }) {
   return (
     <div
-      className={`setup-step flex gap-[15px] relative [padding:0_0_27px] items-start [&:last-child]:pb-0 [&:not(:last-child)::after]:[content:""] [&:not(:last-child)::after]:absolute [&:not(:last-child)::after]:w-[1px] [&:not(:last-child)::after]:h-[calc(100%_-_37px)] [&:not(:last-child)::after]:top-[33px] [&:not(:last-child)::after]:left-[15px] [&:not(:last-child)::after]:bg-border [&_h3]:text-[13px] [&_h3]:[margin:3px_0_5px] [&_p]:text-[11px] [&_p]:text-muted-foreground [&_p]:leading-[1.6] ${done ? "step-done [&_.step-number]:text-primary [&_.step-number]:bg-[#e4eedb] [&_.step-number]:border-[#ceddc0]" : active ? "step-active [&_.step-number]:text-primary [&_.step-number]:border-[#a9bf94] [&_.step-number]:shadow-[0_0_0_4px_#f1f5ed]" : ""}`}
+      className={`setup-step flex gap-[15px] relative [padding:0_0_27px] items-start [&:last-child]:pb-0 [&:not(:last-child)::after]:[content:""] [&:not(:last-child)::after]:absolute [&:not(:last-child)::after]:w-[1px] [&:not(:last-child)::after]:h-[calc(100%_-_37px)] [&:not(:last-child)::after]:top-[33px] [&:not(:last-child)::after]:left-[15px] [&:not(:last-child)::after]:bg-border [&_h3]:text-[13px] [&_h3]:[margin:3px_0_5px] [&_p]:text-[11px] [&_p]:text-muted-foreground [&_p]:leading-[1.6] ${done ? "step-done [&_.step-number]:text-primary [&_.step-number]:bg-[light-dark(#e4eedb,var(--accent))] [&_.step-number]:border-[light-dark(#ceddc0,var(--border))]" : active ? "step-active [&_.step-number]:text-primary [&_.step-number]:border-[light-dark(#a9bf94,var(--border))] [&_.step-number]:shadow-[0_0_0_4px_light-dark(#f1f5ed,var(--border))]" : ""}`}
     >
       <span
         className={

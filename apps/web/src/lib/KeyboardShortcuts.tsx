@@ -29,6 +29,7 @@ export function KeyboardShortcuts({
     const handle = (event: KeyboardEvent) => {
       if (
         !enabled ||
+        Boolean(document.querySelector(`[data-site-page="${dashboard ? "workspace" : "landing"}"][hidden]`)) ||
         event.repeat ||
         !event.altKey ||
         !event.shiftKey ||
@@ -73,7 +74,7 @@ export function KeyboardShortcuts({
     };
     document.addEventListener("keydown", handle);
     return () => document.removeEventListener("keydown", handle);
-  }, [enabled, payments]);
+  }, [enabled, payments, dashboard]);
   const shortcuts = [
     ...[{ label: "Show shortcuts", keys: ["Alt", "Shift", "K"] }],
     ...(dashboard

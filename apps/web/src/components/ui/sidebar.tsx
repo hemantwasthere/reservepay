@@ -116,6 +116,7 @@ function SidebarProvider({
         !event.defaultPrevented &&
         !event.isComposing &&
         enabled &&
+        !document.querySelector('[data-site-page="workspace"][hidden]') &&
         !document.querySelector('[role="dialog"][data-state="open"]') &&
         !(
           event.target instanceof Element &&

@@ -4,6 +4,7 @@ ReservePay uses Tailwind CSS v4 and locally owned shadcn components.
 
 - Build controls from `@/components/ui` and compose them in feature components. Extend these primitives or add a shadcn primitive before building a new control from scratch.
 - Keep component layout, responsive states, and interaction styling in Tailwind utilities. Combine conditional classes with `cn` from `@/lib/utils`.
+- `ThemeProvider` owns System/Light/Dark appearance; `public/theme.js` applies it before first paint. Use semantic theme tokens for new UI. Existing custom shades use `light-dark()` in Tailwind utilities to retain their light palette and select dark theme tokens. Keep `color-scheme` declarations in the CSS theme selectors: the production CSS transform uses them to generate its compatibility variables.
 - `src/styles.css` contains fonts, theme tokens, base document defaults, and animation keyframes. Do not add feature-specific stylesheets.
 - Use the shared Button variants (`brand`, `ink`, `quiet`, `outline`, `ghost`) for actions. `unstyled` is for controls whose feature layout supplies their appearance. Buttons default to `type="button"`; form submissions must explicitly use `type="submit"`.
 - Use shadcn Dialog, Sheet, Popover, Tooltip, Accordion, Slider, and Sonner for their corresponding interactions. Preserve their focus management, labels, keyboard behavior, and reduced-motion support.

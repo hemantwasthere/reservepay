@@ -25,7 +25,7 @@ A frontend rollback can use the previous frontend with this backend because its 
 
 ## Workspace navigation and merchant images
 
-Sidebar links use browser history within the workspace. The wallet/session provider and all three views stay mounted, keeping Convex subscriptions and form drafts alive. Back/forward, direct URLs, reloads, and modifier-clicks still work. Hidden views are excluded from keyboard shortcuts. Wallet changes reset view data; session expiry and server revocation still end access.
+Landing and sidebar links share browser-history navigation through `SiteApp`. After the first workspace visit, its wallet/session provider and all three views stay mounted while the landing page is visible, keeping Convex subscriptions and form drafts alive. A hard reload creates a new runtime and validates the stored session before restoring private queries; authentication is never bypassed with a cached result. Back/forward, direct URLs, reloads, and modifier-clicks still work. Hidden views are excluded from keyboard shortcuts. Wallet changes reset view data; session expiry and server revocation still end access.
 
 Overview and Payment Links share one reserve-account result. Balances and on-chain orders refresh through Solana RPC every 20 seconds while the document is visible and on window focus. Convex profile/link updates remain reactive; they do not require a reload. Clean profile forms follow incoming changes, while unsaved edits remain intact.
 

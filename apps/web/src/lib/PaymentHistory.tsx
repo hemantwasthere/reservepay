@@ -20,7 +20,7 @@ export function PaymentHistory({
   const { orders, loading, mode, connected } = useDemoStore();
   return (
     <div
-      className={"payment-history mt-7 border border-line bg-white/50"}
+      className={"payment-history mt-7 border border-line bg-card/50"}
       aria-label="Demo payment history"
     >
       <div

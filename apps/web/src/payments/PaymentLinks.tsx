@@ -52,7 +52,7 @@ export function PaymentLinks(props: {
     >
       <CardHeader
         className={
-          "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+          "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[light-dark(#91a481,var(--primary))]"
         }
       >
         <div>
@@ -78,7 +78,7 @@ export function PaymentLinks(props: {
       {!props.active ? (
         <div
           className={
-            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
           }
         >
           Connect your wallet to manage payment links.
@@ -86,7 +86,7 @@ export function PaymentLinks(props: {
       ) : !props.registered ? (
         <div
           className={
-            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
           }
         >
           Register your merchant account in Overview to start accepting
@@ -95,7 +95,7 @@ export function PaymentLinks(props: {
       ) : !ready ? (
         <div
           className={
-            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
           }
           role="status"
         >
@@ -306,7 +306,7 @@ function LinkManager({
       {!active.wallet.signMessage && (
         <p
           className={
-            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+            "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
           }
         >
           This wallet does not support message approval. Switch to a wallet such
@@ -317,7 +317,7 @@ function LinkManager({
         <p
           role="alert"
           className={
-            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+            "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
           }
         >
           {error}
@@ -356,7 +356,7 @@ function LinkManager({
       {links === undefined ? (
         <div
           className={
-            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
           }
           role="status"
         >
@@ -365,7 +365,7 @@ function LinkManager({
       ) : links.length === 0 ? (
         <div
           className={
-            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+            "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[light-dark(#f6f7f2,var(--secondary))] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
           }
         >
           <Link2 size={24} />
@@ -377,14 +377,14 @@ function LinkManager({
       ) : (
         <ul
           className={
-            "payment-link-list [list-style:none] p-0 [margin:10px_0_0] [&_li]:flex [&_li]:items-center [&_li]:gap-[18px] [&_li]:py-[18px] [&_li]:px-[12px] [&_li]:rounded-[4px] [&_li]:[border-bottom:1px_solid_var(--line)] [&_li]:[transition:background-color_180ms_ease] [&_li:hover]:bg-[#f8f9f5] [&_li:last-child]:[border-bottom:0] max-[640px]:[&_li]:gap-[10px] max-[640px]:[&_li]:flex-wrap"
+            "payment-link-list [list-style:none] p-0 [margin:10px_0_0] [&_li]:flex [&_li]:items-center [&_li]:gap-[18px] [&_li]:py-[18px] [&_li]:px-[12px] [&_li]:rounded-[4px] [&_li]:[border-bottom:1px_solid_var(--line)] [&_li]:[transition:background-color_180ms_ease] [&_li:hover]:bg-[light-dark(#f8f9f5,var(--card))] [&_li:last-child]:[border-bottom:0] max-[640px]:[&_li]:gap-[10px] max-[640px]:[&_li]:flex-wrap"
           }
         >
           {links.map((link) => (
             <li key={link._id}>
               <div
                 className={
-                  "payment-link-details min-w-[0] flex-[1] flex flex-col gap-[7px] [&>a]:inline-flex [&>a]:items-center [&>a]:gap-[6px] [&>a]:text-[13px] [&>a]:[overflow-wrap:anywhere] [&>span]:text-muted-foreground [&>span]:text-[10px] [&>.payment-order-link]:inline-flex [&>.payment-order-link]:gap-[5px] [&>.payment-order-link]:items-center [&>.payment-order-link]:text-[#476238] [&>.payment-order-link]:text-[11px] max-[640px]:[flex-basis:calc(100%_-_48px)]"
+                  "payment-link-details min-w-[0] flex-[1] flex flex-col gap-[7px] [&>a]:inline-flex [&>a]:items-center [&>a]:gap-[6px] [&>a]:text-[13px] [&>a]:[overflow-wrap:anywhere] [&>span]:text-muted-foreground [&>span]:text-[10px] [&>.payment-order-link]:inline-flex [&>.payment-order-link]:gap-[5px] [&>.payment-order-link]:items-center [&>.payment-order-link]:text-[light-dark(#476238,var(--primary))] [&>.payment-order-link]:text-[11px] max-[640px]:[flex-basis:calc(100%_-_48px)]"
                 }
               >
                 <a href={`/pay/${link._id}`}>
@@ -423,7 +423,7 @@ function LinkManager({
                 variant="unstyled"
                 size="unstyled"
                 className={
-                  "payment-copy w-[38px] h-[38px] grid place-items-center [border:1px_solid_var(--line)] bg-card rounded-[4px] text-muted-foreground shrink-[0] [transition:background-color_180ms_ease] [&:hover]:bg-[#eaf0e2] [&:hover]:text-[#476238]"
+                  "payment-copy w-[38px] h-[38px] grid place-items-center [border:1px_solid_var(--line)] bg-card rounded-[4px] text-muted-foreground shrink-[0] [transition:background-color_180ms_ease] [&:hover]:bg-[light-dark(#eaf0e2,var(--secondary))] [&:hover]:text-[light-dark(#476238,var(--primary))]"
                 }
                 aria-label={`Copy payment link for ${link.title}`}
                 title="Copy payment link"

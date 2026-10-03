@@ -25,7 +25,7 @@ export function SignInCard({
     >
       <CardHeader
         className={
-          "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[#91a481]"
+          "reserve-card-heading flex justify-between gap-[14px] items-start [&>svg]:text-[light-dark(#91a481,var(--primary))]"
         }
       >
         <div>
@@ -77,7 +77,7 @@ export function SignInCard({
       {!supported && (
         <p
           className={
-            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+            "payment-error py-[13px] px-[15px] [border:1px_solid_light-dark(#e9cdc4,var(--border))] bg-[light-dark(#fbf0eb,var(--secondary))] text-[light-dark(#964b36,var(--danger))] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
           }
         >
           This wallet does not support message signing. Switch to a wallet such

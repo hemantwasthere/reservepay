@@ -1,3 +1,4 @@
+import { ThemeProvider } from "../lib/Theme";
 import "../merchant/polyfills";
 import { StrictMode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
@@ -6,11 +7,13 @@ import { PaymentProvider } from "./PaymentProvider";
 import { CheckoutApp } from "./CheckoutApp";
 const app = (
   <StrictMode>
-    <ToastProvider>
-      <PaymentProvider>
-        <CheckoutApp />
-      </PaymentProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <PaymentProvider>
+          <CheckoutApp />
+        </PaymentProvider>
+      </ToastProvider>
+    </ThemeProvider>
   </StrictMode>
 );
 const root = document.getElementById("root")!;

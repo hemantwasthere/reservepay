@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @font-face {
   font-family: "DM Sans";
   font-style: normal;
@@ -45,7 +47,7 @@
   --color-popover: var(--card);
   --color-popover-foreground: var(--foreground);
   --color-primary: var(--primary);
-  --color-primary-foreground: #fff;
+  --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--foreground);
   --color-muted: var(--muted);
@@ -59,7 +61,7 @@
   --color-sidebar: var(--background);
   --color-sidebar-foreground: var(--foreground);
   --color-sidebar-primary: var(--primary);
-  --color-sidebar-primary-foreground: #fff;
+  --color-sidebar-primary-foreground: var(--primary-foreground);
   --color-sidebar-accent: var(--accent);
   --color-sidebar-accent-foreground: var(--primary);
   --color-sidebar-border: var(--border);
@@ -74,6 +76,7 @@
   --radius-xl: 6px;
 }
 :root {
+  color-scheme: light;
   --info: #395f78;
   --info-soft: #edf2f5;
   --warning: #806022;
@@ -84,6 +87,7 @@
   --foreground: #242820;
   --card: #fcfdf9;
   --primary: #426b36;
+  --primary-foreground: #fff;
   --secondary: #edf1e7;
   --muted: #eef1e8;
   --muted-foreground: #646b5c;
@@ -98,6 +102,26 @@
   --lime: #d4edba;
   --mono: "IBM Plex Mono", monospace;
   --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dark {
+  color-scheme: dark;
+  --background: #181c18;
+  --foreground: #e2e7dd;
+  --card: #1e241f;
+  --primary: #a5c58e;
+  --primary-foreground: #1c2918;
+  --secondary: #252e24;
+  --muted: #252b25;
+  --muted-foreground: #a4af9e;
+  --accent: #2c3828;
+  --border: #364032;
+  --info: #a1bdd0;
+  --info-soft: #222d33;
+  --warning: #d4bb87;
+  --warning-soft: #332e22;
+  --danger: #e0a095;
+  --danger-soft: #352722;
+  --lime: #394e2d;
 }
 @layer base {
   * {
@@ -145,7 +169,7 @@
     @apply text-inherit no-underline;
   }
   ::selection {
-    @apply bg-[#cfe8b8];
+    @apply bg-primary/25;
   }
   h1,
   h2,
@@ -171,7 +195,7 @@
     @apply text-[42px] leading-[1.15] tracking-[-1.9px] max-[900px]:text-[35px] max-[700px]:text-[32px] max-[700px]:tracking-[-1.5px];
   }
   h2 > span {
-    @apply text-[#82877b];
+    @apply text-muted-foreground;
   }
   footer {
     @apply px-10 pt-10 max-[700px]:px-[23px] max-[700px]:pt-[30px];

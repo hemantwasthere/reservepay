@@ -90,7 +90,7 @@ export function WorkspaceSidebar({ page }: { page: WorkspacePage }) {
                   asChild
                   isActive={page === item.page}
                   tooltip={item.label}
-                  className={`${menuClasses} text-[13px] data-[active=true]:border-[#d9e1ce] data-[active=true]:bg-[#e8eddf] data-[active=true]:text-primary`}
+                  className={`${menuClasses} text-[13px] data-[active=true]:border-[light-dark(#d9e1ce,var(--border))] data-[active=true]:bg-[light-dark(#e8eddf,var(--secondary))] data-[active=true]:text-primary`}
                 >
                   <a
                     href={item.href}
@@ -115,7 +115,7 @@ export function WorkspaceSidebar({ page }: { page: WorkspacePage }) {
           aria-hidden={!isMobile && state === "collapsed"}
         >
           <div className="w-[212px] px-3">
-            <ShieldCheck className="mb-4 size-[22px] text-[#779469]" />
+            <ShieldCheck className="mb-4 size-[22px] text-[light-dark(#779469,var(--primary))]" />
             <strong className="text-[15px] font-medium leading-relaxed">
               A little reserve.
               <br />A lot of trust.

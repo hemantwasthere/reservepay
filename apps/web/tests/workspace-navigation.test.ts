@@ -2,11 +2,11 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { act, createElement, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { useWorkspaceNavigation } from "../src/merchant/workspace-navigation";
+import { useSiteNavigation } from "../src/merchant/workspace-navigation";
 let root: Root, container: HTMLDivElement;
 let mounts = 0;
 function Probe() {
-  const page = useWorkspaceNavigation("overview");
+  const page = useSiteNavigation("overview");
   const [draft, setDraft] = useState("");
   useEffect(() => {
     mounts++;
@@ -16,6 +16,8 @@ function Probe() {
     { id: "merchant-main", tabIndex: -1 },
     createElement("p", { id: "page" }, page),
     createElement("a", { id: "payments", href: "/app/payments" }, "Payments"),
+    createElement("a", { id: "home", href: "/" }, "Home"),
+    createElement("a", { id: "faq", href: "/#faq-title" }, "FAQ"),
     createElement("a", { id: "profile", href: "/app/profile" }, "Profile"),
     createElement(
       "a",
@@ -76,15 +78,13 @@ it("leaves modified clicks, external destinations and new tabs to the browser", 
     };
     window.addEventListener("click", stopBrowser, { once: true });
     await act(async () =>
-      container
-        .querySelector(selector)!
-        .dispatchEvent(
-          new MouseEvent("click", {
-            bubbles: true,
-            cancelable: true,
-            ...options,
-          }),
-        ),
+      container.querySelector(selector)!.dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          ...options,
+        }),
+      ),
     );
     return handled;
   }
@@ -99,4 +99,33 @@ it("leaves modified clicks, external destinations and new tabs to the browser", 
   container.querySelector<HTMLAnchorElement>("#profile")!.target = "_blank";
   expect(await intercepted("#profile")).toBe(false);
   expect(await intercepted("#external")).toBe(false);
+});
+
+it("keeps the running workspace and draft through landing visits and history", async () => {
+  const input = container.querySelector("input")!;
+  await act(async () => {
+    input.value = "Keep this draft";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () =>
+    container.querySelector<HTMLAnchorElement>("#home")!.click(),
+  );
+  expect(location.pathname).toBe("/");
+  expect(container.querySelector("#page")?.textContent).toBe("landing");
+  await act(async () =>
+    container.querySelector<HTMLAnchorElement>("#profile")!.click(),
+  );
+  expect(container.querySelector("#page")?.textContent).toBe("profile");
+  await act(async () =>
+    container.querySelector<HTMLAnchorElement>("#faq")!.click(),
+  );
+  expect(location.hash).toBe("#faq-title");
+  expect(container.querySelector("#page")?.textContent).toBe("landing");
+  await act(async () => {
+    window.history.replaceState(null, "", "/app/profile");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  expect(container.querySelector("#page")?.textContent).toBe("profile");
+  expect(input.value).toBe("Keep this draft");
+  expect(mounts).toBe(1);
 });
