@@ -1,5 +1,12 @@
 import { ConvexError, v } from "convex/values";
-import { query, internalMutation, internalQuery } from "./_generated/server";
+import {
+  query,
+  mutation,
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+} from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { validateTerms } from "../src/payments/terms";
 import { requireMerchant } from "./session";
 
@@ -82,6 +89,38 @@ export const insert = internalMutation({
     return ctx.db.insert("paymentLinks", terms);
   },
 });
+// The merchant can stop an unpaid link without touching paid receipts. Other
+// merchants' link IDs are never revealed: same "not found" as a missing link.
+const ownedUnpaidLink = async (
+  ctx: MutationCtx,
+  session: string,
+  id: Id<"paymentLinks">,
+) => {
+  const wallet = await requireMerchant(ctx, session);
+  const link = await ctx.db.get(id);
+  if (!link || link.merchant !== wallet)
+    throw new ConvexError("Payment link not found.");
+  if (link.receipt) throw new ConvexError("This link has already been paid.");
+  return link;
+};
+export const deactivate = mutation({
+  args: { session: v.string(), id: v.id("paymentLinks") },
+  handler: async (ctx, { session, id }) => {
+    const link = await ownedUnpaidLink(ctx, session, id);
+    if (!link.deactivatedAt)
+      await ctx.db.patch(id, { deactivatedAt: Date.now() });
+  },
+});
+export const reactivate = mutation({
+  args: { session: v.string(), id: v.id("paymentLinks") },
+  handler: async (ctx, { session, id }) => {
+    const link = await ownedUnpaidLink(ctx, session, id);
+    if (link.deactivatedAt)
+      await ctx.db.patch(id, { deactivatedAt: undefined });
+  },
+});
+// record stays unchanged: a buyer can still pay a stale tab after
+// deactivation, and moved funds must always get their receipt.
 export const record = internalMutation({
   args: { id: v.id("paymentLinks"), receipt: v.object(receiptFields) },
   handler: async (ctx, { id, receipt }) => {

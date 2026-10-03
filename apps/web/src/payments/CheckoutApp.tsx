@@ -4,7 +4,7 @@ import { OrderActions } from "./OrderActions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useConvex, useQuery } from "convex/react";
 import { PublicKey } from "@solana/web3.js";
 import {
   ArrowUpRight,
@@ -206,6 +206,7 @@ function Checkout({
   isCurrent: (value: WalletConnection) => boolean;
 }) {
   const link = useQuery(api.payments.get, { id });
+  const convex = useConvex();
   const merchantProfile = useQuery(
     api.merchants.publicProfile,
     link ? { wallet: link.merchant } : "skip",
@@ -304,6 +305,7 @@ function Checkout({
     if (
       !link ||
       link.receipt ||
+      link.deactivatedAt ||
       !active?.wallet.signTransaction ||
       pending ||
       !loaded ||
@@ -318,6 +320,12 @@ function Checkout({
         setPending(saved);
         throw new Error("This payment is already awaiting confirmation.");
       }
+      // Re-read just before preparing: a tab loaded before the merchant
+      // deactivated the link must not pay. The live query usually wins
+      // this race; this closes the rest of it.
+      const fresh = await convex.query(api.payments.get, { id });
+      if (!fresh || fresh.deactivatedAt)
+        throw new Error("This payment link is no longer active.");
       const prepared = await paymentClient(connection).prepare(
         link,
         new PublicKey(wallet.account.address),
@@ -529,62 +537,76 @@ function Checkout({
           Refunds require an authorized resolver’s approval.
         </p>
       </div>
-      {!active && (
-        <p
+      {link.deactivatedAt ? (
+        <div
           className={
             "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
           }
+          role="status"
         >
-          Connect your wallet above to continue.
-        </p>
-      )}
-      {active && !active.wallet.signTransaction && (
-        <p
-          className={
-            "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
-          }
-        >
-          This wallet does not support devnet transaction signing. Switch
-          wallets to continue.
-        </p>
-      )}
-      {active?.account.address === link.merchant && (
-        <p
-          className={
-            "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
-          }
-        >
-          You’re viewing your own link. Share it with a buyer using another
-          wallet.
-        </p>
-      )}
-      <Button
-        variant="brand"
-        size="unstyled"
-        className={"button button-green checkout-pay w-[100%] mt-[12px]"}
-        disabled={
-          !active?.wallet.signTransaction ||
-          active?.account.address === link.merchant ||
-          Boolean(busy || pending || journalError) ||
-          !loaded
-        }
-        onClick={() => void pay()}
-      >
-        {busy || pending ? (
-          <LoaderCircle
-            size={17}
-            className={
-              "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+          <strong>This payment link is no longer active.</strong>
+          <span>Contact the merchant for a new link. No payment was taken.</span>
+        </div>
+      ) : (
+        <>
+          {!active && (
+            <p
+              className={
+                "payment-empty flex flex-col items-center text-center gap-[9px] py-[32px] px-[18px] text-muted-foreground text-[12px] bg-[#f6f7f2] [border:1px_dashed_var(--line)] rounded-[4px] mt-[14px] leading-[1.7] [&_strong]:text-foreground [&_strong]:font-[500]"
+              }
+            >
+              Connect your wallet above to continue.
+            </p>
+          )}
+          {active && !active.wallet.signTransaction && (
+            <p
+              className={
+                "payment-error py-[13px] px-[15px] [border:1px_solid_#e9cdc4] bg-[#fbf0eb] text-[#964b36] text-[12px] leading-[1.7] rounded-[4px] [overflow-wrap:anywhere] my-[14px] mx-0"
+              }
+            >
+              This wallet does not support devnet transaction signing. Switch
+              wallets to continue.
+            </p>
+          )}
+          {active?.account.address === link.merchant && (
+            <p
+              className={
+                "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"
+              }
+            >
+              You’re viewing your own link. Share it with a buyer using another
+              wallet.
+            </p>
+          )}
+          <Button
+            variant="brand"
+            size="unstyled"
+            className={"button button-green checkout-pay w-[100%] mt-[12px]"}
+            disabled={
+              !active?.wallet.signTransaction ||
+              active?.account.address === link.merchant ||
+              Boolean(busy || pending || journalError) ||
+              !loaded
             }
-          />
-        ) : (
-          <LockKeyhole size={16} />
-        )}
-        {busy ||
-          (pending
-            ? "Payment in progress…"
-            : `Pay ${exactAmount(BigInt(link.amount))} USDC`)}
-      </Button>
+            onClick={() => void pay()}
+          >
+            {busy || pending ? (
+              <LoaderCircle
+                size={17}
+                className={
+                  "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                }
+              />
+            ) : (
+              <LockKeyhole size={16} />
+            )}
+            {busy ||
+              (pending
+                ? "Payment in progress…"
+                : `Pay ${exactAmount(BigInt(link.amount))} USDC`)}
+          </Button>
+        </>
+      )}
       <p
         className={
           "payment-fineprint text-muted-foreground my-[14px] mx-0 text-[11px]"

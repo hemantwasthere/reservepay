@@ -5,11 +5,12 @@ import {
 } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConvexError } from "convex/values";
 import { useRef, useState } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import {
   Link2,
   Copy,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import bs58 from "bs58";
 import { api } from "../../convex/_generated/api";
+import type { Doc } from "../../convex/_generated/dataModel";
 import { type WalletConnection } from "../lib/WalletControl";
 import { SessionErrorBoundary } from "../lib/useMerchantSession";
 import { useToast } from "../lib/Toast";
@@ -138,6 +140,8 @@ function LinkManager({
   );
   const create = useAction(api.paymentActions.create);
   const sync = useAction(api.paymentActions.sync);
+  const deactivate = useMutation(api.payments.deactivate);
+  const reactivate = useMutation(api.payments.reactivate);
   const { notify } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -147,6 +151,7 @@ function LinkManager({
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
   const [checking, setChecking] = useState(false);
+  const [toggling, setToggling] = useState("");
   const inFlight = useRef(false);
   // Preserve an approved request if the network response is lost; retry is idempotent.
   const approval = useRef<{ terms: PaymentTerms; signature: string } | null>(
@@ -231,6 +236,36 @@ function LinkManager({
       );
     } finally {
       setChecking(false);
+    }
+  };
+  const toggleLink = async (link: Doc<"paymentLinks">) => {
+    if (!session || toggling || link.receipt) return;
+    setToggling(link._id);
+    try {
+      if (link.deactivatedAt) {
+        await reactivate({ session, id: link._id });
+        notify({
+          title: "Payment link reactivated",
+          description: "The checkout page accepts payments again.",
+        });
+      } else {
+        await deactivate({ session, id: link._id });
+        notify({
+          title: "Payment link deactivated",
+          description: "The checkout page no longer accepts payments.",
+        });
+      }
+    } catch (error) {
+      notify({
+        title: "Could not update the link",
+        description:
+          error instanceof ConvexError && typeof error.data === "string"
+            ? error.data
+            : "Try again.",
+        tone: "error",
+      });
+    } finally {
+      setToggling("");
     }
   };
   return (
@@ -447,7 +482,38 @@ function LinkManager({
                 <strong>
                   {exactAmount(BigInt(link.amount))} <small>USDC</small>
                 </strong>
-                <PaymentStatus receipt={link.receipt} />
+                {link.deactivatedAt && !link.receipt ? (
+                  <Badge
+                    variant="outline"
+                    className="link-payment-status rounded-[3px] border-0 bg-secondary px-[7px] py-[5px] font-mono text-[9px] font-normal text-muted-foreground"
+                  >
+                    Inactive
+                  </Badge>
+                ) : (
+                  <PaymentStatus receipt={link.receipt} />
+                )}
+                {!link.receipt && (
+                  <Button
+                    variant="unstyled"
+                    size="unstyled"
+                    className={
+                      "payment-text-button inline-flex items-center gap-[7px] text-muted-foreground bg-transparent [border:0] text-[11px] py-[4px] px-0"
+                    }
+                    type="button"
+                    disabled={Boolean(toggling)}
+                    onClick={() => void toggleLink(link)}
+                  >
+                    {toggling === link._id ? (
+                      <LoaderCircle
+                        size={12}
+                        className={
+                          "pending-spinner animate-[pending-turn_900ms_linear_infinite]"
+                        }
+                      />
+                    ) : null}
+                    {link.deactivatedAt ? "Reactivate" : "Deactivate"}
+                  </Button>
+                )}
               </div>
               <Button
                 variant="unstyled"
@@ -457,6 +523,7 @@ function LinkManager({
                 }
                 aria-label={`Copy payment link for ${link.title}`}
                 title="Copy payment link"
+                disabled={Boolean(link.deactivatedAt && !link.receipt)}
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(
