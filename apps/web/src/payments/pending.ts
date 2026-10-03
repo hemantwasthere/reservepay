@@ -4,9 +4,9 @@ export type PendingPayment = {
   lastValidBlockHeight: number;
   buyer: string;
 };
-const key = (id: string) => `reservepay:devnet:checkout:${id}`;
+export const paymentKey = (id: string) => `reservepay:devnet:checkout:${id}`;
 export function loadPayment(id: string): PendingPayment | null {
-  const raw = localStorage.getItem(key(id));
+  const raw = localStorage.getItem(paymentKey(id));
   if (!raw) return null;
   const value = JSON.parse(raw) as PendingPayment;
   if (
@@ -23,8 +23,8 @@ export function loadPayment(id: string): PendingPayment | null {
   return value;
 }
 export function savePayment(id: string, payment: PendingPayment) {
-  localStorage.setItem(key(id), JSON.stringify(payment));
+  localStorage.setItem(paymentKey(id), JSON.stringify(payment));
 }
 export function clearPayment(id: string) {
-  localStorage.removeItem(key(id));
+  localStorage.removeItem(paymentKey(id));
 }

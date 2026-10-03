@@ -35,6 +35,7 @@ import {
   loadPayment,
   savePayment,
   clearPayment,
+  paymentKey,
   type PendingPayment,
 } from "./pending";
 import {
@@ -265,8 +266,14 @@ function Checkout({
       setLoaded(true);
     };
     read();
-    window.addEventListener("storage", read);
-    return () => window.removeEventListener("storage", read);
+    // Only this payment's journal matters; other keys (theme, sessions)
+    // changing in another tab must not disturb the checkout phase.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== paymentKey(id)) return;
+      read();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [id]);
   useEffect(() => {
     if (!link || (link.receipt && link.receipt.status !== "paid")) return;
