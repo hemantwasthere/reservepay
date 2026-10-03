@@ -190,3 +190,70 @@ describe("merchant-approved payment links", () => {
     );
   });
 });
+
+describe("payment link descriptions", () => {
+  it("keeps the v1 approval message byte-for-byte without a description", () => {
+    const value = terms();
+    const message = new TextDecoder().decode(paymentApproval(value));
+    expect(message).toBe(
+      [
+        "ReservePay payment link approval v1",
+        "Network: Solana devnet (test tokens only)",
+        `Merchant: ${value.merchant}`,
+        `Reference: ${value.reference}`,
+        `Title: ${value.title}`,
+        `Amount (USDC base units): ${value.amount}`,
+        `Protection (seconds): ${value.protectionSeconds}`,
+        `Issued at (milliseconds): ${value.issuedAt}`,
+        "Create this single-use payment link. This signature does not transfer funds.",
+      ].join("\n"),
+    );
+  });
+  it("creates a v2-signed link with a description and returns it", async () => {
+    read.mockResolvedValue({ ready: true, registered: true });
+    const t = convexTest(schema, modules),
+      value = { ...terms(), description: "Two logo concepts.\nOne revision." };
+    const request = approved(value);
+    const id = await t.action(api.paymentActions.create, request);
+    expect(await t.action(api.paymentActions.create, request)).toBe(id);
+    expect((await t.query(api.payments.get, { id }))?.description).toBe(
+      value.description,
+    );
+  });
+  it("rejects a description changed after signing", async () => {
+    read.mockResolvedValue({ ready: true, registered: true });
+    const t = convexTest(schema, modules),
+      request = approved({ ...terms(), description: "Original scope." });
+    await expect(
+      t.action(api.paymentActions.create, {
+        ...request,
+        terms: { ...request.terms, description: "Expanded scope." },
+      }),
+    ).rejects.toThrow("did not approve");
+  });
+  it("still verifies v1 links without a description", async () => {
+    read.mockResolvedValue({ ready: true, registered: true });
+    const t = convexTest(schema, modules),
+      request = approved(terms());
+    const id = await t.action(api.paymentActions.create, request);
+    expect((await t.query(api.payments.get, { id }))?.description).toBeUndefined();
+  });
+  it("validates description length, control characters and empty values", () => {
+    expect(() =>
+      validateTerms({ ...terms(), description: "x".repeat(501) }),
+    ).toThrow();
+    expect(() =>
+      validateTerms({ ...terms(), description: "bad\tdescription" }),
+    ).toThrow();
+    expect(() =>
+      validateTerms({ ...terms(), description: "bad\rdescription" }),
+    ).toThrow();
+    expect(() => validateTerms({ ...terms(), description: "" })).toThrow();
+    expect(() => validateTerms({ ...terms(), description: "  " })).toThrow();
+    expect(() => validateTerms({ ...terms(), description: " padded " })).toThrow();
+    expect(() =>
+      validateTerms({ ...terms(), description: "line one\nline two" }),
+    ).not.toThrow();
+    expect(() => validateTerms(terms())).not.toThrow();
+  });
+});

@@ -3,6 +3,7 @@ export const termsFields = {
   merchant: v.string(),
   reference: v.string(),
   title: v.string(),
+  description: v.optional(v.string()),
   amount: v.string(),
   protectionSeconds: v.number(),
   issuedAt: v.number(),

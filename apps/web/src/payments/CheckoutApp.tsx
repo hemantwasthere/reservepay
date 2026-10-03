@@ -446,6 +446,11 @@ function Checkout({
         PAYMENT FOR
       </span>
       <h2>{link.title}</h2>
+      {link.description && (
+        <p className="whitespace-pre-line break-words text-muted-foreground">
+          {link.description}
+        </p>
+      )}
       {merchantProfile && (
         <div className="mb-3 flex items-center gap-3">
           <MerchantAvatar
@@ -669,6 +674,11 @@ function Receipt({
             : "Payment received."}
       </h2>
       <p>{link.title}</p>
+      {link.description && (
+        <p className="whitespace-pre-line break-words text-muted-foreground">
+          {link.description}
+        </p>
+      )}
       {merchantProfile && (
         <div className="mt-3 flex items-center gap-3 text-sm">
           <MerchantAvatar

@@ -4,6 +4,7 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConvexError } from "convex/values";
@@ -139,6 +140,7 @@ function LinkManager({
   const sync = useAction(api.paymentActions.sync);
   const { notify } = useToast();
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [protection, setProtection] = useState(86400);
   const [busy, setBusy] = useState("");
@@ -157,10 +159,12 @@ function LinkManager({
     setError("");
     try {
       const units = parseAmount(amount).toString();
+      const details = description.trim().replace(/\r\n/g, "\n") || undefined;
       let request = approval.current;
       if (
         !request ||
         request.terms.title !== title.trim() ||
+        request.terms.description !== details ||
         request.terms.amount !== units ||
         request.terms.protectionSeconds !== protection ||
         Date.now() - request.terms.issuedAt > 540_000
@@ -172,6 +176,7 @@ function LinkManager({
             (b) => b.toString(16).padStart(2, "0"),
           ).join(""),
           title: title.trim(),
+          ...(details ? { description: details } : {}),
           amount: units,
           protectionSeconds: protection,
           issuedAt: Date.now(),
@@ -191,6 +196,7 @@ function LinkManager({
       if (!isCurrent(active)) return;
       approval.current = null;
       setTitle("");
+      setDescription("");
       setAmount("");
     } catch (error) {
       if (isCurrent(active))
@@ -274,6 +280,25 @@ function LinkManager({
             <NativeSelectOption value={86400}>1 day</NativeSelectOption>
             <NativeSelectOption value={604800}>7 days</NativeSelectOption>
           </NativeSelect>
+        </label>
+        <label className="[grid-column:1_/_-1]">
+          <span className="flex justify-between gap-[12px]">
+            Description (optional)
+            <span className="[font:10px_var(--mono)]">
+              {description.length}/500
+            </span>
+          </span>
+          <Textarea
+            maxLength={500}
+            value={description}
+            disabled={Boolean(busy)}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="What is the buyer paying for? Shown on the checkout page."
+            rows={3}
+            className={
+              "min-h-[72px] w-full min-w-0 resize-y rounded-[4px] [border:1px_solid_var(--line)] bg-card px-[12px] py-[11px] text-[13px] text-foreground shadow-none [font:inherit] focus-visible:border-primary"
+            }
+          />
         </label>
         <Button
           variant="brand"
@@ -391,6 +416,11 @@ function LinkManager({
                   {link.title}
                   <ArrowUpRight size={14} />
                 </a>
+                {link.description && (
+                  <span className="line-clamp-1 max-w-[420px] text-muted-foreground">
+                    {link.description}
+                  </span>
+                )}
                 <span>
                   {protectionLabel(link.protectionSeconds)} protection ·{" "}
                   {new Date(link._creationTime).toLocaleDateString()}
