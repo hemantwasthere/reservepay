@@ -7,6 +7,7 @@ import {
   Transaction,
   ComputeBudgetProgram,
   SYSVAR_CLOCK_PUBKEY,
+  type TransactionInstruction,
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -25,6 +26,69 @@ import type { Reservepay } from "../merchant/reservepay";
 import idl from "../merchant/reservepay.json";
 import { referenceBytes, validateTerms, type PaymentTerms } from "./terms";
 import { orderStatus } from "./order-status";
+
+// Byte offset of the 1-byte status enum inside a serialized Order account:
+// 8 discriminator + 32 merchant + 32 buyer + 32 buyer_token_account
+// + 16 reference + 4×8 (amount, reserve, created_at, expires_at).
+// Open = 0 (programs/reservepay/src/lib.rs).
+export const ORDER_STATUS_OFFSET = 152;
+
+export async function readChainTime(rpc: Connection): Promise<bigint> {
+  const clock = await rpc.getAccountInfo(SYSVAR_CLOCK_PUBKEY, "confirmed");
+  if (!clock) throw new Error("Could not read the Solana clock.");
+  return clock.data.readBigInt64LE(32);
+}
+
+// Shared by the resolver/merchant resolution flow (createAta: true, the
+// signer pays any rent) and the keeper (createAta: false, it never pays rent).
+export async function completeOrderInstructions(
+  rpc: Connection,
+  {
+    order,
+    merchantPda,
+    authority,
+    mint,
+    caller,
+    createAta,
+  }: {
+    order: PublicKey;
+    merchantPda: PublicKey;
+    authority: PublicKey;
+    mint: PublicKey;
+    caller: PublicKey;
+    createAta: boolean;
+  },
+): Promise<TransactionInstruction[]> {
+  const program = new Program<Reservepay>(idl as Reservepay, {
+    connection: rpc,
+  });
+  const merchantTokenAccount = getAssociatedTokenAddressSync(mint, authority);
+  const instructions: TransactionInstruction[] = [];
+  if (createAta)
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        caller,
+        merchantTokenAccount,
+        authority,
+        mint,
+      ),
+    );
+  instructions.push(
+    await program.methods
+      .completeOrder()
+      .accountsStrict({
+        protocol: protocolAddress(),
+        merchant: merchantPda,
+        order,
+        reserveVault: getAssociatedTokenAddressSync(mint, merchantPda, true),
+        merchantTokenAccount,
+        caller,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .instruction(),
+  );
+  return instructions;
+}
 
 export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
   const program = new Program<Reservepay>(idl as Reservepay, {
@@ -117,14 +181,7 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
           throw new Error(
             "Connect the merchant or resolver wallet to complete this order.",
           );
-        const clock = await rpc.getAccountInfo(
-          SYSVAR_CLOCK_PUBKEY,
-          "confirmed",
-        );
-        if (
-          !clock ||
-          clock.data.readBigInt64LE(32) < BigInt(state.expiresAt.toString())
-        )
+        if ((await readChainTime(rpc)) < BigInt(state.expiresAt.toString()))
           throw new Error(
             "Protection has not ended. Only the resolver can complete this order early.",
           );
@@ -163,26 +220,14 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
         );
       } else {
         transaction.add(
-          createAssociatedTokenAccountIdempotentInstruction(
-            signer,
-            merchantTokenAccount,
+          ...(await completeOrderInstructions(rpc, {
+            order,
+            merchantPda: merchant,
             authority,
             mint,
-          ),
-        );
-        transaction.add(
-          await program.methods
-            .completeOrder()
-            .accountsStrict({
-              protocol: protocolAddress(),
-              merchant,
-              order,
-              reserveVault,
-              merchantTokenAccount,
-              caller: signer,
-              tokenProgram: TOKEN_PROGRAM_ID,
-            })
-            .instruction(),
+            caller: signer,
+            createAta: true,
+          })),
         );
       }
       const lifetime = await rpc.getLatestBlockhash("confirmed");

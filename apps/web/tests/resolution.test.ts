@@ -7,9 +7,17 @@ import {
   SYSVAR_CLOCK_PUBKEY,
   SystemProgram,
 } from "@solana/web3.js";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import {
+  TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { PROGRAM_ID, protocolAddress } from "@reservepay/core";
-import { paymentClient } from "../src/payments/chain";
+import {
+  ORDER_STATUS_OFFSET,
+  paymentClient,
+  readChainTime,
+} from "../src/payments/chain";
 import { DEVNET_USDC } from "../src/merchant/client";
 import idl from "../src/merchant/reservepay.json";
 import type { Reservepay } from "../src/merchant/reservepay";
@@ -139,6 +147,73 @@ describe("order resolution transactions", () => {
     await expect(
       noFunds.client.prepareResolution(terms, resolver.publicKey, "refund"),
     ).rejects.toThrow("network fee");
+  });
+  it("keeps the shared complete-order builder byte-identical to the previous inline code", async () => {
+    const { client, rpc } = await setup({ now: 3700 });
+    const { transaction } = await client.prepareResolution(
+      terms,
+      merchant.publicKey,
+      "complete",
+    );
+    const {
+      authority,
+      merchant: merchantPda,
+      order,
+      reserveVault,
+      merchantTokenAccount,
+    } = client.addresses(terms);
+    const program = new Program<Reservepay>(idl as Reservepay, {
+      connection: rpc,
+    });
+    const expected = [
+      createAssociatedTokenAccountIdempotentInstruction(
+        merchant.publicKey,
+        merchantTokenAccount,
+        authority,
+        DEVNET_USDC,
+      ),
+      await program.methods
+        .completeOrder()
+        .accountsStrict({
+          protocol: protocolAddress(),
+          merchant: merchantPda,
+          order,
+          reserveVault,
+          merchantTokenAccount,
+          caller: merchant.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .instruction(),
+    ];
+    const shape = (instruction: (typeof expected)[number]) => ({
+      programId: instruction.programId.toBase58(),
+      keys: instruction.keys.map((key) => [
+        key.pubkey.toBase58(),
+        key.isSigner,
+        key.isWritable,
+      ]),
+      data: Buffer.from(instruction.data).toString("hex"),
+    });
+    expect(transaction.instructions.slice(2).map(shape)).toEqual(
+      expected.map(shape),
+    );
+  });
+  it("pins ORDER_STATUS_OFFSET against the Anchor coder", async () => {
+    const { rpc, state } = await setup();
+    const coder = new Program<Reservepay>(idl as Reservepay, {
+      connection: rpc,
+    }).coder.accounts;
+    const open = await coder.encode("order", state);
+    expect(open[ORDER_STATUS_OFFSET]).toBe(0);
+    const completed = await coder.encode("order", {
+      ...state,
+      status: { completed: {} } as never,
+    });
+    expect(completed[ORDER_STATUS_OFFSET]).toBe(1);
+  });
+  it("decodes the chain clock unix timestamp", async () => {
+    const { rpc } = await setup({ now: 1234 });
+    await expect(readChainTime(rpc)).resolves.toBe(1234n);
   });
   it("recovers saved transactions and refuses malformed journals", () => {
     const storage = new Map<string, string>();
