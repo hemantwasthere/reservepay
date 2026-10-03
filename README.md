@@ -31,18 +31,20 @@ Merchants can withdraw only the surplus above locked liability. Reserve checks, 
 
 ## What you can do today
 
-| Merchant                                        | Buyer                                                    | Resolver                                           |
-| ----------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------- |
-| Connect a Solana wallet and register a reserve  | Pay a single-use link with devnet USDC                   | Review pending refund requests                     |
-| Deposit collateral and withdraw available funds | View a receipt verified against finalized chain state    | Approve a full refund to the original buyer        |
-| Create links and follow payment history         | Submit a signed refund request before protection expires | Complete an open order, including before expiry    |
-| Complete orders after protection expires        | Follow the order’s final status from the same URL        | Approve every resolution with a wallet transaction |
+| Merchant                                            | Buyer                                                    | Resolver                                           |
+| --------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------- |
+| Sign in with a Solana wallet and register a reserve | Pay a single-use link with devnet USDC                   | Review pending refund requests                     |
+| Deposit collateral and withdraw available funds     | View a receipt verified against finalized chain state    | Approve a full refund to the original buyer        |
+| Create links and follow payment history             | Submit a signed refund request before protection expires | Complete an open order, including before expiry    |
+| Complete orders after protection expires            | Follow the order’s final status from the same URL        | Approve every resolution with a wallet transaction |
 
 The app also includes a collapsible sidebar, mobile navigation, wallet switching, and recovery for pending transactions after a reload or uncertain network response. Components use Tailwind CSS and locally customized shadcn primitives.
 
 ### Merchant workspace
 
-The overview separates total reserve, funds backing open orders, and funds available to withdraw. Payment links live on their own page.
+The overview separates total reserve, funds backing open orders, and funds available to withdraw, with an on-chain order list filtered by open, completed, or refunded status. Payment links live on their own page. Sign a wallet message to access your link history and merchant profile; this login does not transfer funds.
+
+At `/app/profile`, save a merchant name and website for buyers to see at checkout. Contact email and description stay private to your signed-in wallet. Sessions last up to seven days; disconnecting signs out and cancels any pending login.
 
 ![Merchant overview with reserve balances, setup steps, and collateral controls in the disconnected-wallet state](docs/images/overview.png)
 
@@ -50,7 +52,7 @@ _Live devnet UI, shown before connecting a wallet._
 
 ### Buyer checkout
 
-Each link shows the amount, merchant wallet, network, and protection period. After payment, the same URL becomes the receipt and the entry point for refund requests and order resolution.
+Each link shows the amount, merchant name (when configured), wallet, network, and protection period. After payment, the same URL becomes the receipt and the entry point for refund requests and order resolution.
 
 ![Buyer checkout for a sample 1.25 USDC design consultation on Solana devnet](docs/images/checkout.png)
 
@@ -80,7 +82,7 @@ flowchart LR
 ```
 
 - **Web app:** React, TypeScript, Vite, Tailwind CSS, and shadcn components.
-- **Application backend:** Convex stores approved link terms, verified receipts, and signed refund requests. It verifies signatures and chain state; it does not hold wallet keys.
+- **Application backend:** Convex stores merchant profiles, hashed session tokens, approved link terms, verified receipts, and signed refund requests. It verifies signatures and chain state; it does not hold wallet keys.
 - **Solana program:** Rust and Anchor enforce reserve coverage, payment splits, withdrawals, refunds, and completion.
 - **Shared core:** Settlement calculations, program addresses, and PDA derivation.
 - **Hosting:** Vercel serves the frontend. Convex functions and schema are deployed separately.
@@ -132,6 +134,14 @@ VITE_CONVEX_SITE_URL=https://your-deployment.convex.site
 
 `VITE_` values are public browser configuration. Keep secrets out of them. Local environment files are gitignored. Without `VITE_CONVEX_URL`, the frontend can render, but payment-link data and backend workflows are unavailable.
 
+Configure `SIGN_IN_SECRET` on the **Convex backend**, not in a `VITE_` variable. It must be a cryptographically random value of at least 32 characters. From `apps/web`, this generates a 32-byte secret and sends it to the selected development deployment without printing it:
+
+```bash
+openssl rand -hex 32 | bunx convex env set SIGN_IN_SECRET
+```
+
+For production, select the intended deployment with the Convex CLI's `--prod` option. Optional backend `SITE_ORIGIN` restricts sign-in to an exact origin such as `https://your-app.example.com` (no trailing slash). Without it, the hosted ReservePay domain and localhost are accepted. Keep an existing secret when redeploying; rotating it invalidates outstanding login challenges.
+
 ### Commands
 
 Run these from the repository root:
@@ -159,6 +169,8 @@ The Anchor integration suite additionally requires Rust, the Solana CLI/local va
 Vercel builds with `bun run build` and serves `apps/web/dist`. Configure `VITE_CONVEX_URL` for the intended backend before building. A frontend deployment does **not** deploy Convex changes or the Solana program.
 
 Deploy backend changes to the matching Convex deployment before enabling frontend code that depends on them. For a production Convex deployment, run `bun run deploy:backend` from `apps/web` with that deployment’s credentials. For a development deployment, use `bunx convex dev --once` there. Check the target deployment carefully; the hosted app still transacts on Solana **devnet**.
+
+The wallet-session rollout preserves `payments.list({ merchant })` for older browser tabs and uses `payments.listForSession({ session })` in the new app. The compatibility endpoint returns only the already-public link terms and receipts, never merchant profile fields. Deploy the additive backend first, verify both APIs and sign-in, then publish the frontend. See [the deployment checklist](docs/merchant-sessions.md).
 
 ## Current scope
 

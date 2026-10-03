@@ -44,8 +44,7 @@ export function MerchantSessionGate({
       signIn: async () => {
         notify({
           title: "Sign-in unavailable",
-          description:
-            "Payment service is not configured for this deployment.",
+          description: "Payment service is not configured for this deployment.",
           tone: "error",
         });
       },
@@ -77,7 +76,7 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
     address: string;
     token: string;
   } | null>(null);
-  const [busyAddress, setBusyAddress] = useState<string | null>(null);
+  const pendingAttempt = useRef<object | null>(null);
   const { notify } = useToast();
   const requestNonce = useAction(api.authActions.requestNonce);
   const signInAction = useAction(api.authActions.signIn);
@@ -99,6 +98,12 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
   // Track the connected wallet across in-flight sign-ins.
   const addressRef = useRef(address);
   addressRef.current = address;
+  useEffect(() => {
+    // Disconnect, wallet switches and unmounts cancel pending authentication.
+    return () => {
+      pendingAttempt.current = null;
+    };
+  }, [address]);
 
   const me = useQuery(api.auth.me, token ? { session: token } : "skip");
 
@@ -114,14 +119,15 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
     !address || !token ? "signed-out" : me ? "signed-in" : "checking";
 
   const signIn = useCallback(async () => {
-    // In-flight sign-ins are tracked per wallet, so switching wallets never
-    // blocks the newly connected wallet's own sign-in.
     if (!active || !address || !active.wallet.signMessage) return;
-    if (busyAddress === address) return;
-    setBusyAddress(address);
-    const stillConnected = () => addressRef.current === address;
+    if (pendingAttempt.current) return;
+    const attempt = {};
+    pendingAttempt.current = attempt;
+    const stillConnected = () =>
+      pendingAttempt.current === attempt && addressRef.current === address;
     try {
       const challenge = await requestNonce({ wallet: address });
+      if (!stillConnected()) return;
       const message = signInMessage({
         ...challenge,
         wallet: address,
@@ -142,16 +148,21 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
           });
         return;
       }
+      if (!stillConnected()) return;
       const session = await signInAction({
         ...challenge,
         wallet: address,
         domain: window.location.host,
         signature,
       });
-      // The session is stored under the signing wallet either way, but only
-      // becomes active if that wallet is still connected.
+      if (!stillConnected()) {
+        // A canceled request may still create a session on the server. Revoke
+        // it, and never persist its token or replace a newer sign-in.
+        await signOutMutation({ session: session.token }).catch(() => {});
+        return;
+      }
       rememberSession(address, session);
-      if (stillConnected()) setStored({ address, token: session.token });
+      setStored({ address, token: session.token });
     } catch (error) {
       if (stillConnected())
         notify({
@@ -165,20 +176,22 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
           tone: "error",
         });
     } finally {
-      setBusyAddress((current) => (current === address ? null : current));
+      if (pendingAttempt.current === attempt) pendingAttempt.current = null;
     }
-  }, [active, address, busyAddress, requestNonce, signInAction, notify]);
+  }, [active, address, requestNonce, signInAction, signOutMutation, notify]);
 
   const expire = useCallback(() => {
+    pendingAttempt.current = null;
     if (!address) return;
     rememberSession(address, null);
     setStored(null);
   }, [address]);
 
   const signOut = useCallback(async () => {
-    if (!address || !token) return;
-    rememberSession(address, null);
+    pendingAttempt.current = null;
+    if (address) rememberSession(address, null);
     setStored(null);
+    if (!token) return;
     try {
       await signOutMutation({ session: token });
     } catch {}

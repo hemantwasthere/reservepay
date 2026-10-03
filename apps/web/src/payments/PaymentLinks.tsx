@@ -131,7 +131,7 @@ function LinkManager({
   onPaid: () => void;
 }) {
   const links = useQuery(
-    api.payments.list,
+    api.payments.listForSession,
     session ? { session } : "skip",
   );
   const create = useAction(api.paymentActions.create);

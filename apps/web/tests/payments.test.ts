@@ -38,6 +38,23 @@ const approved = (value: PaymentTerms) => ({
 });
 
 describe("merchant-approved payment links", () => {
+  it("keeps the legacy public list usable while the new session API rolls out", async () => {
+    const t = convexTest(schema, modules);
+    const value = terms();
+    const id = await t.mutation(internal.payments.insert, value);
+    const oldClient = await t.query(api.payments.list, {
+      merchant: value.merchant,
+    });
+    expect(oldClient).toEqual([await t.query(api.payments.get, { id })]);
+    expect(
+      await t.query(api.payments.list, {
+        merchant: Keypair.generate().publicKey.toBase58(),
+      }),
+    ).toEqual([]);
+    await expect(
+      t.query(api.payments.listForSession, { session: "bad-token" }),
+    ).rejects.toThrow("Sign in again.");
+  });
   it("creates only with wallet approval and keeps exact retries idempotent", async () => {
     read.mockResolvedValue({ ready: true, registered: true });
     const t = convexTest(schema, modules),
@@ -45,7 +62,9 @@ describe("merchant-approved payment links", () => {
     const id = await t.action(api.paymentActions.create, request);
     expect(await t.action(api.paymentActions.create, request)).toBe(id);
     const { token } = await signIn(t, seller);
-    expect(await t.query(api.payments.list, { session: token })).toHaveLength(1);
+    expect(
+      await t.query(api.payments.listForSession, { session: token }),
+    ).toHaveLength(1);
     expect((await t.query(api.payments.get, { id }))?.receipt).toBeUndefined();
   });
   it("only lists links for the signed-in wallet", async () => {
@@ -54,12 +73,16 @@ describe("merchant-approved payment links", () => {
     await t.action(api.paymentActions.create, approved(terms()));
     const stranger = Keypair.generate();
     const { token } = await signIn(t, stranger);
-    expect(await t.query(api.payments.list, { session: token })).toHaveLength(0);
+    expect(
+      await t.query(api.payments.listForSession, { session: token }),
+    ).toHaveLength(0);
     await expect(
-      t.query(api.payments.list, { session: "ff".repeat(32) }),
+      t.query(api.payments.listForSession, { session: "ff".repeat(32) }),
     ).rejects.toThrow("Sign in again.");
     const { token: own } = await signIn(t, seller);
-    expect(await t.query(api.payments.list, { session: own })).toHaveLength(1);
+    expect(
+      await t.query(api.payments.listForSession, { session: own }),
+    ).toHaveLength(1);
   });
   it("rejects forged approvals, changed terms, and expired approvals", async () => {
     const t = convexTest(schema, modules),

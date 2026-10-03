@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { ArrowUpRight, ShieldAlert } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -71,8 +72,8 @@ export function ProtectedOrders({
           }
           role="alert"
         >
-          The open orders below do not add up to the locked reserve shown
-          above. Refresh in a moment; recent payments may still be confirming.
+          The open orders below do not add up to the locked reserve shown above.
+          Refresh in a moment; recent payments may still be confirming.
         </div>
       )}
       <div
@@ -83,14 +84,16 @@ export function ProtectedOrders({
         aria-label="Order status"
       >
         {tabs.map((item) => (
-          <button
+          <Button
+            variant="unstyled"
+            size="unstyled"
             key={item.key}
             type="button"
             aria-pressed={tab === item.key}
             onClick={() => setTab(item.key)}
           >
             {item.label}
-          </button>
+          </Button>
         ))}
       </div>
       {!orders ? (
@@ -127,7 +130,9 @@ export function ProtectedOrders({
               </span>
             </>
           ) : (
-            <span>No {tab === "completed" ? "completed" : "refunded"} orders.</span>
+            <span>
+              No {tab === "completed" ? "completed" : "refunded"} orders.
+            </span>
           )}
         </div>
       ) : (
@@ -148,12 +153,17 @@ export function ProtectedOrders({
                     "min-w-[0] flex flex-col gap-[5px] [&>strong]:text-[13px] [&>strong]:font-[500] [&>strong]:[overflow-wrap:anywhere] [&>span]:text-muted-foreground [&>span]:text-[10px] [&>span]:[font:10px_var(--mono)]"
                   }
                 >
-                  <strong>{titles[order.reference] ?? `Order · ${order.reference.slice(0, 8)}`}</strong>
+                  <strong>
+                    {titles[order.reference] ??
+                      `Order · ${order.reference.slice(0, 8)}`}
+                  </strong>
                   <span>Buyer {short(order.buyer)}</span>
                 </div>
                 <div className={"[font:12px_var(--mono)] whitespace-nowrap"}>
                   {exactAmount(order.amount)}{" "}
-                  <span className={"text-muted-foreground text-[9px]"}>USDC</span>
+                  <span className={"text-muted-foreground text-[9px]"}>
+                    USDC
+                  </span>
                 </div>
                 <div
                   className={

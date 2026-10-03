@@ -142,14 +142,14 @@ describe("wallet sign-in", () => {
         .unique();
       if (row) await ctx.db.patch(row._id, { expiresAt: Date.now() - 1 });
     });
-    await expect(t.query(api.payments.list, { session: token })).rejects.toThrow(
+    await expect(t.query(api.payments.listForSession, { session: token })).rejects.toThrow(
       "Sign in again.",
     );
     const fresh = await signIn(t, seller);
     await t.mutation(api.auth.signOut, { session: fresh.token });
     expect(await t.query(api.auth.me, { session: fresh.token })).toBeNull();
     await expect(
-      t.query(api.payments.list, { session: fresh.token }),
+      t.query(api.payments.listForSession, { session: fresh.token }),
     ).rejects.toThrow("Sign in again.");
   });
   it("issues nonces without writing anything or locking anyone out", async () => {

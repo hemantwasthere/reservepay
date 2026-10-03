@@ -5,6 +5,7 @@ import { Store, LoaderCircle, Check } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { api } from "../../convex/_generated/api";
 import type { WalletConnection } from "../lib/WalletControl";
@@ -181,7 +182,7 @@ function ProfileForm({
             void submit();
           }}
         >
-          <Label>
+          <Label className="items-start">
             Display name
             <Input
               required
@@ -194,8 +195,10 @@ function ProfileForm({
               autoComplete="organization"
             />
           </Label>
-          <Label>
-            Website <span className={"text-[10px]"}>optional · public</span>
+          <Label className="items-start">
+            <span>
+              Website <span className="text-[10px]">optional · public</span>
+            </span>
             <Input
               type="url"
               maxLength={200}
@@ -206,8 +209,11 @@ function ProfileForm({
               autoComplete="url"
             />
           </Label>
-          <Label>
-            Contact email <span className={"text-[10px]"}>optional · private</span>
+          <Label className="items-start">
+            <span>
+              Contact email{" "}
+              <span className="text-[10px]">optional · private</span>
+            </span>
             <Input
               type="email"
               maxLength={120}
@@ -218,9 +224,12 @@ function ProfileForm({
               autoComplete="email"
             />
           </Label>
-          <Label>
-            Description <span className={"text-[10px]"}>optional</span>
-            <textarea
+          <Label className="items-start">
+            <span>
+              Description{" "}
+              <span className="text-[10px]">optional · private</span>
+            </span>
+            <Textarea
               rows={3}
               maxLength={280}
               value={description}

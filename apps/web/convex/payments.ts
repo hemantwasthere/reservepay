@@ -13,7 +13,19 @@ export const get = query({
     return key ? ctx.db.get(key) : null;
   },
 });
+// Compatibility for already-open clients from before wallet sessions. Link
+// terms and receipts remain public (also available through get/refundQueue).
+// Keep this separate from the authenticated API; never add profile data here.
 export const list = query({
+  args: { merchant: v.string() },
+  handler: (ctx, { merchant }) =>
+    ctx.db
+      .query("paymentLinks")
+      .withIndex("by_merchant", (q) => q.eq("merchant", merchant))
+      .order("desc")
+      .take(50),
+});
+export const listForSession = query({
   args: { session: v.string() },
   handler: async (ctx, { session }) => {
     const merchant = await requireMerchant(ctx, session);

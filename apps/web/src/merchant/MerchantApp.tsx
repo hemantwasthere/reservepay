@@ -1235,7 +1235,7 @@ function MerchantWorkspace({
 
 type SessionData = {
   profile: FunctionReturnType<typeof api.merchants.me> | undefined;
-  links: FunctionReturnType<typeof api.payments.list> | undefined;
+  links: FunctionReturnType<typeof api.payments.listForSession> | undefined;
 };
 
 // Runs the session-gated queries as a leaf component so the error boundary
@@ -1248,7 +1248,7 @@ function SessionQueries({
   onData: (data: SessionData) => void;
 }) {
   const profile = useQuery(api.merchants.me, { session: token });
-  const links = useQuery(api.payments.list, { session: token });
+  const links = useQuery(api.payments.listForSession, { session: token });
   useEffect(() => {
     onData({ profile, links });
   }, [profile, links, onData]);
