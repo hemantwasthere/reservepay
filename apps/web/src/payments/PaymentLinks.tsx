@@ -140,7 +140,7 @@ function LinkManager({
     status,
     loadMore,
   } = usePaginatedQuery(
-    api.payments.listForSession,
+    api.payments.listForSessionPaginated,
     session ? { session } : "skip",
     { initialNumItems: 20 },
   );

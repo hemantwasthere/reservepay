@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -58,12 +59,43 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
   }, [theme, ready]);
-  const setTheme = (next: Theme) => {
+  const setTheme = useCallback((next: Theme) => {
     updateTheme(next);
     try {
       localStorage.setItem(key, next);
     } catch {}
-  };
+  }, []);
+  useEffect(() => {
+    // One listener at the provider keeps hidden, mounted pages from cycling twice.
+    const cycleTheme = (event: KeyboardEvent) => {
+      if (
+        !ready ||
+        event.code !== "KeyT" ||
+        !event.altKey ||
+        !event.shiftKey ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.repeat ||
+        event.isComposing ||
+        event.defaultPrevented ||
+        document.querySelector('[role="dialog"][data-state="open"]') ||
+        (event.target instanceof Element &&
+          event.target.closest(
+            'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="dialog"]',
+          ))
+      )
+        return;
+      try {
+        if (localStorage.getItem("reservepay.shortcuts") === "off") return;
+      } catch {}
+      event.preventDefault();
+      setTheme(
+        theme === "system" ? "light" : theme === "light" ? "dark" : "system",
+      );
+    };
+    window.addEventListener("keydown", cycleTheme);
+    return () => window.removeEventListener("keydown", cycleTheme);
+  }, [ready, theme, setTheme]);
   return (
     <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
       {children}
@@ -83,7 +115,8 @@ export function ThemeControl() {
           size="icon"
           className="size-8 shrink-0 text-muted-foreground"
           aria-label={`Appearance: ${theme}`}
-          title="Appearance"
+          title="Appearance (Alt + Shift + T)"
+          aria-keyshortcuts="Alt+Shift+T"
         >
           <Icon className="size-4" />
         </Button>
@@ -123,6 +156,9 @@ export function ThemeControl() {
             </Button>
           ))}
         </div>
+        <p className="mt-1 border-t border-border px-2 pt-2 pb-1 text-[9px] text-muted-foreground">
+          Alt + Shift + T to cycle
+        </p>
       </PopoverContent>
     </Popover>
   );

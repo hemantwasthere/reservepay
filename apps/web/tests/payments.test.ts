@@ -52,7 +52,7 @@ describe("merchant-approved payment links", () => {
       }),
     ).toEqual([]);
     await expect(
-      t.query(api.payments.listForSession, {
+      t.query(api.payments.listForSessionPaginated, {
         session: "bad-token",
         paginationOpts: { numItems: 20, cursor: null },
       }),
@@ -67,7 +67,7 @@ describe("merchant-approved payment links", () => {
     const { token } = await signIn(t, seller);
     expect(
       (
-        await t.query(api.payments.listForSession, {
+        await t.query(api.payments.listForSessionPaginated, {
           session: token,
           paginationOpts: { numItems: 20, cursor: null },
         })
@@ -83,14 +83,14 @@ describe("merchant-approved payment links", () => {
     const { token } = await signIn(t, stranger);
     expect(
       (
-        await t.query(api.payments.listForSession, {
+        await t.query(api.payments.listForSessionPaginated, {
           session: token,
           paginationOpts: { numItems: 20, cursor: null },
         })
       ).page,
     ).toHaveLength(0);
     await expect(
-      t.query(api.payments.listForSession, {
+      t.query(api.payments.listForSessionPaginated, {
         session: "ff".repeat(32),
         paginationOpts: { numItems: 20, cursor: null },
       }),
@@ -98,7 +98,7 @@ describe("merchant-approved payment links", () => {
     const { token: own } = await signIn(t, seller);
     expect(
       (
-        await t.query(api.payments.listForSession, {
+        await t.query(api.payments.listForSessionPaginated, {
           session: own,
           paginationOpts: { numItems: 20, cursor: null },
         })
@@ -281,7 +281,9 @@ describe("payment link descriptions", () => {
     const t = convexTest(schema, modules),
       request = approved(terms());
     const id = await t.action(api.paymentActions.create, request);
-    expect((await t.query(api.payments.get, { id }))?.description).toBeUndefined();
+    expect(
+      (await t.query(api.payments.get, { id }))?.description,
+    ).toBeUndefined();
   });
   it("validates description length, control characters and empty values", () => {
     expect(() =>
@@ -295,7 +297,9 @@ describe("payment link descriptions", () => {
     ).toThrow();
     expect(() => validateTerms({ ...terms(), description: "" })).toThrow();
     expect(() => validateTerms({ ...terms(), description: "  " })).toThrow();
-    expect(() => validateTerms({ ...terms(), description: " padded " })).toThrow();
+    expect(() =>
+      validateTerms({ ...terms(), description: " padded " }),
+    ).toThrow();
     expect(() =>
       validateTerms({ ...terms(), description: "line one\nline two" }),
     ).not.toThrow();
@@ -377,7 +381,9 @@ describe("deactivating payment links", () => {
     await expect(
       t.action(api.paymentActions.deactivate, { session: token, id }),
     ).rejects.toThrow();
-    expect((await t.query(api.payments.get, { id }))?.deactivatedAt).toBeUndefined();
+    expect(
+      (await t.query(api.payments.get, { id }))?.deactivatedAt,
+    ).toBeUndefined();
   });
   it("authorizes before reading the chain", async () => {
     const t = convexTest(schema, modules);
@@ -429,13 +435,13 @@ describe("paginated link history", () => {
       await t.run((ctx) => ctx.db.insert("paymentLinks", value));
     }
     const { token } = await signIn(t, seller);
-    const first = await t.query(api.payments.listForSession, {
+    const first = await t.query(api.payments.listForSessionPaginated, {
       session: token,
       paginationOpts: { numItems: 20, cursor: null },
     });
     expect(first.page).toHaveLength(20);
     expect(first.isDone).toBe(false);
-    const rest = await t.query(api.payments.listForSession, {
+    const rest = await t.query(api.payments.listForSessionPaginated, {
       session: token,
       paginationOpts: { numItems: 20, cursor: first.continueCursor },
     });
@@ -489,5 +495,85 @@ describe("titles for protected orders", () => {
         references: [],
       }),
     ).rejects.toThrow("Sign in again.");
+  });
+});
+
+describe("payment-link deployment compatibility", () => {
+  it("keeps session-only callers working alongside pagination, with the same ownership rules", async () => {
+    const t = convexTest(schema, modules);
+    const ids = [];
+    for (let index = 0; index < 55; index++)
+      ids.push(await t.run((ctx) => ctx.db.insert("paymentLinks", terms())));
+    await t.run((ctx) =>
+      ctx.db.insert("paymentLinks", {
+        ...terms(),
+        merchant: Keypair.generate().publicKey.toBase58(),
+      }),
+    );
+    const { token } = await signIn(t, seller);
+    const legacy = await t.query(api.payments.listForSession, {
+      session: token,
+    });
+    expect(legacy.map((link) => link._id)).toEqual(ids.slice(-50).reverse());
+    const paginated = await t.query(api.payments.listForSessionPaginated, {
+      session: token,
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(paginated.page).toEqual(legacy.slice(0, 20));
+    expect(paginated.isDone).toBe(false);
+    const stranger = await signIn(t, Keypair.generate());
+    expect(
+      await t.query(api.payments.listForSession, { session: stranger.token }),
+    ).toEqual([]);
+    await expect(
+      t.query(api.payments.listForSession, { session: "invalid" }),
+    ).rejects.toThrow("Sign in again.");
+    await t.mutation(api.auth.signOut, { session: token });
+    await expect(
+      t.query(api.payments.listForSession, { session: token }),
+    ).rejects.toThrow("Sign in again.");
+  });
+});
+
+describe("server checkout preflight", () => {
+  it("reads the latest state even when the buyer previously read an active link", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    const cached = await t.query(api.payments.get, { id });
+    await expect(
+      t.action(api.paymentActions.requirePayable, { id }),
+    ).resolves.toBeNull();
+    await t.run((ctx) => ctx.db.patch(id, { deactivatedAt: Date.now() }));
+    expect(cached?.deactivatedAt).toBeUndefined();
+    await expect(
+      t.action(api.paymentActions.requirePayable, { id }),
+    ).rejects.toThrow("no longer active");
+    await t.run((ctx) => ctx.db.patch(id, { deactivatedAt: undefined }));
+    await expect(
+      t.action(api.paymentActions.requirePayable, { id }),
+    ).resolves.toBeNull();
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: {
+        order: "order",
+        buyer: "buyer",
+        reserveAmount: "50000",
+        createdAt: 1000,
+        expiresAt: 86401000,
+        status: "paid",
+      },
+    });
+    await expect(
+      t.action(api.paymentActions.requirePayable, { id }),
+    ).rejects.toThrow("already been paid");
+  });
+  it("rejects missing or malformed link IDs", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    await t.run((ctx) => ctx.db.delete(id));
+    for (const missing of [id, "invalid"])
+      await expect(
+        t.action(api.paymentActions.requirePayable, { id: missing }),
+      ).rejects.toThrow("no longer active");
   });
 });

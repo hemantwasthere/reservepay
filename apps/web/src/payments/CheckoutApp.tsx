@@ -5,7 +5,7 @@ import { OrderActions } from "./OrderActions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAction, useConvex, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { PublicKey } from "@solana/web3.js";
 import {
   ArrowUpRight,
@@ -219,7 +219,7 @@ function Checkout({
   isCurrent: (value: WalletConnection) => boolean;
 }) {
   const link = useQuery(api.payments.get, { id });
-  const convex = useConvex();
+  const requirePayable = useAction(api.paymentActions.requirePayable);
   const merchantProfile = useQuery(
     api.merchants.publicProfile,
     link ? { wallet: link.merchant } : "skip",
@@ -332,22 +332,13 @@ function Checkout({
     // Tracks how far the payment got so an error marks the step that
     // actually failed instead of always marking Review.
     let stage: "review" | "approve" | "send" = "review";
-    // Re-read the link: a tab loaded before the merchant deactivated or
-    // the link was paid must not pay. The live query usually wins this
-    // race; re-checking closes the rest of it.
-    const requirePayable = async () => {
-      const fresh = await convex.query(api.payments.get, { id });
-      if (!fresh || fresh.deactivatedAt)
-        throw new Error("This payment link is no longer active.");
-      if (fresh.receipt) throw new Error("This link has already been paid.");
-    };
     const execute = async () => {
       const saved = loadPayment(id);
       if (saved) {
         setPending(saved);
         throw new Error("This payment is already awaiting confirmation.");
       }
-      await requirePayable();
+      await requirePayable({ id });
       const prepared = await paymentClient(connection).prepare(
         link,
         new PublicKey(wallet.account.address),
@@ -375,9 +366,12 @@ function Checkout({
       if (!isCurrent(wallet))
         throw new Error("Wallet changed. Nothing was submitted.");
       const signed = validateSignedTransaction(prepared.transaction, bytes);
-      // The wallet prompt can stay open for minutes; check again before
-      // anything is persisted or sent.
-      await requirePayable();
+      // Always round-trip to the server after wallet approval. A subscribed
+      // query may still cache an active link after the merchant deactivates it.
+      // If the server is unavailable, nothing is persisted or sent.
+      await requirePayable({ id });
+      if (!isCurrent(wallet))
+        throw new Error("Wallet changed. Nothing was submitted.");
       const record = {
         signature: signed.signature,
         lastValidBlockHeight: prepared.lastValidBlockHeight,
@@ -581,7 +575,9 @@ function Checkout({
           role="status"
         >
           <strong>This payment link is no longer active.</strong>
-          <span>Contact the merchant for a new link. No payment was taken.</span>
+          <span>
+            Contact the merchant for a new link. No payment was taken.
+          </span>
         </div>
       ) : (
         <>

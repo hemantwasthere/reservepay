@@ -58,6 +58,18 @@ export const create = action({
     }
   },
 });
+// Actions always execute on the server; a React query can return cached data.
+// This is a preflight check, not an on-chain cancellation of signed payments.
+export const requirePayable = action({
+  args: { id: v.string() },
+  handler: async (ctx, { id }): Promise<void> => {
+    const link = await ctx.runQuery(api.payments.get, { id });
+    if (!link || link.deactivatedAt)
+      throw new ConvexError("This payment link is no longer active.");
+    if (link.receipt) throw new ConvexError("This link has already been paid.");
+  },
+});
+
 export const sync = action({
   args: { id: v.string() },
   handler: async (ctx, { id }): Promise<boolean> => {
