@@ -46,6 +46,7 @@ import {
   type CheckoutPhase,
 } from "./checkout-phase";
 import { isWalletRejection, WalletRejected } from "../lib/wallets";
+import { nextDelay } from "../lib/backoff";
 
 // Declining the wallet prompt is a normal choice, so it gets its own
 // phase instead of the generic error path.
@@ -289,9 +290,26 @@ function Checkout({
   useEffect(() => {
     if (!link || (link.receipt && link.receipt.status !== "paid")) return;
     let stopped = false,
-      running = false;
+      running = false,
+      failures = 0,
+      timer: number | undefined;
+    // A receipt already exists and only its resolution is pending, so it can
+    // poll more slowly than an unpaid checkout.
+    const base = link.receipt ? 30_000 : 10_000,
+      max = link.receipt ? 120_000 : 60_000;
+    // The single owner of the timer: there is never more than one pending.
+    const schedule = () => {
+      if (stopped) return;
+      clearTimeout(timer);
+      timer = window.setTimeout(check, nextDelay(failures, base, max));
+    };
     const check = async () => {
-      if (running || document.hidden) return;
+      if (running) return;
+      // A hidden tab skips this round but must not end the chain.
+      if (document.hidden) {
+        schedule();
+        return;
+      }
       running = true;
       try {
         const verified = await sync({ id });
@@ -311,20 +329,38 @@ function Checkout({
               kind: result === "confirmed" ? "verifying" : "confirming",
             });
         }
+        failures = 0;
       } catch {
+        // Only real check failures back off; skips and the running guard's
+        // early returns are not failures.
+        failures += 1;
         // Only a pending payment depends on these checks. Without one a
         // failed check must not disable Pay or overwrite states like
         // rejected; with one, the next successful check moves the phase on.
         if (!stopped && pending) setPhase({ kind: "unavailable" });
       } finally {
         running = false;
+        schedule();
       }
     };
+    // Back online or visible again: check now instead of waiting out the
+    // backoff, unless a check is already running.
+    const wake = () => {
+      if (running || stopped) return;
+      clearTimeout(timer);
+      void check();
+    };
+    const onVisible = () => {
+      if (!document.hidden) wake();
+    };
+    window.addEventListener("online", wake);
+    document.addEventListener("visibilitychange", onVisible);
     void check();
-    const timer = window.setInterval(check, link.receipt ? 30_000 : 10_000);
     return () => {
       stopped = true;
-      clearInterval(timer);
+      clearTimeout(timer);
+      window.removeEventListener("online", wake);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [id, Boolean(link), link?.receipt?.status, pending, sync]);
   useEffect(() => {
