@@ -26,6 +26,9 @@ describe("reservepay", () => {
   const workspaceProgram = anchor.workspace
     .Reservepay as anchor.Program<Reservepay>;
   const payer = (provider.wallet as anchor.Wallet & { payer: Keypair }).payer;
+  // The resolver is a separate wallet: with payer as merchant authority and
+  // resolver, a regression letting the merchant resolve disputes would pass.
+  const resolver = Keypair.generate();
   const buyer = Keypair.generate();
   let mint: PublicKey;
   let merchant: PublicKey;
@@ -34,11 +37,13 @@ describe("reservepay", () => {
   let buyerTokenAccount: PublicKey;
 
   before(async () => {
-    const signature = await provider.connection.requestAirdrop(
-      buyer.publicKey,
-      2 * LAMPORTS_PER_SOL,
-    );
-    await provider.connection.confirmTransaction(signature, "confirmed");
+    for (const wallet of [buyer.publicKey, resolver.publicKey]) {
+      const signature = await provider.connection.requestAirdrop(
+        wallet,
+        2 * LAMPORTS_PER_SOL,
+      );
+      await provider.connection.confirmTransaction(signature, "confirmed");
+    }
     mint = await createMint(
       provider.connection,
       payer,
@@ -92,7 +97,7 @@ describe("reservepay", () => {
     )[0];
 
     await workspaceProgram.methods
-      .initializeProtocol(payer.publicKey, 500)
+      .initializeProtocol(resolver.publicKey, 500)
       .accountsStrict({
         protocol,
         authority: payer.publicKey,
@@ -197,9 +202,10 @@ describe("reservepay", () => {
         order,
         reserveVault,
         buyerTokenAccount,
-        resolver: payer.publicKey,
+        resolver: resolver.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
+      .signers([resolver])
       .rpc();
 
     const buyerAfterRefund = await getAccount(
@@ -247,9 +253,10 @@ describe("reservepay", () => {
         order,
         reserveVault,
         merchantTokenAccount,
-        caller: payer.publicKey,
+        caller: resolver.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
+      .signers([resolver])
       .rpc();
 
     await workspaceProgram.methods
@@ -442,8 +449,9 @@ describe("reservepay", () => {
     }
     const transact = async (
       prepared: Awaited<ReturnType<typeof client.prepareResolution>>,
+      signer: Keypair = payer,
     ) => {
-      prepared.transaction.sign(payer);
+      prepared.transaction.sign(signer);
       const signature = await provider.connection.sendRawTransaction(
         prepared.transaction.serialize(),
       );
@@ -458,7 +466,8 @@ describe("reservepay", () => {
       expect(result.value.err).to.equal(null);
     };
     await transact(
-      await client.prepareResolution(terms, payer.publicKey, "refund"),
+      await client.prepareResolution(terms, resolver.publicKey, "refund"),
+      resolver,
     );
     const after = await merchantClient(provider.connection, mint).read(
       buyer.publicKey,
@@ -488,7 +497,8 @@ describe("reservepay", () => {
       mint,
     ).read(buyer.publicKey);
     await transact(
-      await client.prepareResolution(clean, payer.publicKey, "complete"),
+      await client.prepareResolution(clean, resolver.publicKey, "complete"),
+      resolver,
     );
     const completed = await merchantClient(provider.connection, mint).read(
       buyer.publicKey,
@@ -504,5 +514,302 @@ describe("reservepay", () => {
     expect((await client.readOrder(clean, "confirmed"))?.status).to.equal(
       "completed",
     );
+  });
+  it("flags an order as disputed when the buyer requests a refund", async () => {
+    const protocol = PublicKey.findProgramAddressSync(
+      [Buffer.from("protocol")],
+      workspaceProgram.programId,
+    )[0];
+    // The earlier tests drained the vault; top it up for the dispute orders.
+    await workspaceProgram.methods
+      .fundReserve(new anchor.BN(100_000_000))
+      .accountsStrict({
+        merchant,
+        source: merchantTokenAccount,
+        reserveVault,
+        authority: payer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const reference = Array.from(Buffer.from("dispute-order-01"));
+    const order = PublicKey.findProgramAddressSync(
+      [Buffer.from("order"), merchant.toBuffer(), Buffer.from(reference)],
+      workspaceProgram.programId,
+    )[0];
+    await workspaceProgram.methods
+      .createOrder(reference, new anchor.BN(10_000_000), new anchor.BN(3_600))
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        buyerTokenAccount,
+        merchantTokenAccount,
+        reserveVault,
+        mint,
+        buyer: buyer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([buyer])
+      .rpc();
+
+    let disputedEvent: {
+      order: PublicKey;
+      merchant: PublicKey;
+      buyer: PublicKey;
+      disputedAt: anchor.BN;
+    } | null = null;
+    const listener = await workspaceProgram.addEventListener(
+      "orderDisputed",
+      (event) => {
+        disputedEvent = event;
+      },
+    );
+    const signature = await workspaceProgram.methods
+      .requestRefund()
+      .accountsStrict({ order, buyer: buyer.publicKey })
+      .signers([buyer])
+      .rpc();
+    await provider.connection.confirmTransaction(signature, "confirmed");
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await workspaceProgram.removeEventListener(listener);
+
+    const orderState = await workspaceProgram.account.order.fetch(order);
+    expect(orderState.status).to.deep.equal({ disputed: {} });
+    expect(disputedEvent).to.not.equal(null);
+    expect(disputedEvent!.order.toBase58()).to.equal(order.toBase58());
+    expect(disputedEvent!.merchant.toBase58()).to.equal(merchant.toBase58());
+    expect(disputedEvent!.buyer.toBase58()).to.equal(
+      buyer.publicKey.toBase58(),
+    );
+    expect(disputedEvent!.disputedAt.toNumber()).to.be.greaterThan(0);
+  });
+
+  it("rejects duplicate, late and non-buyer disputes", async () => {
+    const protocol = PublicKey.findProgramAddressSync(
+      [Buffer.from("protocol")],
+      workspaceProgram.programId,
+    )[0];
+    const disputedOrder = PublicKey.findProgramAddressSync(
+      [Buffer.from("order"), merchant.toBuffer(), Buffer.from("dispute-order-01")],
+      workspaceProgram.programId,
+    )[0];
+
+    const expectProgramError = async (
+      call: Promise<string>,
+      code: string,
+    ) => {
+      let message: string | null = null;
+      try {
+        await call;
+      } catch (error) {
+        message = String(error);
+      }
+      expect(message, `expected ${code}`).to.not.equal(null);
+      expect(message!).to.include(code);
+    };
+
+    // A second dispute on the same order is no longer Open.
+    await expectProgramError(
+      workspaceProgram.methods
+        .requestRefund()
+        .accountsStrict({ order: disputedOrder, buyer: buyer.publicKey })
+        .signers([buyer])
+        .rpc(),
+      "OrderClosed",
+    );
+    // Only the buyer can dispute their order.
+    await expectProgramError(
+      workspaceProgram.methods
+        .requestRefund()
+        .accountsStrict({ order: disputedOrder, buyer: payer.publicKey })
+        .rpc(),
+      "ConstraintHasOne",
+    );
+
+    // A dispute raised after the protection window ends is rejected.
+    const reference = Array.from(Buffer.from("dispute-late-001"));
+    const order = PublicKey.findProgramAddressSync(
+      [Buffer.from("order"), merchant.toBuffer(), Buffer.from(reference)],
+      workspaceProgram.programId,
+    )[0];
+    await workspaceProgram.methods
+      .createOrder(reference, new anchor.BN(10_000_000), new anchor.BN(1))
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        buyerTokenAccount,
+        merchantTokenAccount,
+        reserveVault,
+        mint,
+        buyer: buyer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([buyer])
+      .rpc();
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    await expectProgramError(
+      workspaceProgram.methods
+        .requestRefund()
+        .accountsStrict({ order, buyer: buyer.publicKey })
+        .signers([buyer])
+        .rpc(),
+      "DisputeWindowClosed",
+    );
+  });
+
+  it("blocks non-resolver completion of a disputed order and lets the resolver complete it", async () => {
+    const protocol = PublicKey.findProgramAddressSync(
+      [Buffer.from("protocol")],
+      workspaceProgram.programId,
+    )[0];
+    const reference = Array.from(Buffer.from("dispute-order-02"));
+    const order = PublicKey.findProgramAddressSync(
+      [Buffer.from("order"), merchant.toBuffer(), Buffer.from(reference)],
+      workspaceProgram.programId,
+    )[0];
+    // Three-second window: the dispute must land before expiry, the
+    // completion attempts after it.
+    await workspaceProgram.methods
+      .createOrder(reference, new anchor.BN(10_000_000), new anchor.BN(3))
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        buyerTokenAccount,
+        merchantTokenAccount,
+        reserveVault,
+        mint,
+        buyer: buyer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([buyer])
+      .rpc();
+    await workspaceProgram.methods
+      .requestRefund()
+      .accountsStrict({ order, buyer: buyer.publicKey })
+      .signers([buyer])
+      .rpc();
+    await new Promise((resolve) => setTimeout(resolve, 3_500));
+
+    // Even after expiry, neither a stranger nor the merchant authority
+    // (payer) can complete it — only the resolver can.
+    for (const caller of [buyer, payer]) {
+      let message: string | null = null;
+      try {
+        await workspaceProgram.methods
+          .completeOrder()
+          .accountsStrict({
+            protocol,
+            merchant,
+            order,
+            reserveVault,
+            merchantTokenAccount,
+            caller: caller.publicKey,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .signers([caller])
+          .rpc();
+      } catch (error) {
+        message = String(error);
+      }
+      expect(message).to.not.equal(null);
+      expect(message!).to.include("OrderUnderDispute");
+    }
+
+    const before = await workspaceProgram.account.merchant.fetch(merchant);
+    await workspaceProgram.methods
+      .completeOrder()
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        reserveVault,
+        merchantTokenAccount,
+        caller: resolver.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([resolver])
+      .rpc();
+    const after = await workspaceProgram.account.merchant.fetch(merchant);
+    const orderState = await workspaceProgram.account.order.fetch(order);
+    expect(orderState.status).to.deep.equal({ completed: {} });
+    expect(
+      before.lockedLiability.sub(after.lockedLiability).toNumber(),
+    ).to.equal(10_000_000);
+    expect(after.totalVolume.sub(before.totalVolume).toNumber()).to.equal(
+      10_000_000,
+    );
+    expect(
+      after.completedOrders.sub(before.completedOrders).toNumber(),
+    ).to.equal(1);
+  });
+
+  it("lets the resolver refund a disputed order in full", async () => {
+    const protocol = PublicKey.findProgramAddressSync(
+      [Buffer.from("protocol")],
+      workspaceProgram.programId,
+    )[0];
+    const reference = Array.from(Buffer.from("dispute-order-03"));
+    const order = PublicKey.findProgramAddressSync(
+      [Buffer.from("order"), merchant.toBuffer(), Buffer.from(reference)],
+      workspaceProgram.programId,
+    )[0];
+    await workspaceProgram.methods
+      .createOrder(reference, new anchor.BN(10_000_000), new anchor.BN(3_600))
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        buyerTokenAccount,
+        merchantTokenAccount,
+        reserveVault,
+        mint,
+        buyer: buyer.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([buyer])
+      .rpc();
+    await workspaceProgram.methods
+      .requestRefund()
+      .accountsStrict({ order, buyer: buyer.publicKey })
+      .signers([buyer])
+      .rpc();
+
+    const merchantBefore = await workspaceProgram.account.merchant.fetch(
+      merchant,
+    );
+    const buyerBefore = await getAccount(provider.connection, buyerTokenAccount);
+    await workspaceProgram.methods
+      .refundOrder()
+      .accountsStrict({
+        protocol,
+        merchant,
+        order,
+        reserveVault,
+        buyerTokenAccount,
+        resolver: resolver.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([resolver])
+      .rpc();
+    const merchantAfter = await workspaceProgram.account.merchant.fetch(
+      merchant,
+    );
+    const buyerAfter = await getAccount(provider.connection, buyerTokenAccount);
+    const orderState = await workspaceProgram.account.order.fetch(order);
+    expect(orderState.status).to.deep.equal({ refunded: {} });
+    expect(buyerAfter.amount - buyerBefore.amount).to.equal(10_000_000n);
+    expect(
+      merchantBefore.lockedLiability.sub(merchantAfter.lockedLiability).toNumber(),
+    ).to.equal(10_000_000);
+    expect(
+      merchantAfter.refundedOrders.sub(merchantBefore.refundedOrders).toNumber(),
+    ).to.equal(1);
   });
 });
