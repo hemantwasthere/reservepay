@@ -5,6 +5,13 @@ import { createRoot, type Root } from "react-dom/client";
 import { useSiteNavigation } from "../src/merchant/workspace-navigation";
 let root: Root, container: HTMLDivElement;
 let mounts = 0;
+let frames: Map<number, FrameRequestCallback>;
+const flushFrames = async () =>
+  act(async () => {
+    const pending = [...frames.values()];
+    frames.clear();
+    pending.forEach((frame) => frame(0));
+  });
 function Probe() {
   const page = useSiteNavigation("overview");
   const [draft, setDraft] = useState("");
@@ -37,6 +44,13 @@ beforeEach(async () => {
   window.history.replaceState(null, "", "/app");
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   mounts = 0;
+  frames = new Map();
+  let nextFrame = 0;
+  vi.stubGlobal("requestAnimationFrame", (frame: FrameRequestCallback) => {
+    frames.set(++nextFrame, frame);
+    return nextFrame;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -46,6 +60,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 it("navigates and handles back/forward without remounting or losing form state", async () => {
   const input = container.querySelector("input")!;
@@ -137,4 +152,32 @@ it("keeps the running workspace and draft through landing visits and history", a
   expect(container.querySelector("#page")?.textContent).toBe("profile");
   expect(input.value).toBe("Keep this draft");
   expect(mounts).toBe(1);
+});
+
+it("does not steal focus on initial load, but focuses main after route navigation", async () => {
+  await flushFrames();
+  expect(document.activeElement).not.toBe(container.querySelector("main"));
+  expect(window.scrollTo).not.toHaveBeenCalled();
+  await act(async () =>
+    container.querySelector<HTMLAnchorElement>("#payments")!.click(),
+  );
+  await flushFrames();
+  expect(document.activeElement).toBe(container.querySelector("main"));
+});
+
+it("focuses a lazily mounted workspace after navigation", async () => {
+  container.querySelector("main")!.removeAttribute("id");
+  await act(async () =>
+    container.querySelector<HTMLAnchorElement>("#payments")!.click(),
+  );
+  await flushFrames();
+  const lazyMain = document.createElement("main");
+  lazyMain.id = "merchant-main";
+  lazyMain.tabIndex = -1;
+  await act(async () => {
+    document.body.append(lazyMain);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(document.activeElement).toBe(lazyMain);
+  lazyMain.remove();
 });

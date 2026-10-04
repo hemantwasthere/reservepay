@@ -1,12 +1,18 @@
 // @vitest-environment happy-dom
-import { act, createElement } from "react";
+import { act, createElement, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { WorkspaceInbox } from "../src/merchant/WorkspaceInbox";
 import type { MerchantSession } from "../src/lib/useMerchantSession";
 import type { WalletConnection } from "../src/lib/WalletControl";
 
-const mock = vi.hoisted(() => ({ markRead: vi.fn(), read: false }));
+const mock = vi.hoisted(() => ({
+  markRead: vi.fn(),
+  read: false,
+  paginated: false,
+  subscriptions: 0,
+  unsubscriptions: 0,
+}));
 vi.mock("../src/payments/PaymentProvider", () => ({
   usePaymentsReady: () => true,
   paymentsConfigured: true,
@@ -15,22 +21,33 @@ vi.mock("convex/react", () => ({
   useQuery: (_ref: unknown, args: unknown) =>
     args === "skip" ? undefined : { count: mock.read ? 0 : 1, more: false },
   useMutation: () => mock.markRead,
-  usePaginatedQuery: (_ref: unknown, args: { session: string }) => ({
-    results: [
-      {
-        _id: "notification",
-        _creationTime: Date.now(),
-        wallet: args.session,
-        linkId: "receipt-id",
-        kind: "refund_requested",
-        title: `Order for ${args.session}`,
-        expiresAt: Date.now() + 1000,
-        ...(mock.read ? { readAt: Date.now() } : {}),
-      },
-    ],
-    status: "Exhausted",
-    loadMore: vi.fn(),
-  }),
+  usePaginatedQuery: (_ref: unknown, args: { session: string } | "skip") => {
+    const [pages, setPages] = useState(1);
+    const token = args === "skip" ? null : args.session;
+    useEffect(() => {
+      if (!token) return;
+      mock.subscriptions++;
+      return () => {
+        mock.unsubscriptions++;
+      };
+    }, [token]);
+    return {
+      results: !token
+        ? []
+        : Array.from({ length: pages }, (_, page) => ({
+            _id: `notification${page || ""}`,
+            _creationTime: Date.now(),
+            wallet: token,
+            linkId: "receipt-id",
+            kind: "refund_requested",
+            title: page ? `Older order for ${token}` : `Order for ${token}`,
+            expiresAt: Date.now() + 1000,
+            ...(mock.read ? { readAt: Date.now() } : {}),
+          })),
+      status: mock.paginated ? "CanLoadMore" : "Exhausted",
+      loadMore: () => setPages((value) => value + 1),
+    };
+  },
 }));
 let root: Root;
 let container: HTMLDivElement;
@@ -61,6 +78,8 @@ const open = async () => {
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   mock.read = false;
+  mock.paginated = false;
+  mock.subscriptions = mock.unsubscriptions = 0;
   mock.markRead.mockReset();
   mock.markRead.mockResolvedValue(undefined);
   container = document.createElement("div");
@@ -159,4 +178,57 @@ it("closes the inbox on browser history navigation while the workspace stays mou
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   await act(async () => window.dispatchEvent(new PopStateEvent("popstate")));
   expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it("preloads once and preserves older pages when the dropdown closes and reopens", async () => {
+  mock.paginated = true;
+  await act(async () =>
+    root.render(
+      createElement(WorkspaceInbox, { active, session: session("wallet-a") }),
+    ),
+  );
+  expect(mock.subscriptions).toBe(1);
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  await open();
+  await act(async () => button("Load older updates").click());
+  expect(document.body.textContent).toContain("Older order for wallet-a");
+  await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>('[aria-label="Close notifications"]')!
+      .click(),
+  );
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(mock.unsubscriptions).toBe(0);
+  await open();
+  expect(mock.subscriptions).toBe(1);
+  expect(document.body.textContent).toContain("Older order for wallet-a");
+  expect(document.body.textContent).not.toContain("Loading your notifications");
+});
+
+it("drops the previous subscription and cached pages when the signed-in wallet changes", async () => {
+  mock.paginated = true;
+  await act(async () =>
+    root.render(
+      createElement(WorkspaceInbox, { active, session: session("wallet-a") }),
+    ),
+  );
+  await open();
+  await act(async () => button("Load older updates").click());
+  await act(async () =>
+    root.render(
+      createElement(WorkspaceInbox, { active, session: session("wallet-b") }),
+    ),
+  );
+  expect(mock.unsubscriptions).toBe(1);
+  expect(mock.subscriptions).toBe(2);
+  expect(document.body.textContent).not.toContain("wallet-a");
+  expect(document.body.textContent).not.toContain("Older order");
+  expect(document.body.textContent).toContain("Order for wallet-b");
+  await act(async () =>
+    root.render(
+      createElement(WorkspaceInbox, { active, session: session(null) }),
+    ),
+  );
+  expect(mock.unsubscriptions).toBe(2);
+  expect(document.body.textContent).not.toContain("Order for wallet-b");
 });

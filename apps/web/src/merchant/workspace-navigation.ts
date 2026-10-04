@@ -20,15 +20,16 @@ export type SitePage = WorkspacePage | "landing";
 // Keep the mounted workspace and its live subscriptions through landing visits.
 // Real hrefs preserve direct entry, modified clicks, and browser history.
 export function useSiteNavigation(initialPage: SitePage) {
-  const [{ page, hash }, setRoute] = useState(() => ({
+  const [{ page, hash, navigated }, setRoute] = useState(() => ({
     page: initialPage,
     hash: typeof window === "undefined" ? "" : window.location.hash,
+    navigated: false,
   }));
   useEffect(() => {
     const show = (url: URL) => {
       const next =
         url.pathname === "/" ? "landing" : workspacePage(url.pathname);
-      if (next) setRoute({ page: next, hash: url.hash });
+      if (next) setRoute({ page: next, hash: url.hash, navigated: true });
     };
     const click = (event: MouseEvent) => {
       if (
@@ -79,6 +80,18 @@ export function useSiteNavigation(initialPage: SitePage) {
         ? "index, follow, max-image-preview:large"
         : "noindex, nofollow",
     );
+    // Leave initial focus and scroll restoration to the browser on refresh.
+    // SPA navigation still moves screen-reader focus to the new page.
+    if (!navigated) return;
+    let observer: MutationObserver | undefined;
+    const focusPage = () => {
+      const main = document.getElementById(
+        page === "landing" ? "main" : "merchant-main",
+      );
+      if (!main) return false;
+      main.focus({ preventScroll: true });
+      return true;
+    };
     const frame = requestAnimationFrame(() => {
       let target: HTMLElement | null = null;
       try {
@@ -88,11 +101,18 @@ export function useSiteNavigation(initialPage: SitePage) {
       } catch {}
       if (target) target.scrollIntoView();
       else window.scrollTo({ top: 0, behavior: "instant" });
-      document
-        .getElementById(page === "landing" ? "main" : "merchant-main")
-        ?.focus({ preventScroll: true });
+      if (!focusPage()) {
+        // The first workspace visit can still be loading its lazy module.
+        observer = new MutationObserver(() => {
+          if (focusPage()) observer?.disconnect();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+      }
     });
-    return () => cancelAnimationFrame(frame);
-  }, [page, hash]);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
+  }, [page, hash, navigated]);
   return page;
 }

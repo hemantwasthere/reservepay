@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot, type Root } from "react-dom/client";
 import {
   BackgroundStatus,
+  ServiceStatusCard,
   describeWorker,
 } from "../src/merchant/BackgroundStatus";
 
@@ -63,4 +65,35 @@ it("distinguishes unconfigured, failed, running and stuck workers", () => {
   expect(describeWorker({ ...row, finishedAt: null }, 302_000)).toBe(
     "Updates delayed",
   );
+});
+
+it("only calls all services running when every required service has a fresh successful check", () => {
+  const now = 100_000;
+  const rows = (["reconcile", "keeper", "notifications"] as const).map(
+    (name) => ({
+      name,
+      startedAt: now - 1000,
+      finishedAt: now,
+      lastSuccessAt: now,
+      issue: null,
+    }),
+  );
+  const render = (workers: typeof rows) =>
+    renderToStaticMarkup(createElement(ServiceStatusCard, { workers, now }));
+  expect(render(rows)).toContain("All services running");
+  expect(render(rows.slice(0, 1))).not.toContain("All services running");
+  const stale = renderToStaticMarkup(
+    createElement(ServiceStatusCard, { workers: rows, now: now + 16 * 60_000 }),
+  );
+  expect(stale).toContain("Some services need attention");
+  expect(stale).toContain("Open a receipt and refresh");
+  expect(stale).not.toContain("All services running");
+});
+
+it("does not show successful services when their status is unavailable", () => {
+  const html = renderToStaticMarkup(
+    createElement(ServiceStatusCard, { now: Date.now(), unavailable: true }),
+  );
+  expect(html).toContain("Service status unavailable");
+  expect(html).not.toContain("Running normally");
 });

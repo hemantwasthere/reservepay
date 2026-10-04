@@ -78,11 +78,6 @@ const errorMessage = (error: unknown) =>
     : "Something went wrong. Refresh and try again.";
 
 export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
-  useEffect(() => {
-    // The first landing-to-workspace visit may finish loading after route focus.
-    if (window.location.pathname.startsWith("/app"))
-      document.getElementById("merchant-main")?.focus({ preventScroll: true });
-  }, []);
   const [active, setActive] = useState<WalletConnection | null>(null);
   const [locked, setLocked] = useState(false);
   const [walletLoading, setWalletLoading] = useState(true);
@@ -196,7 +191,7 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
             <main
               id="merchant-main"
               className={
-                "merchant-main min-w-[0] [padding:42px_clamp(24px,_3.5vw,_56px)_0] min-[1600px]:pt-[52px] max-[1100px]:[padding:30px_24px_0] max-[860px]:max-w-[800px] max-[860px]:my-0 max-[860px]:mx-auto max-[860px]:w-[100%] max-[640px]:[padding:27px_16px_0] motion-reduce:[&>*]:animate-[none] flex-1"
+                "merchant-main focus:outline-none min-w-[0] [padding:42px_clamp(24px,_3.5vw,_56px)_0] min-[1600px]:pt-[52px] max-[1100px]:[padding:30px_24px_0] max-[860px]:max-w-[800px] max-[860px]:my-0 max-[860px]:mx-auto max-[860px]:w-[100%] max-[640px]:[padding:27px_16px_0] motion-reduce:[&>*]:animate-[none] flex-1"
               }
               tabIndex={-1}
             >
