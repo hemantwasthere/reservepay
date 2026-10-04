@@ -7,29 +7,37 @@ import { ConvexError } from "convex/values";
 // HTTP/2 statusText is empty ("429 : …"), so the status must be followed by
 // a space and then either a capital letter or a colon. The anchoring keeps
 // digits inside base58 pubkeys and signatures from matching.
-const TRANSIENT_STATUS = /\b(429|50[234]) (?:[A-Z]|:)/;
-const TRANSIENT_NETWORK =
-  /Too Many Requests|Failed to fetch|NetworkError|Load failed|fetch failed|ECONNRESET|ETIMEDOUT|socket hang up/i;
+// Rate limiting (429) is defined once and reused by both classifiers, so a
+// new 429 phrasing added here reaches isTransient and isRateLimited alike.
+const RATE_LIMITED = /\b429 (?:[A-Z]|:)|Too Many Requests/i;
+const SERVER_OR_NETWORK =
+  /\b50[234] (?:[A-Z]|:)|Failed to fetch|NetworkError|Load failed|fetch failed|ECONNRESET|ETIMEDOUT|socket hang up/i;
 
-const RATE_LIMITED_STATUS = /\b429 (?:[A-Z]|:)/;
-const RATE_LIMITED_TEXT = /Too Many Requests/i;
+const messageOf = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
 export function isTransient(error: unknown): boolean {
   // ConvexError messages are for users; program and validation errors ("does
   // not match") are deterministic. Neither is helped by retrying.
   if (error instanceof ConvexError) return false;
-  const message = error instanceof Error ? error.message : String(error);
+  const message = messageOf(error);
   if (/does not match/i.test(message)) return false;
-  return TRANSIENT_STATUS.test(message) || TRANSIENT_NETWORK.test(message);
+  return RATE_LIMITED.test(message) || SERVER_OR_NETWORK.test(message);
 }
 
-// 429 specifically. A dedicated matcher because TRANSIENT_NETWORK also
-// matches the "Too Many Requests" text, so isTransient's parts cannot be
-// re-tested from outside.
+// 429 specifically: the RPC is throttling us.
 export function isRateLimited(error: unknown): boolean {
   if (error instanceof ConvexError) return false;
-  const message = error instanceof Error ? error.message : String(error);
-  return RATE_LIMITED_STATUS.test(message) || RATE_LIMITED_TEXT.test(message);
+  return RATE_LIMITED.test(messageOf(error));
+}
+
+// Release policy for a rate-limit slot whose guarded chain read failed: give
+// the slot back only for server or network failures, so the next caller can
+// retry. Keep it on 429 (retrying would amplify the throttling) and on
+// deterministic failures (an attacker-created mismatched order would
+// otherwise bypass the limit entirely).
+export function releasesRateLimitSlot(error: unknown): boolean {
+  return isTransient(error) && !isRateLimited(error);
 }
 
 function abortError(): Error {

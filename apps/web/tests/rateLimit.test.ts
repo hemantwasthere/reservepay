@@ -163,8 +163,8 @@ describe("fixed-window rate limiter", () => {
         count: 99,
       }),
     );
-    // An old legacy row: Convex omits documents missing the indexed field, so
-    // the by_expires_at sweep can never reach it — by_window does.
+    // An old legacy row with no expiresAt: a missing field indexes as
+    // undefined, which sorts first, so the by_expires_at lt() sweep reaches it.
     await t.run((ctx) =>
       ctx.db.insert("rateLimits", {
         key: "test:legacy-unswept",
@@ -215,6 +215,12 @@ describe("fixed-window rate limiter", () => {
     );
   });
 });
+
+// The shape web3.js 1.98 throws from getAccountInfo (see retry.test.ts).
+const rpcError = (inner: string) =>
+  new Error(
+    `failed to get info about account ${Keypair.generate().publicKey.toBase58()}: Error: ${inner}`,
+  );
 
 describe("paymentActions.sync coalescing", () => {
   const seller = Keypair.generate().publicKey.toBase58();
@@ -269,7 +275,7 @@ describe("paymentActions.sync coalescing", () => {
     vi.useFakeTimers();
     const t = convexTest(schema, modules);
     const id = await insertLink(t);
-    readOrder.mockRejectedValue(new Error("503 Service Unavailable: upstream error"));
+    readOrder.mockRejectedValue(rpcError("503 Service Unavailable: upstream error"));
     await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
       "503",
     );
@@ -281,12 +287,29 @@ describe("paymentActions.sync coalescing", () => {
     );
     expect(readOrder).toHaveBeenCalledTimes(2);
   });
+  it("releases the bucket on a network failure", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const id = await insertLink(t);
+    readOrder.mockRejectedValue(
+      new Error(
+        `failed to get info about account ${Keypair.generate().publicKey.toBase58()}: TypeError: fetch failed`,
+      ),
+    );
+    await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
+      "fetch failed",
+    );
+    await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
+      "fetch failed",
+    );
+    expect(readOrder).toHaveBeenCalledTimes(2);
+  });
   it("keeps the bucket when the chain read is rate limited", async () => {
     vi.useFakeTimers();
     const t = convexTest(schema, modules);
     const id = await insertLink(t);
     readOrder.mockRejectedValue(
-      new Error("429 Too Many Requests: you are rate limited"),
+      rpcError("429 Too Many Requests: you are rate limited"),
     );
     await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
       "429",
@@ -475,7 +498,7 @@ describe("paymentActions.requestRefund rate limit", () => {
   it("an RPC outage does not lock the buyer out", async () => {
     const { t, request } = await setup();
     readOrder.mockRejectedValue(
-      new Error("503 Service Unavailable: upstream error"),
+      rpcError("503 Service Unavailable: upstream error"),
     );
     for (let i = 0; i < 8; i++)
       await expect(
@@ -496,7 +519,7 @@ describe("paymentActions.requestRefund rate limit", () => {
     vi.useFakeTimers();
     const { t, request } = await setup();
     readOrder.mockRejectedValue(
-      new Error("429 Too Many Requests: you are rate limited"),
+      rpcError("429 Too Many Requests: you are rate limited"),
     );
     for (let i = 0; i < 5; i++)
       await expect(

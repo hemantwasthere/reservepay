@@ -13,7 +13,7 @@ import { refundApproval } from "../src/payments/refunds";
 import { syncLink } from "./syncLink";
 import { serverRpc } from "./rpc";
 import { enforce, allow, release } from "./rateLimit";
-import { isTransient, isRateLimited } from "../src/lib/retry";
+import { releasesRateLimitSlot } from "../src/lib/retry";
 import type { Id } from "./_generated/dataModel";
 
 const rpc = new Connection("https://api.devnet.solana.com", {
@@ -102,7 +102,7 @@ export const sync = action({
       // order with a link's reference and a wrong amount, after which every
       // read throws "does not match" — if that released the bucket, the
       // coalescer would be bypassed entirely.
-      if (isTransient(error) && !isRateLimited(error))
+      if (releasesRateLimitSlot(error))
         await release(ctx, "sync", link._id, claim);
       throw error;
     }
@@ -204,7 +204,7 @@ export const requestRefund = action({
         // An RPC outage must not lock the buyer out of retrying — but a 429
         // keeps the slot: under throttling the buyer's own limit is the
         // backpressure, not a free retry loop.
-        if (isTransient(error) && !isRateLimited(error))
+        if (releasesRateLimitSlot(error))
           await release(ctx, "refund", link._id, claim);
         throw error;
       }

@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
-import { isTransient, isRateLimited, withRetry } from "../src/lib/retry";
+import {
+  isTransient,
+  isRateLimited,
+  releasesRateLimitSlot,
+  withRetry,
+} from "../src/lib/retry";
+
+// The shape web3.js 1.98 actually throws from getAccountInfo: the HTTP or
+// fetch error is wrapped with the account, whose base58 may contain "429".
+const ACCOUNT = "4Zx429kQ7VbG2mLwz3HhC9pU1sRtYnE8aJfD6oXcBqMv";
+const wrapped = (inner: string) =>
+  `failed to get info about account ${ACCOUNT}: Error: ${inner}`;
 
 describe("isTransient", () => {
   it.each([
@@ -17,6 +28,10 @@ describe("isTransient", () => {
     "socket hang up",
     "read ECONNRESET",
     "connect ETIMEDOUT 1.2.3.4:443",
+    wrapped("429 Too Many Requests: rate limited"),
+    wrapped("429 : rate limited"),
+    wrapped("503 Service Unavailable: upstream"),
+    `failed to get info about account ${ACCOUNT}: TypeError: fetch failed`,
   ])("retries: %s", (message) => {
     expect(isTransient(new Error(message))).toBe(true);
   });
@@ -41,6 +56,8 @@ describe("isRateLimited", () => {
     "429 Too Many Requests: you are rate limited",
     "429 : rate limited", // HTTP/2: empty status text
     "Too many requests, slow down",
+    wrapped("429 Too Many Requests: rate limited"),
+    wrapped("429 : rate limited"),
   ])("matches: %s", (message) => {
     expect(isRateLimited(new Error(message))).toBe(true);
   });
@@ -51,6 +68,8 @@ describe("isRateLimited", () => {
     // 429 inside a base58 account, not an HTTP status
     "failed to get info about account 4Zx429abc: invalid param",
     "The on-chain order does not match this payment link. Do not send another payment.",
+    wrapped("503 Service Unavailable: upstream"),
+    `failed to get info about account ${ACCOUNT}: TypeError: fetch failed`,
   ])("does not match: %s", (message) => {
     expect(isRateLimited(new Error(message))).toBe(false);
   });
@@ -122,5 +141,33 @@ describe("withRetry", () => {
       withRetry(fn, { signal: controller.signal }),
     ).rejects.toThrow("aborted");
     expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+describe("releasesRateLimitSlot", () => {
+  it.each([
+    wrapped("502 Bad Gateway: upstream"),
+    wrapped("503 Service Unavailable: upstream"),
+    wrapped("503 : upstream"),
+    wrapped("504 Gateway Timeout: upstream"),
+    `failed to get info about account ${ACCOUNT}: TypeError: fetch failed`,
+    "Failed to fetch",
+  ])("releases on server or network failure: %s", (message) => {
+    expect(releasesRateLimitSlot(new Error(message))).toBe(true);
+  });
+  it.each([
+    wrapped("429 Too Many Requests: rate limited"),
+    wrapped("429 : rate limited"),
+    "Too many requests, slow down",
+    "The on-chain order does not match this payment link. Do not send another payment.",
+    wrapped("500 Internal Server Error: boom"),
+    "custom program error: 0x1770",
+  ])("keeps the slot otherwise: %s", (message) => {
+    expect(releasesRateLimitSlot(new Error(message))).toBe(false);
+  });
+  it("keeps the slot for a ConvexError", () => {
+    expect(
+      releasesRateLimitSlot(new ConvexError("503 Service Unavailable")),
+    ).toBe(false);
   });
 });
