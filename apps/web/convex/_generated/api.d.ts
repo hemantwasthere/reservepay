@@ -21,6 +21,7 @@ import type * as paymentValidators from "../paymentValidators.js";
 import type * as payments from "../payments.js";
 import type * as reconcile from "../reconcile.js";
 import type * as reconcileActions from "../reconcileActions.js";
+import type * as rpc from "../rpc.js";
 import type * as session from "../session.js";
 import type * as signInNonce from "../signInNonce.js";
 import type * as syncLink from "../syncLink.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   payments: typeof payments;
   reconcile: typeof reconcile;
   reconcileActions: typeof reconcileActions;
+  rpc: typeof rpc;
   session: typeof session;
   signInNonce: typeof signInNonce;
   syncLink: typeof syncLink;
