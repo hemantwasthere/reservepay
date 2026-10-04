@@ -136,17 +136,40 @@ pub mod reservepay {
         Ok(())
     }
 
+    pub fn request_refund(ctx: Context<RequestRefund>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let order = &mut ctx.accounts.order;
+        require!(
+            order.status == OrderStatus::Open,
+            ReservePayError::OrderClosed
+        );
+        require!(now < order.expires_at, ReservePayError::DisputeWindowClosed);
+        order.status = OrderStatus::Disputed;
+        emit!(OrderDisputed {
+            order: order.key(),
+            merchant: order.merchant,
+            buyer: ctx.accounts.buyer.key(),
+            disputed_at: now,
+        });
+        Ok(())
+    }
+
     pub fn complete_order(ctx: Context<CompleteOrder>) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let caller = ctx.accounts.caller.key();
-        require!(
-            caller == ctx.accounts.protocol.resolver || now >= ctx.accounts.order.expires_at,
-            ReservePayError::OrderStillProtected
-        );
-        require!(
-            ctx.accounts.order.status == OrderStatus::Open,
-            ReservePayError::OrderClosed
-        );
+        match ctx.accounts.order.status {
+            OrderStatus::Completed | OrderStatus::Refunded => {
+                return err!(ReservePayError::OrderClosed)
+            }
+            OrderStatus::Disputed => require!(
+                caller == ctx.accounts.protocol.resolver,
+                ReservePayError::OrderUnderDispute
+            ),
+            OrderStatus::Open => require!(
+                caller == ctx.accounts.protocol.resolver || now >= ctx.accounts.order.expires_at,
+                ReservePayError::OrderStillProtected
+            ),
+        }
         let signer_seeds: &[&[u8]] = &[
             b"merchant",
             ctx.accounts.merchant.authority.as_ref(),
@@ -184,7 +207,10 @@ pub mod reservepay {
 
     pub fn refund_order(ctx: Context<RefundOrder>) -> Result<()> {
         require!(
-            ctx.accounts.order.status == OrderStatus::Open,
+            matches!(
+                ctx.accounts.order.status,
+                OrderStatus::Open | OrderStatus::Disputed
+            ),
             ReservePayError::OrderClosed
         );
         let signer_seeds: &[&[u8]] = &[
@@ -370,6 +396,13 @@ impl<'info> CreateOrder<'info> {
 }
 
 #[derive(Accounts)]
+pub struct RequestRefund<'info> {
+    #[account(mut, has_one = buyer)]
+    pub order: Account<'info, Order>,
+    pub buyer: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct CompleteOrder<'info> {
     #[account(seeds = [b"protocol"], bump = protocol.bump)]
     pub protocol: Account<'info, Protocol>,
@@ -511,6 +544,7 @@ pub enum OrderStatus {
     Open,
     Completed,
     Refunded,
+    Disputed,
 }
 
 #[event]
@@ -543,6 +577,14 @@ pub struct OrderCreated {
     pub amount: u64,
     pub reserve_amount: u64,
     pub expires_at: i64,
+}
+
+#[event]
+pub struct OrderDisputed {
+    pub order: Pubkey,
+    pub merchant: Pubkey,
+    pub buyer: Pubkey,
+    pub disputed_at: i64,
 }
 
 #[event]
@@ -591,6 +633,10 @@ pub enum ReservePayError {
     OrderStillProtected,
     #[msg("The order has already been resolved")]
     OrderClosed,
+    #[msg("The protection window has ended; the order can no longer be disputed")]
+    DisputeWindowClosed,
+    #[msg("The order is under dispute; only the resolver can resolve it")]
+    OrderUnderDispute,
     #[msg("A numeric operation overflowed")]
     MathOverflow,
 }
