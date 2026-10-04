@@ -22,14 +22,17 @@ async function build(extraArgs: string[]): Promise<number> {
     cwd: root,
     stdio: ["inherit", "pipe", "pipe"],
   });
-  let log = "";
+  // Each pipe can split a diagnostic across chunks. Mixing the streams can
+  // insert unrelated progress output into the middle of that diagnostic.
+  let stdout = "";
+  let stderr = "";
   child.stdout.on("data", (chunk: Buffer) => {
     process.stdout.write(chunk);
-    log += chunk.toString();
+    stdout += chunk.toString();
   });
   child.stderr.on("data", (chunk: Buffer) => {
     process.stderr.write(chunk);
-    log += chunk.toString();
+    stderr += chunk.toString();
   });
   const code = await new Promise<number>((resolve) => {
     child.on("error", (error) => {
@@ -39,7 +42,10 @@ async function build(extraArgs: string[]): Promise<number> {
     child.on("close", (exitCode) => resolve(exitCode ?? 1));
   });
   if (code !== 0) return code;
-  const overflows = stackOverflowLines(log);
+  const overflows = [
+    ...stackOverflowLines(stdout),
+    ...stackOverflowLines(stderr),
+  ];
   if (overflows.length > 0) {
     console.error(
       "\nAn instruction's stack frame exceeds the 4096-byte SBF limit. The " +
