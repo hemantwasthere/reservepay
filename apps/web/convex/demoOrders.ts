@@ -1,7 +1,10 @@
 import { ConvexError, v } from "convex/values";
 import { calculateSettlement } from "@reservepay/core/settlement";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
+
+const CLEANUP_BATCH = 500;
 
 function validateKey(value: string) {
   if (!/^[a-f0-9]{64}$/.test(value)) {
@@ -87,6 +90,20 @@ export const create = mutation({
       throw new ConvexError(
         "Please wait a minute before making another demo payment.",
       );
+    // The session key is client-chosen, so the per-session cap alone is
+    // bypassed by rotating keys. A global cap is acceptable here because the
+    // demo has no real users to lock out — never do this for payments or
+    // sign-in. Mutations are OCC-serializable, so count-then-insert is exact.
+    const globalRecent = await ctx.db
+      .query("demoOrders")
+      .withIndex("by_creation_time", (q) =>
+        q.gte("_creationTime", Date.now() - 60_000),
+      )
+      .take(60);
+    if (globalRecent.length >= 60)
+      throw new ConvexError(
+        "The demo is busy right now. Please try again in a minute.",
+      );
     const settlement = calculateSettlement(
       BigInt(amountCents) * 10_000n,
       reserveBps,
@@ -103,6 +120,27 @@ export const create = mutation({
   },
 });
 
+// Cron entry point. The demo is a simulation, so rows expire after 24 hours.
+// Deletes in bounded, indexed batches and reschedules itself until the
+// backlog is drained (mirrors auth.cleanup).
+export const cleanup = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const stale = await ctx.db
+      .query("demoOrders")
+      .withIndex("by_creation_time", (q) =>
+        q.lt("_creationTime", Date.now() - 24 * 60 * 60_000),
+      )
+      .take(CLEANUP_BATCH);
+    for (const row of stale) await ctx.db.delete(row._id);
+    if (stale.length === CLEANUP_BATCH)
+      await ctx.scheduler.runAfter(0, internal.demoOrders.cleanup, {});
+    return stale.length;
+  },
+});
+
+// A get plus one patch of the caller's own row: one-way transition, no
+// insert, no RPC. Harmless without a rate cap.
 export const resolve = mutation({
   args: {
     sessionKey: v.string(),

@@ -11,6 +11,13 @@ crons.interval(
 );
 
 crons.interval(
+  "delete old demo orders",
+  { hours: 1 },
+  internal.demoOrders.cleanup,
+  {},
+);
+
+crons.interval(
   "release expired orders and reconcile disputes",
   { minutes: 5 },
   internal.keeperActions.run,

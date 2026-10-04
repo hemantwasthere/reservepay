@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
-import { api } from "../convex/_generated/api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
 
 const modules = import.meta.glob("../convex/**/*.ts");
@@ -12,6 +12,8 @@ const payment = () => ({
   amountCents: 10000,
   reserveBps: 500,
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe("demo payments", () => {
   it("computes settlement on the server and isolates browser histories", async () => {
@@ -95,5 +97,53 @@ describe("demo payments", () => {
     await expect(t.mutation(api.demoOrders.create, payment())).rejects.toThrow(
       "wait a minute",
     );
+  });
+
+  it("caps demo writes globally across rotating session keys", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    for (let i = 0; i < 60; i++)
+      await t.mutation(api.demoOrders.create, {
+        ...payment(),
+        sessionKey: i.toString(16).padStart(64, "0"),
+      });
+    await expect(
+      t.mutation(api.demoOrders.create, {
+        ...payment(),
+        sessionKey: "f".repeat(64),
+      }),
+    ).rejects.toThrow("busy");
+    vi.advanceTimersByTime(61_000);
+    const order = await t.mutation(api.demoOrders.create, {
+      ...payment(),
+      sessionKey: "f".repeat(64),
+    });
+    expect(order.status).toBe("paid");
+  });
+
+  it("expires demo rows after 24 hours in batches", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 600; i++)
+        await ctx.db.insert("demoOrders", {
+          sessionKey: otherSession,
+          requestId: crypto.randomUUID(),
+          amount: 100_000_000n,
+          merchantAmount: 95_000_000n,
+          reserveAmount: 5_000_000n,
+          reserveBps: 500,
+          status: "paid",
+        });
+    });
+    vi.advanceTimersByTime(25 * 60 * 60_000);
+    const fresh = await t.mutation(api.demoOrders.create, payment());
+    expect(await t.mutation(internal.demoOrders.cleanup, {})).toBe(500);
+    // A full batch reschedules itself until the backlog is drained.
+    await t.finishAllScheduledFunctions(() => vi.advanceTimersByTime(1_000));
+    expect(await t.run((ctx) => ctx.db.query("demoOrders").collect())).toEqual([
+      expect.objectContaining({ _id: fresh.id }),
+    ]);
+    expect(await t.query(api.demoOrders.list, { sessionKey })).toEqual([fresh]);
   });
 });
