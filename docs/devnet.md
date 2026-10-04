@@ -76,6 +76,21 @@ bunx convex env set SOLANA_RPC_URL https://your-rpc.example.com
 
 One run attempts at most 5 releases and stops starting new work after 4 minutes. The queue starts with the oldest eligible orders, then resumes after the last attempted order on the following run, including after failed sends. This prevents frozen token accounts or repeated preflight failures from blocking newer orders. Missing token accounts are skipped before the attempt limit. A confirmed release schedules a receipt sync 90 seconds later (finalization takes about 13 seconds). Expected races — a resolver or merchant completing the same order first — are logged and counted as skipped. The keeper spends only transaction fees, never token-account rent; check its SOL balance after the first hour and top up with a devnet airdrop when low.
 
+## Public endpoint limits
+
+Anonymous endpoints are bounded so no caller can spend unlimited RPC reads or writes. Each bucket is consumed only after the cheap proof that the caller is legitimate (a verified signature or the recorded receipt), and is keyed on validated identifiers — never on raw client input.
+
+| Endpoint | Limit | When exceeded |
+| --- | --- | --- |
+| `demoOrders.create` | 20/min per session key, 60/min globally | rejected |
+| `paymentActions.sync` | 1 chain read per 5s per link | coalesced, not denied: returns the already-recorded receipt state with no new RPC read |
+| `authActions.signIn` | 10/min per wallet | rejected |
+| `paymentActions.requestRefund` | 5/min per link, after the recorded receipt proves the caller is the buyer | rejected |
+
+`sync` coalescing means checkout polling, multiple tabs, and merchant refreshes all keep working while backend cost stays capped at one chain read and one receipt write per 5 seconds per link; internal paths (`syncById`, the reconciler, the keeper) are unaffected. `paymentActions.requirePayable`, `payments.get`, the refund queue and `authActions.requestNonce` stay unlimited: they are read-only or stateless and perform no write or chain read.
+
+The landing-page demo is a simulation: demo orders older than 24 hours are deleted by an hourly cron, and the 60/min global cap bounds growth between runs. Rate-limit buckets themselves expire ten minutes after their window and are swept every 30 minutes.
+
 ## Service health and recovery
 
 The merchant workspace shows **Payment updates**, **Automatic releases**, and **Inbox reminders**, their current status, and time since the last successful run. The backend stores one heartbeat per worker in `workerHealth`; public status exposes fixed issue codes and timestamps only. An overlapping older run cannot overwrite a newer result. Unexpected action errors count as failures; raw RPC errors are never saved or logged by these workers.
