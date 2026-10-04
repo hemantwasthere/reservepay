@@ -419,8 +419,14 @@ describe("syncLink extraction", () => {
     expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
       "completed",
     );
-    // A resolved receipt short-circuits, so use a fresh unpaid link: no order
-    // on chain still reports false.
+    // The public sync short-circuits resolved receipts, so the stale re-read
+    // goes through the internal path: record must refuse to regress it.
+    readOrder.mockResolvedValue(receipt(orderAddress, "paid"));
+    await t.action(internal.paymentActions.syncById, { id });
+    expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
+      "completed",
+    );
+    // An unpaid link with no order on chain still reports false.
     const unpaid = await t.mutation(internal.payments.insert, {
       merchant: Keypair.generate().publicKey.toBase58(),
       reference,
@@ -430,8 +436,8 @@ describe("syncLink extraction", () => {
       issuedAt: Date.now(),
     });
     readOrder.mockResolvedValue(null);
-    await expect(t.action(api.paymentActions.sync, { id: unpaid })).resolves.toBe(
-      false,
-    );
+    await expect(
+      t.action(api.paymentActions.sync, { id: unpaid }),
+    ).resolves.toBe(false);
   });
 });

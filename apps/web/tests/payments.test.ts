@@ -209,8 +209,10 @@ describe("merchant-approved payment links", () => {
       id,
       receipt: { ...receipt, status: "completed" },
     });
-    // A resolved receipt short-circuits before the coalescer: no chain read.
-    await t.action(api.paymentActions.sync, { id });
+    // The public sync short-circuits resolved receipts, so the stale re-read
+    // (readOrder still resolves the old "paid" receipt) goes through the
+    // internal path: record must refuse to regress it.
+    await t.action(internal.paymentActions.syncById, { id });
     expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
       "completed",
     );

@@ -145,6 +145,7 @@ describe("paymentActions.sync coalescing", () => {
     expect(readOrder).toHaveBeenCalledTimes(3);
   });
   it("reports a recorded receipt for a coalesced sync", async () => {
+    vi.useFakeTimers();
     const t = convexTest(schema, modules);
     const id = await insertLink(t);
     const receipt = {
@@ -159,6 +160,22 @@ describe("paymentActions.sync coalescing", () => {
     expect(await t.action(api.paymentActions.sync, { id })).toBe(true);
     expect(await t.action(api.paymentActions.sync, { id })).toBe(true);
     expect(readOrder).toHaveBeenCalledTimes(1);
+  });
+  it("releases the bucket when the chain read fails", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const id = await insertLink(t);
+    readOrder.mockRejectedValue(new Error("RPC unavailable"));
+    await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
+      "RPC unavailable",
+    );
+    expect(readOrder).toHaveBeenCalledTimes(1);
+    // The failed read returned the bucket: the next caller within the window
+    // retries the chain instead of getting a quiet false.
+    await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
+      "RPC unavailable",
+    );
+    expect(readOrder).toHaveBeenCalledTimes(2);
   });
   it("short-circuits a resolved receipt with no bucket and no chain read", async () => {
     const t = convexTest(schema, modules);

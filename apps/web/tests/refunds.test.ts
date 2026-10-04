@@ -94,8 +94,8 @@ describe("buyer refund requests", () => {
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(0);
   });
   it("rejects stale, future, unpaid, expired and resolved requests", async () => {
-    vi.useFakeTimers();
     const { t, request, receipt } = await setup();
+    readOrder.mockClear();
     for (const issuedAt of [Date.now() - 700000, Date.now() + 60000])
       await expect(
         t.action(
@@ -103,6 +103,11 @@ describe("buyer refund requests", () => {
           sign({ ...request, issuedAt }),
         ),
       ).rejects.toThrow("expired");
+    // Stale approvals are refused before the bucket and the chain read.
+    expect(readOrder).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual(
+      [],
+    );
     readOrder.mockResolvedValue(null);
     await expect(
       t.action(api.paymentActions.requestRefund, sign(request)),
@@ -111,9 +116,8 @@ describe("buyer refund requests", () => {
     await expect(
       t.action(api.paymentActions.requestRefund, sign(request)),
     ).rejects.toThrow("period has ended");
-    // The four calls above spent this link's 5-per-minute bucket; the next
-    // window still rejects each resolved status on its own.
-    vi.advanceTimersByTime(60_000);
+    // The recorded receipt still says "paid", so these reach the chain read
+    // and are refused on the fresh receipt.
     for (const status of ["completed", "refunded"]) {
       readOrder.mockResolvedValue({ ...receipt, status });
       await expect(
@@ -121,18 +125,52 @@ describe("buyer refund requests", () => {
       ).rejects.toThrow("already resolved");
     }
   });
+  it("tells a legitimate buyer to wait when the payment is not recorded yet", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, {
+      merchant: merchant.publicKey.toBase58(),
+      reference: "ef".repeat(16),
+      title: "Unsynced order",
+      amount: "1000000",
+      protectionSeconds: 3600,
+      issuedAt: Date.now(),
+    });
+    const request: RefundApproval = {
+      id,
+      order: Keypair.generate().publicKey.toBase58(),
+      buyer: buyer.publicKey.toBase58(),
+      reason: "not_received",
+      issuedAt: Date.now(),
+    };
+    readOrder.mockClear();
+    await expect(
+      t.action(api.paymentActions.requestRefund, sign(request)),
+    ).rejects.toThrow("not been recorded yet");
+    // Refused before the bucket and the chain read.
+    expect(readOrder).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual(
+      [],
+    );
+  });
   it("removes finalized resolutions from the queue and cannot regress on stale RPC responses", async () => {
     const { t, id, request, receipt } = await setup();
     await t.action(api.paymentActions.requestRefund, sign(request));
     readOrder.mockResolvedValue({ ...receipt, status: "refunded" });
     await t.action(api.paymentActions.sync, { id });
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(0);
+    // The public sync short-circuits resolved receipts, so the stale re-read
+    // goes through the internal path: payments.record must refuse to regress.
     readOrder.mockResolvedValue(receipt);
-    await t.action(api.paymentActions.sync, { id });
-    await t.action(api.paymentActions.requestRefund, sign(request));
+    await t.action(internal.paymentActions.syncById, { id });
     const link = await t.query(api.payments.get, { id });
     expect(link?.receipt?.status).toBe("refunded");
     expect(link?.refundPending).toBe(false);
+    // A resolved order rejects new requests before the bucket and the RPC.
+    readOrder.mockClear();
+    await expect(
+      t.action(api.paymentActions.requestRefund, sign(request)),
+    ).rejects.toThrow("already resolved");
+    expect(readOrder).not.toHaveBeenCalled();
     expect(link?.refundRequest?.reason).toBe("not_received");
   });
   it("refuses a new request when a concurrent resolution is already recorded", async () => {
@@ -141,9 +179,14 @@ describe("buyer refund requests", () => {
       id,
       receipt: { ...receipt, status: "completed" },
     });
+    readOrder.mockClear();
     await expect(
       t.action(api.paymentActions.requestRefund, sign(request)),
     ).rejects.toThrow("already resolved");
+    expect(readOrder).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual(
+      [],
+    );
   });
   it("records the refund outcome only when a request existed", async () => {
     const { t, id, request, receipt } = await setup();

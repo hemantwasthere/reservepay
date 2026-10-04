@@ -12,7 +12,7 @@ import { merchantClient } from "../src/merchant/client";
 import { refundApproval } from "../src/payments/refunds";
 import { syncLink } from "./syncLink";
 import { serverRpc } from "./rpc";
-import { enforce } from "./rateLimit";
+import { enforce, allow, release } from "./rateLimit";
 import type { Id } from "./_generated/dataModel";
 
 const rpc = new Connection("https://api.devnet.solana.com", {
@@ -84,13 +84,17 @@ export const sync = action({
     // per link, keyed on the validated link id (never the raw id string, or
     // every garbage string would insert a bucket row). Callers are never
     // locked out — a coalesced call reports the receipt state we already have.
-    const { allowed } = await ctx.runMutation(internal.rateLimit.hit, {
-      key: `sync:${link._id}`,
-      limit: 1,
-      windowMs: 5_000,
-    });
+    const { allowed } = await allow(ctx, "sync", link._id, 1, 5_000);
     if (!allowed) return Boolean(link.receipt);
-    return syncLink(ctx, link, rpc);
+    try {
+      return await syncLink(ctx, link, rpc);
+    } catch (error) {
+      // The bucket is claimed before the read so an outage cannot amplify RPC
+      // cost, but a failed read must not hide behind the coalescer: release
+      // it so the next caller retries the chain instead of a quiet false.
+      await release(ctx, "sync", link._id);
+      throw error;
+    }
   },
 });
 // Lets the keeper record the finalized receipt of an order it released.
@@ -146,22 +150,17 @@ export const requestRefund = action({
         throw new Error("The buyer did not approve this refund request.");
       const link = await ctx.runQuery(api.payments.get, { id: request.id });
       if (!link) throw new Error("Payment link not found.");
-      // Cheap ownership proof before the counter and the RPC: only the
-      // recorded buyer can spend this link's bucket or trigger a chain read.
+      // Cheap proofs before the counter and the RPC: only the recorded buyer
+      // can spend this link's bucket or trigger a chain read. A payment that
+      // has not synced yet gets its own message — the buyer is legitimate,
+      // just early.
+      if (!link.receipt)
+        throw new Error(
+          "This payment has not been recorded yet. Refresh the page and try again.",
+        );
       if (
-        !link.receipt ||
         link.receipt.buyer !== request.buyer ||
         link.receipt.order !== request.order
-      )
-        throw new Error(
-          "Only the verified buyer can request a refund for this order.",
-        );
-      await enforce(ctx, "refund", link._id, 5, 60_000);
-      const receipt = await paymentClient(rpc).readOrder(link);
-      if (
-        !receipt ||
-        receipt.buyer !== request.buyer ||
-        receipt.order !== request.order
       )
         throw new Error(
           "Only the verified buyer can request a refund for this order.",
@@ -172,6 +171,20 @@ export const requestRefund = action({
           request.issuedAt > Date.now() + 30_000)
       )
         throw new Error("This approval expired. Request the refund again.");
+      // A resolved order is known from the recorded receipt; a still-open
+      // pending request proceeds — it needs the fresh chain read.
+      if (link.receipt.status !== "paid")
+        throw new Error("This order is already resolved.");
+      await enforce(ctx, "refund", link._id, 5, 60_000);
+      const receipt = await paymentClient(rpc).readOrder(link);
+      if (
+        !receipt ||
+        receipt.buyer !== request.buyer ||
+        receipt.order !== request.order
+      )
+        throw new Error(
+          "Only the verified buyer can request a refund for this order.",
+        );
       await ctx.runMutation(internal.payments.requestRefund, {
         id: link._id,
         receipt,
