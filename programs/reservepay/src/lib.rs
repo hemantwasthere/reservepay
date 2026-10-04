@@ -1,3 +1,7 @@
+// Anchor's `Error` exceeds 128 bytes, which trips clippy::result_large_err on
+// every handler; allow it crate-wide instead of per-function.
+#![allow(clippy::result_large_err)]
+
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
