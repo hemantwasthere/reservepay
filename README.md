@@ -140,14 +140,15 @@ Configure `SIGN_IN_SECRET` on the **Convex backend**, not in a `VITE_` variable.
 openssl rand -hex 32 | bunx convex env set SIGN_IN_SECRET
 ```
 
-Two more server-only backend variables control the order keeper; both are optional while you develop. Without `KEEPER_SECRET_KEY` the keeper skips every run and changes nothing.
+Three more server-only backend variables control the order keeper and reconciliation; all are optional while you develop. Without `KEEPER_SECRET_KEY` the keeper skips every run and changes nothing, but payment reconciliation keeps running.
 
-| Variable            | Used for                                                                                |
-| ------------------- | --------------------------------------------------------------------------------------- |
-| `KEEPER_SECRET_KEY` | Base58 secret of the dedicated keeper keypair; enables automatic release of expired orders |
-| `KEEPER_RPC_URL`    | Optional dedicated RPC for the keeper; defaults to public devnet                        |
+| Variable            | Used for                                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `KEEPER_SECRET_KEY` | Base58 secret of the dedicated keeper keypair; enables automatic release of expired orders           |
+| `SOLANA_RPC_URL`    | Optional dedicated RPC for the reconciler, keeper, and receipt syncs; defaults to public devnet      |
+| `KEEPER_RPC_URL`    | Fallback alias for `SOLANA_RPC_URL`                                                                  |
 
-See [devnet operations](docs/devnet.md) for keeper funding and protocol setup.
+See [devnet operations](docs/devnet.md) for keeper funding, reconciliation, and protocol setup.
 
 For production, select the intended deployment with the Convex CLI's `--prod` option. Optional backend `SITE_ORIGIN` restricts sign-in to an exact origin such as `https://your-app.example.com` (no trailing slash). Without it, the hosted ReservePay domain and localhost are accepted. Keep an existing secret when redeploying; rotating it invalidates outstanding login challenges.
 

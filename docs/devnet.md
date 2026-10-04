@@ -35,6 +35,17 @@ Initialization uses the program's default reserve rate of 500 bps. The script pr
 
 A Convex cron runs the keeper every 5 minutes. It completes orders whose protection expired (chain clock past expiry, and wall clock at least 60 seconds past it, so no new refund request can still arrive) and that have no pending refund request. It also syncs disputes whose on-chain resolution was never recorded. The keeper never pays rent: orders whose merchant token account is missing are left for manual release from the receipt page.
 
+## Reconciliation
+
+A separate Convex cron reconciles payment receipts with Solana every 2 minutes. It needs no `KEEPER_SECRET_KEY` and keeps running when the keeper is unconfigured. Each run:
+
+1. scans open orders on-chain and records receipts for links paid while no client was watching (for example a buyer who closed the tab right after sending);
+2. syncs disputes whose on-chain resolution was never recorded;
+3. re-checks a page of links whose receipt says "paid" but whose order is no longer open, recording completed or refunded outcomes;
+4. sweeps a page of links with no receipt at all, catching orders paid and resolved before anyone synced.
+
+Receipts are read at finalized commitment and `payments.record` never regresses a status, so reconciliation can only move a receipt forward or leave it unchanged. Paged steps resume from cursors stored in the `syncState` table; a failed page retries next run instead of skipping links. Each run logs one summary line (counts only, never link documents or env values).
+
 ### Configure
 
 ```bash
@@ -50,17 +61,17 @@ bun -e 'console.log(require("bs58").encode(Uint8Array.from(JSON.parse(require("f
 rm keeper.json
 ```
 
-If the variable is unset or invalid, every keeper run skips with `{ skipped: "unconfigured" }` and changes nothing. Unsetting it stops all releases and reconciliation immediately.
+If the variable is unset or invalid, every keeper run skips with `{ skipped: "unconfigured" }` and changes nothing. Unsetting it stops all releases immediately; reconciliation keeps running because it needs no key.
 
 ### RPC
 
-Public devnet `getProgramAccounts` from shared Convex IPs is rate-limited. Point the keeper at a dedicated RPC when you have one:
+Public devnet `getProgramAccounts` from shared Convex IPs is rate-limited. Point the keeper and the reconciler at a dedicated RPC when you have one:
 
 ```bash
-bunx convex env set KEEPER_RPC_URL https://your-rpc.example.com
+bunx convex env set SOLANA_RPC_URL https://your-rpc.example.com
 ```
 
-Without it, the keeper uses `https://api.devnet.solana.com`. The post-release receipt sync (`syncById`) uses the same URL.
+`KEEPER_RPC_URL` is kept as a fallback alias. Without either, internal actions use `https://api.devnet.solana.com`, where the built-in retry absorbs occasional 429s. Public actions (`paymentActions.sync`, `requestRefund`) intentionally stay on public devnet: they are unauthenticated, so a private RPC's quota would be spendable by anyone.
 
 ### Operation
 

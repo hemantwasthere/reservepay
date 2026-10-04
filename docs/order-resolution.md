@@ -27,6 +27,12 @@ The browser saves a validated signed transaction’s signature and expiration be
 
 Receipts poll while open. Use **Refresh orders** or the Disputes page’s **Refresh** to recover changes made outside the app. The queue is paginated and sorted by protection deadline, soonest first. A keeper cron releases expired undisputed orders and syncs disputes whose on-chain resolution was never recorded, so resolved requests leave the queue even when nobody reloads a receipt. Private case management, a resolver rotation UI, and mainnet deployment are not included.
 
+## Reconciliation and retries
+
+Solana is the source of truth for funds and settlement; Convex receipts are a cache of the finalized chain state. A keyless Convex cron reconciles that cache with Solana every 2 minutes (see [devnet operations](devnet.md#reconciliation)): it records receipts for orders paid while no client was watching, clears disputes resolved outside the app, advances stale "paid" receipts whose orders completed or refunded, and sweeps links that were never synced at all. Receipts are only written from finalized chain reads and never regress, so refreshing the page, closing a tab, or losing connectivity cannot create an incorrect payment state — the next run repairs it.
+
+Transient RPC failures (rate limits, bad gateways, dropped connections) are retried with jittered exponential backoff on every read, in the browser and on the backend. Checkout status polling backs off after consecutive failures (10 → 20 → 40 → 60 seconds) and checks again immediately when the tab becomes visible or the network returns.
+
 ## Validation
 
 `bun run check` covers type checking, unit and Convex tests, production build, SEO and routing. `bun run test:program` runs the Anchor integration suite against a local validator. The suite uses test tokens and checks the actual browser transaction builders, authorization failures, full-refund accounting, reserve release, and duplicate resolution refusal.
