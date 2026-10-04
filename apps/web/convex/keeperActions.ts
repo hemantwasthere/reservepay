@@ -91,11 +91,15 @@ export const run = internalAction({
         string,
         { id: Id<"paymentLinks">; refundPending: boolean }
       > = {};
-      for (
-        let start = 0;
-        start < candidates.length && !outOfTime();
-        start += LINK_BATCH
-      )
+      // An order whose refund request was never checked looks unlinked, and
+      // unlinked orders are treated as safe to release. If the refund-request
+      // check did not finish, release nothing this run.
+      let linksComplete = true;
+      for (let start = 0; start < candidates.length; start += LINK_BATCH) {
+        if (outOfTime()) {
+          linksComplete = false;
+          break;
+        }
         Object.assign(
           links,
           await ctx.runQuery(internal.keeper.linksForReferences, {
@@ -104,13 +108,20 @@ export const run = internalAction({
               .map(({ authority, reference }) => ({ authority, reference })),
           }),
         );
-      const selected = selectReleasable({
-        openOrders: candidates,
-        links,
-        chainNow,
-        wallNow,
-        limit: RELEASE_LIMIT,
-      });
+      }
+      if (!linksComplete)
+        console.log(
+          "keeper: ran out of time before checking every refund request; no orders were released this run.",
+        );
+      const selected = linksComplete
+        ? selectReleasable({
+            openOrders: candidates,
+            links,
+            chainNow,
+            wallNow,
+            limit: RELEASE_LIMIT,
+          })
+        : [];
       const attempts = await Promise.allSettled(
         selected.map(async (order) => {
           const authority = new PublicKey(order.authority);

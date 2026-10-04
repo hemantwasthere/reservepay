@@ -235,6 +235,24 @@ describe("keeper run", () => {
     expect(readOrder).not.toHaveBeenCalled();
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(1);
   });
+  it("releases nothing when the run ends before every refund request is checked", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    // A disputed order must never be released, even in a truncated run.
+    const orderAddress = Keypair.generate().publicKey.toBase58();
+    await insertLink(t, orderAddress, true);
+    fns.openOrders.mockResolvedValue([openOrder(1_000_000, orderAddress)]);
+    // The merchant read exhausts the 4-minute budget, so the refund-request
+    // check never runs and the order would look unlinked.
+    fns.merchant.mockImplementation(async () => {
+      vi.advanceTimersByTime(5 * 60_000);
+      return { authority: authority.publicKey.toBase58(), mint };
+    });
+    const result = await t.action(internal.keeperActions.run, {});
+    expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 0 });
+    expect(fns.send).not.toHaveBeenCalled();
+    expect(await t.query(api.payments.refundQueue, {})).toHaveLength(1);
+  });
   it("keeps releasing after one send fails and counts races as skipped", async () => {
     const t = convexTest(schema, modules);
     fns.openOrders.mockResolvedValue([
