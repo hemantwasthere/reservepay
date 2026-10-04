@@ -13,6 +13,7 @@ import { refundApproval } from "../src/payments/refunds";
 import { syncLink } from "./syncLink";
 import { serverRpc } from "./rpc";
 import { enforce, allow, release } from "./rateLimit";
+import { isTransient } from "../src/lib/retry";
 import type { Id } from "./_generated/dataModel";
 
 const rpc = new Connection("https://api.devnet.solana.com", {
@@ -75,7 +76,11 @@ export const requirePayable = action({
 
 export const sync = action({
   args: { id: v.string() },
-  handler: async (ctx, { id }): Promise<boolean> => {
+  // true: a receipt is recorded. false: the chain was read and there is no
+  // order yet. null: coalesced — another caller read the chain for this link
+  // within the last 5s and nothing is recorded, so this call verified nothing
+  // (callers should not treat it as a fresh, successful check).
+  handler: async (ctx, { id }): Promise<boolean | null> => {
     const link = await ctx.runQuery(api.payments.get, { id });
     if (!link) throw new Error("Payment link not found.");
     // A resolved receipt cannot change; record would no-op anyway.
@@ -83,16 +88,18 @@ export const sync = action({
     // Coalesce, don't deny: at most one chain read and receipt write per 5s
     // per link, keyed on the validated link id (never the raw id string, or
     // every garbage string would insert a bucket row). Callers are never
-    // locked out — a coalesced call reports the receipt state we already have.
-    const { allowed } = await allow(ctx, "sync", link._id, 1, 5_000);
-    if (!allowed) return Boolean(link.receipt);
+    // locked out.
+    const claim = await allow(ctx, "sync", link._id, 1, 5_000);
+    if (!claim.allowed) return link.receipt ? true : null;
     try {
       return await syncLink(ctx, link, rpc);
     } catch (error) {
-      // The bucket is claimed before the read so an outage cannot amplify RPC
-      // cost, but a failed read must not hide behind the coalescer: release
-      // it so the next caller retries the chain instead of a quiet false.
-      await release(ctx, "sync", link._id);
+      // Only a transient failure (rate limit, gateway, network) returns the
+      // claim so the next caller retries. A deterministic failure keeps it:
+      // anyone can create an on-chain order with a link's reference and a
+      // wrong amount, after which every read throws "does not match" — if
+      // that released the bucket, the coalescer would be bypassed entirely.
+      if (isTransient(error)) await release(ctx, "sync", link._id, claim);
       throw error;
     }
   },
@@ -165,18 +172,33 @@ export const requestRefund = action({
         throw new Error(
           "Only the verified buyer can request a refund for this order.",
         );
-      if (
-        !link.refundRequest &&
-        (request.issuedAt < Date.now() - 600_000 ||
-          request.issuedAt > Date.now() + 30_000)
-      )
-        throw new Error("This approval expired. Request the refund again.");
       // A resolved order is known from the recorded receipt; a still-open
       // pending request proceeds — it needs the fresh chain read.
       if (link.receipt.status !== "paid")
         throw new Error("This order is already resolved.");
-      await enforce(ctx, "refund", link._id, 5, 60_000);
-      const receipt = await paymentClient(rpc).readOrder(link);
+      // One request per order: a repeat with the same reason is a no-op and
+      // a different reason is refused, exactly as the mutation would decide,
+      // but without spending the bucket or a chain read. This also covers a
+      // replayed old approval, which is why freshness is checked after it.
+      if (link.refundRequest) {
+        if (link.refundRequest.reason !== request.reason)
+          throw new Error("A refund has already been requested for this order.");
+        return;
+      }
+      if (
+        request.issuedAt < Date.now() - 600_000 ||
+        request.issuedAt > Date.now() + 30_000
+      )
+        throw new Error("This approval expired. Request the refund again.");
+      const claim = await enforce(ctx, "refund", link._id, 5, 60_000);
+      let receipt;
+      try {
+        receipt = await paymentClient(rpc).readOrder(link);
+      } catch (error) {
+        // An RPC outage must not lock the buyer out of retrying.
+        if (isTransient(error)) await release(ctx, "refund", link._id, claim);
+        throw error;
+      }
       if (
         !receipt ||
         receipt.buyer !== request.buyer ||

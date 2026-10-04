@@ -71,10 +71,13 @@ export default defineSchema({
   // Fixed-window counters for the public-endpoint rate limits (rateLimit.ts).
   rateLimits: defineTable({
     key: v.string(),
-    windowStart: v.number(),
-    // windowStart + windowMs: the sweep keys off this so a live long window
-    // is never deleted mid-window.
-    expiresAt: v.number(),
+    // End of the current window. The sweep keys off this so a live long
+    // window is never deleted mid-window. Optional only so rows written by an
+    // earlier build (which had windowStart and no expiresAt) still validate;
+    // hit() treats a missing value as expired and the sweep removes them.
+    expiresAt: v.optional(v.number()),
+    // Legacy, no longer written. Remove once old rows have been swept.
+    windowStart: v.optional(v.number()),
     count: v.number(),
   })
     .index("by_key", ["key"])

@@ -11,6 +11,8 @@ export const key = (scope: string, subject: string) => `${scope}:${subject}`;
 // exact under concurrency. A bucket may only be consumed by the party it
 // protects: callers enforce after the cheap proof that the caller is
 // legitimate, never keyed on raw unvalidated input.
+// Every result carries the window's expiresAt so a later release can prove
+// it is returning a hit to the same window it took it from.
 export const hit = internalMutation({
   args: { key: v.string(), limit: v.number(), windowMs: v.number() },
   handler: async (ctx, { key, limit, windowMs }) => {
@@ -19,34 +21,42 @@ export const hit = internalMutation({
       .query("rateLimits")
       .withIndex("by_key", (q) => q.eq("key", key))
       .unique();
-    if (!row || row.expiresAt <= now) {
-      const window = { windowStart: now, expiresAt: now + windowMs, count: 1 };
+    // Rows written before expiresAt existed count as expired.
+    if (!row || row.expiresAt === undefined || row.expiresAt <= now) {
+      const window = { expiresAt: now + windowMs, count: 1 };
       if (row) await ctx.db.patch(row._id, window);
       else await ctx.db.insert("rateLimits", { key, ...window });
-      return { allowed: true, retryAfterMs: 0 };
+      return { allowed: true, retryAfterMs: 0, expiresAt: window.expiresAt };
     }
     if (row.count >= limit)
-      return { allowed: false, retryAfterMs: row.expiresAt - now };
+      return {
+        allowed: false,
+        retryAfterMs: row.expiresAt - now,
+        expiresAt: row.expiresAt,
+      };
     await ctx.db.patch(row._id, { count: row.count + 1 });
-    return { allowed: true, retryAfterMs: 0 };
+    return { allowed: true, retryAfterMs: 0, expiresAt: row.expiresAt };
   },
 });
 
-// Returns a hit to the bucket, e.g. when the work it guarded failed and the
-// next caller should retry instead of waiting out the window. Only the
-// current window can be released; an expired row is dead anyway.
+// Returns a hit to the bucket when the work it guarded failed transiently, so
+// the next caller retries instead of waiting out the window. Bound to the
+// window the hit came from: if that window has expired or rolled over, the
+// row now belongs to someone else's claim and is left alone.
 export const unhit = internalMutation({
-  args: { key: v.string() },
-  handler: async (ctx, { key }) => {
+  args: { key: v.string(), expiresAt: v.number() },
+  handler: async (ctx, { key, expiresAt }) => {
     const row = await ctx.db
       .query("rateLimits")
       .withIndex("by_key", (q) => q.eq("key", key))
       .unique();
-    if (!row || row.expiresAt <= Date.now()) return;
+    if (!row || row.expiresAt !== expiresAt || expiresAt <= Date.now()) return;
     if (row.count <= 1) await ctx.db.delete(row._id);
     else await ctx.db.patch(row._id, { count: row.count - 1 });
   },
 });
+
+export type Claim = { allowed: boolean; retryAfterMs: number; expiresAt: number };
 
 export async function allow(
   ctx: ActionCtx,
@@ -54,7 +64,7 @@ export async function allow(
   subject: string,
   limit: number,
   windowMs: number,
-): Promise<{ allowed: boolean; retryAfterMs: number }> {
+): Promise<Claim> {
   return ctx.runMutation(internal.rateLimit.hit, {
     key: key(scope, subject),
     limit,
@@ -66,28 +76,29 @@ export async function release(
   ctx: ActionCtx,
   scope: string,
   subject: string,
+  claim: Pick<Claim, "expiresAt">,
 ): Promise<void> {
-  await ctx.runMutation(internal.rateLimit.unhit, { key: key(scope, subject) });
+  await ctx.runMutation(internal.rateLimit.unhit, {
+    key: key(scope, subject),
+    expiresAt: claim.expiresAt,
+  });
 }
 
+// Throws when the bucket is full; otherwise returns the claim so the caller
+// can release it if the guarded work fails transiently.
 export async function enforce(
   ctx: ActionCtx,
   scope: string,
   subject: string,
   limit: number,
   windowMs: number,
-): Promise<void> {
-  const { allowed, retryAfterMs } = await allow(
-    ctx,
-    scope,
-    subject,
-    limit,
-    windowMs,
-  );
-  if (!allowed)
+): Promise<Claim> {
+  const claim = await allow(ctx, scope, subject, limit, windowMs);
+  if (!claim.allowed)
     throw new ConvexError(
-      `Too many requests. Try again in ${Math.ceil(retryAfterMs / 1000)} seconds.`,
+      `Too many requests. Try again in ${Math.ceil(claim.retryAfterMs / 1000)} seconds.`,
     );
+  return claim;
 }
 
 // Cron entry point. Rows are only read while their window is live, so rows
