@@ -383,24 +383,44 @@ describe("keeper run", () => {
     const t = convexTest(schema, modules);
     const orderAddress = Keypair.generate().publicKey.toBase58();
     await insertLink(t, orderAddress);
-    // The order is Disputed on-chain (not Open), so it is not a release
-    // candidate regardless of what Convex says.
-    fns.disputedOrders.mockResolvedValue([openOrder(1_000_000, orderAddress)]);
+    // The order is Disputed on-chain, so the Open-only scan never returns it
+    // and it cannot become a release candidate, whatever Convex says.
+    fns.openOrders.mockResolvedValue([]);
     const result = await t.action(internal.keeperActions.run, {});
     expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 0 });
     expect(fns.send).not.toHaveBeenCalled();
   });
-  it("does not re-sync a dispute whose order is disputed on-chain every run", async () => {
+  it("scans the chain once per run, for Open orders only", async () => {
+    const t = convexTest(schema, modules);
+    await t.action(internal.keeperActions.run, {});
+    expect(fns.openOrders).toHaveBeenCalledTimes(1);
+    expect(fns.disputedOrders).not.toHaveBeenCalled();
+  });
+  it("does not re-sync a dispute recorded as disputed on-chain every run", async () => {
     const t = convexTest(schema, modules);
     const orderAddress = Keypair.generate().publicKey.toBase58();
-    await insertLink(t, orderAddress, true);
-    // Still Disputed on-chain: counts as open for the reconcile step, so the
-    // link is skipped without an RPC read.
-    fns.disputedOrders.mockResolvedValue([openOrder(1_000_000, orderAddress)]);
+    const id = await insertLink(t, orderAddress);
+    // record() stores the chain's Disputed flag (and backfills the request).
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt(orderAddress, "paid"), disputed: true },
+    });
+    // Not in the Open scan, but recorded as Disputed: only the resolver can
+    // move it on, so the keeper leaves it to the reconciler — no RPC read.
     const result = await t.action(internal.keeperActions.run, {});
     expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 0 });
     expect(readOrder).not.toHaveBeenCalled();
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(1);
+  });
+  it("still syncs a dispute resolved on-chain that was never recorded as disputed", async () => {
+    const t = convexTest(schema, modules);
+    const orderAddress = Keypair.generate().publicKey.toBase58();
+    await insertLink(t, orderAddress, true);
+    // A Convex-only request whose order was refunded on-chain.
+    readOrder.mockResolvedValue(receipt(orderAddress, "refunded"));
+    const result = await t.action(internal.keeperActions.run, {});
+    expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 1 });
+    expect(await t.query(api.payments.refundQueue, {})).toHaveLength(0);
   });
   it("counts a race with a fresh dispute as skipped, not failed", async () => {
     const t = convexTest(schema, modules);

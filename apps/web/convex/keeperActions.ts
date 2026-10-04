@@ -67,21 +67,18 @@ export const run = internalAction({
       let lowFunds = false;
       try {
         lowFunds = (await chain.balance(keeper.publicKey)) < 1_000_000;
-        const [openOrders, disputedOrders, chainTime, disputes] =
-          await Promise.all([
-            chain.openOrders(),
-            chain.disputedOrders(),
-            chain.chainTime(),
-            ctx.runQuery(internal.keeper.openDisputes, {}),
-          ]);
+        // One program-account scan per run: Open orders only. Disputed
+        // orders are never release candidates, and the dispute reconcile
+        // below recognises them from the stored receipt instead of a second
+        // full scan (the reconciler's scan is what discovers new disputes).
+        const [openOrders, chainTime, disputes] = await Promise.all([
+          chain.openOrders(),
+          chain.chainTime(),
+          ctx.runQuery(internal.keeper.openDisputes, {}),
+        ]);
         const chainNow = Number(chainTime);
         const wallNow = Date.now();
-        // Disputed orders are still open liability: they count as "open" for
-        // the dispute reconcile below, but only openOrders feeds the release
-        // candidates, so a disputed order is never released.
-        const openSet = new Set(
-          [...openOrders, ...disputedOrders].map((order) => order.order),
-        );
+        const openSet = new Set(openOrders.map((order) => order.order));
         // Merchant accounts give authority and mint; cached once per run.
         const merchants = new Map<
           string,
@@ -212,10 +209,18 @@ export const run = internalAction({
         }
         // Reconcile disputes resolved on-chain but never synced (for example a
         // resolver who closed the tab right after signing). Disputes still open
-        // on-chain are skipped, so this costs no RPC for them.
+        // on-chain are skipped, so this costs no RPC for them: Open orders are
+        // in openSet, and an order recorded as Disputed (which only the
+        // resolver can leave) is left to the reconciler, whose scan includes
+        // Disputed orders.
         for (const link of disputes) {
           if (outOfTime()) break;
-          if (!link.receipt || openSet.has(link.receipt.order)) continue;
+          if (
+            !link.receipt ||
+            openSet.has(link.receipt.order) ||
+            link.receipt.disputed
+          )
+            continue;
           try {
             if (await syncLink(ctx, link, rpc)) synced += 1;
           } catch {
