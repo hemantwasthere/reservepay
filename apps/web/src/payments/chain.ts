@@ -330,6 +330,12 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
     async prepareRefundRequest(terms: PaymentTerms, buyer: PublicKey) {
       const { order } = addresses(terms);
       const state = await this.readState(terms, "confirmed");
+      // A retry after a slow confirm is common; say what actually happened
+      // instead of the program's generic OrderClosed.
+      if (state && "disputed" in state.status)
+        throw new Error(
+          "You already disputed this order. The resolver will review it.",
+        );
       if (!state || !("open" in state.status))
         throw new Error("This order is already resolved or has not been paid.");
       if (!state.buyer.equals(buyer))

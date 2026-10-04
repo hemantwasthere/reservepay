@@ -257,9 +257,15 @@ describe("order resolution transactions", () => {
     await expect(
       expired.client.prepareRefundRequest(terms, buyer.publicKey),
     ).rejects.toThrow("protection period has ended");
+    // A retry on an order the buyer already disputed says so, rather than
+    // the generic "already resolved".
     const disputed = await setup({ status: { disputed: {} } as never });
     await expect(
       disputed.client.prepareRefundRequest(terms, buyer.publicKey),
+    ).rejects.toThrow("already disputed");
+    const refunded = await setup({ status: { refunded: {} } as never });
+    await expect(
+      refunded.client.prepareRefundRequest(terms, buyer.publicKey),
     ).rejects.toThrow("already resolved");
     expect(rpc.getBalance).toHaveBeenCalled();
   });

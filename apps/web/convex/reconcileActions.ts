@@ -108,9 +108,8 @@ export const run = internalAction({
         if (unsynced.length + newDisputes.length > 0 && !outOfTime()) {
           for (const link of [...unsynced, ...newDisputes])
             syncedInScan.add(link._id);
-          if (unsynced.length > 0) count(await syncLinks(ctx, unsynced, receipts));
-          if (newDisputes.length > 0)
-            count(await syncLinks(ctx, newDisputes, receipts));
+          // One batched read for both: a link is in at most one list.
+          count(await syncLinks(ctx, [...unsynced, ...newDisputes], receipts));
         } else if (unsynced.length + newDisputes.length > 0) {
           complete = false;
         }

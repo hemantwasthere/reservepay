@@ -17,7 +17,11 @@ import {
 import { PROGRAM_ID, merchantAddress, protocolAddress } from "@reservepay/core";
 import type { Reservepay } from "./reservepay";
 import idl from "./reservepay.json";
-import { orderStatus, type OrderStatus } from "../payments/order-status";
+import {
+  isDisputed,
+  orderStatus,
+  type OrderStatus,
+} from "../payments/order-status";
 import { withRetry } from "../lib/retry";
 
 export const DEVNET_USDC = new PublicKey(
@@ -53,6 +57,9 @@ export type MerchantOrder = {
   createdAt: number;
   expiresAt: number;
   status: OrderStatus;
+  // Disputed on-chain: status stays "paid" (still open liability), but only
+  // the resolver can complete or refund it — never offer the merchant Release.
+  disputed: boolean;
 };
 
 export function parseAmount(value: string): bigint {
@@ -173,6 +180,7 @@ export function merchantClient(
         createdAt: account.createdAt.toNumber() * 1000,
         expiresAt: account.expiresAt.toNumber() * 1000,
         status: orderStatus(account.status),
+        disputed: isDisputed(account.status),
       }));
       orders.sort(
         (a, b) =>
