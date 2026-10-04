@@ -7,11 +7,22 @@ import { ConvexError } from "convex/values";
 // HTTP/2 statusText is empty ("429 : …"), so the status must be followed by
 // a space and then either a capital letter or a colon. The anchoring keeps
 // digits inside base58 pubkeys and signatures from matching.
+// The status patterns are case-SENSITIVE on purpose: the capital letter is
+// the HTTP status text ("429 Too…", "503 Service…"). Case-insensitive, they
+// would match program logs such as "consumed 429 of 200000 compute units".
+// Only the free-text phrases are case-insensitive.
 // Rate limiting (429) is defined once and reused by both classifiers, so a
 // new 429 phrasing added here reaches isTransient and isRateLimited alike.
-const RATE_LIMITED = /\b429 (?:[A-Z]|:)|Too Many Requests/i;
-const SERVER_OR_NETWORK =
-  /\b50[234] (?:[A-Z]|:)|Failed to fetch|NetworkError|Load failed|fetch failed|ECONNRESET|ETIMEDOUT|socket hang up/i;
+const RATE_LIMITED_STATUS = /\b429 (?:[A-Z]|:)/;
+const RATE_LIMITED_TEXT = /Too Many Requests/i;
+const SERVER_STATUS = /\b50[234] (?:[A-Z]|:)/;
+const NETWORK_TEXT =
+  /Failed to fetch|NetworkError|Load failed|fetch failed|ECONNRESET|ETIMEDOUT|socket hang up/i;
+
+const rateLimited = (message: string) =>
+  RATE_LIMITED_STATUS.test(message) || RATE_LIMITED_TEXT.test(message);
+const serverOrNetwork = (message: string) =>
+  SERVER_STATUS.test(message) || NETWORK_TEXT.test(message);
 
 const messageOf = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
@@ -22,13 +33,13 @@ export function isTransient(error: unknown): boolean {
   if (error instanceof ConvexError) return false;
   const message = messageOf(error);
   if (/does not match/i.test(message)) return false;
-  return RATE_LIMITED.test(message) || SERVER_OR_NETWORK.test(message);
+  return rateLimited(message) || serverOrNetwork(message);
 }
 
 // 429 specifically: the RPC is throttling us.
 export function isRateLimited(error: unknown): boolean {
   if (error instanceof ConvexError) return false;
-  return RATE_LIMITED.test(messageOf(error));
+  return rateLimited(messageOf(error));
 }
 
 // Release policy for a rate-limit slot whose guarded chain read failed: give

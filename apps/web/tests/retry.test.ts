@@ -43,6 +43,11 @@ describe("isTransient", () => {
     "custom program error: 0x1770",
     "RPC unavailable",
     "This payment link has already been paid.",
+    // A status code followed by lowercase is a program log, not HTTP.
+    "Program log: consumed 429 of 200000 compute units",
+    "consumed 503 of 200000 compute units; custom program error: 0x1770",
+    "need 504 more lamports",
+    "503 service unavailable",
   ])("does not retry: %s", (message) => {
     expect(isTransient(new Error(message))).toBe(false);
   });
@@ -68,6 +73,7 @@ describe("isRateLimited", () => {
     // 429 inside a base58 account, not an HTTP status
     "failed to get info about account 4Zx429abc: invalid param",
     "The on-chain order does not match this payment link. Do not send another payment.",
+    "Program log: consumed 429 of 200000 compute units",
     wrapped("503 Service Unavailable: upstream"),
     `failed to get info about account ${ACCOUNT}: TypeError: fetch failed`,
   ])("does not match: %s", (message) => {
@@ -162,6 +168,7 @@ describe("releasesRateLimitSlot", () => {
     "The on-chain order does not match this payment link. Do not send another payment.",
     wrapped("500 Internal Server Error: boom"),
     "custom program error: 0x1770",
+    "consumed 503 of 200000 compute units; custom program error: 0x1770",
   ])("keeps the slot otherwise: %s", (message) => {
     expect(releasesRateLimitSlot(new Error(message))).toBe(false);
   });
