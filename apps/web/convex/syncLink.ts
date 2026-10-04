@@ -25,6 +25,10 @@ export type SyncSummary = {
   failed: number;
 };
 
+// syncLinks also reports links left unwritten because shouldStop() said the
+// caller's budget was spent; they are retried on a later run.
+export type SyncResult = SyncSummary & { deferred: number };
+
 // Batched variant for the reconciler. Mismatches are counted, not logged per
 // link: anyone can create an order for a link's reference with a different
 // amount (it stays Open forever), and per-link logs would spam every run.
@@ -34,17 +38,36 @@ export async function syncLinks(
   ctx: ActionCtx,
   links: Doc<"paymentLinks">[],
   connection: Connection,
-): Promise<SyncSummary> {
+  // Checked before each receipt write; links left unwritten count as
+  // deferred (retried on a later run), not failed.
+  shouldStop?: () => boolean,
+): Promise<SyncResult> {
   let receipts: Map<string, OrderReceipt | null | Error>;
   try {
     receipts = await paymentClient(connection).readOrders(
       links.map((link) => ({ id: link._id as string, terms: link })),
     );
   } catch {
-    return { synced: 0, missing: 0, mismatched: 0, failed: links.length };
+    return {
+      synced: 0,
+      missing: 0,
+      mismatched: 0,
+      failed: links.length,
+      deferred: 0,
+    };
   }
-  const summary = { synced: 0, missing: 0, mismatched: 0, failed: 0 };
-  for (const link of links) {
+  const summary = {
+    synced: 0,
+    missing: 0,
+    mismatched: 0,
+    failed: 0,
+    deferred: 0,
+  };
+  for (const [index, link] of links.entries()) {
+    if (shouldStop?.()) {
+      summary.deferred = links.length - index;
+      break;
+    }
     const receipt = receipts.get(link._id);
     if (receipt === undefined) summary.failed += 1;
     else if (receipt instanceof Error) summary.mismatched += 1;

@@ -432,6 +432,32 @@ describe("keeper run", () => {
     expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 1 });
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(0);
   });
+  it("defers resolved-dispute writes once the run budget is spent", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const orderAddress = Keypair.generate().publicKey.toBase58();
+    const id = await insertLink(t, orderAddress, true);
+    // The batched read itself eats past the 4-minute budget: the receipt it
+    // returns is not written this run, and that is not a failure.
+    readOrders.mockImplementation(async () => {
+      vi.advanceTimersByTime(4 * 60_000 + 1);
+      return new Map([[id, receipt(orderAddress, "refunded")]]);
+    });
+    const result = await t.action(internal.keeperActions.run, {});
+    expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 0 });
+    expect(await t.query(api.payments.refundQueue, {})).toHaveLength(1);
+    // The next run, with time to spare, writes it.
+    readOrders.mockResolvedValue(
+      new Map([[id, receipt(orderAddress, "refunded")]]),
+    );
+    expect(await t.action(internal.keeperActions.run, {})).toEqual({
+      released: 0,
+      skipped: 0,
+      failed: 0,
+      synced: 1,
+    });
+    expect(await t.query(api.payments.refundQueue, {})).toHaveLength(0);
+  });
   it("counts a race with a fresh dispute as skipped, not failed", async () => {
     const t = convexTest(schema, modules);
     fns.openOrders.mockResolvedValue([openOrder(1_000_000)]);

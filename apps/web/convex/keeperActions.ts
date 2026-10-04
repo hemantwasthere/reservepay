@@ -221,7 +221,9 @@ export const run = internalAction({
             !link.receipt.disputed,
         );
         if (staleDisputes.length > 0 && !outOfTime()) {
-          const result = await syncLinks(ctx, staleDisputes, rpc);
+          // Stops writing receipts once the run budget is spent; the rest are
+          // deferred to the next run (the run is then reported incomplete).
+          const result = await syncLinks(ctx, staleDisputes, rpc, outOfTime);
           synced += result.synced;
           failed += result.failed + result.mismatched;
         }
