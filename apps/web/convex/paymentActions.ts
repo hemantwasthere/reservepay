@@ -197,18 +197,25 @@ export const requestRefund = action({
       )
         throw new Error("This approval expired. Request the refund again.");
       const claim = await enforce(ctx, "refund", link._id, 5, 60_000);
+      const requireDispute = process.env.REQUIRE_ONCHAIN_DISPUTE === "1";
       let receipt, disputed;
       try {
         const client = paymentClient(rpc);
-        // The dispute gate and the expiry decision read at confirmed: the
-        // buyer signs right after the dispute transaction confirms, and
-        // Disputed cannot regress. The stored receipt stays finalized.
-        const [confirmed, finalized] = await Promise.all([
-          client.readOrder(link, "confirmed"),
-          client.readOrder(link),
-        ]);
-        receipt = finalized;
-        disputed = confirmed?.disputed === true || finalized?.disputed === true;
+        // The stored receipt is always the finalized read.
+        receipt = await client.readOrder(link);
+        disputed = receipt?.disputed === true;
+        // Only when the answer can change the outcome — the dispute gate is
+        // on, or protection has ended — and finalized doesn't already show
+        // the dispute, also read at confirmed: the buyer signs right after
+        // the dispute transaction confirms, finalized can lag it by ~13s, and
+        // Disputed cannot regress. Otherwise one read is enough.
+        if (
+          receipt &&
+          !disputed &&
+          (requireDispute || receipt.expiresAt <= Date.now())
+        )
+          disputed =
+            (await client.readOrder(link, "confirmed"))?.disputed === true;
       } catch (error) {
         // An RPC outage must not lock the buyer out of retrying — but a 429
         // keeps the slot: under throttling the buyer's own limit is the
@@ -225,12 +232,12 @@ export const requestRefund = action({
         throw new Error(
           "Only the verified buyer can request a refund for this order.",
         );
-      if (process.env.REQUIRE_ONCHAIN_DISPUTE === "1" && !disputed) {
-        // A deterministic refusal, not a failed chain read: return the slot
-        // so retrying once the dispute confirms is never locked out.
-        await release(ctx, "refund", link._id, claim);
+      // A deterministic refusal keeps the slot, like every other non-transient
+      // failure: returning it would let a buyer who never disputes replay a
+      // signed approval for unlimited chain reads. Five per minute is plenty
+      // to retry once the dispute confirms.
+      if (requireDispute && !disputed)
         throw new ConvexError("Submit the on-chain dispute first.");
-      }
       if (!disputed && receipt.expiresAt <= Date.now())
         throw new Error("The protection period has ended.");
       await ctx.runMutation(internal.payments.requestRefund, {

@@ -243,27 +243,61 @@ describe("buyer refund requests", () => {
       ),
     ).rejects.toThrow("already been requested");
   });
-  it("returns the rate-limit slot when the on-chain dispute is missing", async () => {
+  it("keeps the rate-limit slot when the on-chain dispute is missing", async () => {
+    vi.useFakeTimers();
     const { t, id, request, receipt } = await setup();
     process.env.REQUIRE_ONCHAIN_DISPUTE = "1";
     try {
       readOrder.mockResolvedValue(receipt);
+      for (let i = 0; i < 5; i++)
+        await expect(
+          t.action(api.paymentActions.requestRefund, sign(request)),
+        ).rejects.toThrow("on-chain dispute first");
+      // Each refusal is a deterministic failure, so it keeps its slot: a buyer
+      // who never disputes cannot replay an approval for unlimited reads.
+      // Each attempt costs at most two reads (finalized, then confirmed).
+      expect(readOrder).toHaveBeenCalledTimes(10);
       await expect(
         t.action(api.paymentActions.requestRefund, sign(request)),
-      ).rejects.toThrow("on-chain dispute first");
-      // The refusal returned the slot, so retrying once the dispute confirms
-      // is not locked out.
-      expect(
-        await t.run((ctx) => ctx.db.query("rateLimits").collect()),
-      ).toEqual([]);
+      ).rejects.toThrow("Too many requests");
+      expect(readOrder).toHaveBeenCalledTimes(10);
+      // Once the dispute confirms, the next window accepts the request.
+      vi.advanceTimersByTime(60_000);
       readOrder.mockResolvedValue({ ...receipt, disputed: true });
-      await t.action(api.paymentActions.requestRefund, sign(request));
+      await t.action(
+        api.paymentActions.requestRefund,
+        sign({ ...request, issuedAt: Date.now() }),
+      );
       expect((await t.query(api.payments.get, { id }))?.refundPending).toBe(
         true,
       );
     } finally {
       delete process.env.REQUIRE_ONCHAIN_DISPUTE;
     }
+  });
+  it("reads the chain once when the confirmed read cannot change the outcome", async () => {
+    const { t, request } = await setup();
+    // Gate off and protection still running: the finalized read decides.
+    await t.action(api.paymentActions.requestRefund, sign(request));
+    expect(readOrder).toHaveBeenCalledTimes(1);
+    expect(readOrder.mock.calls[0][1]).toBeUndefined();
+  });
+  it("keeps a recorded dispute when the refund request's finalized read lags", async () => {
+    const { t, id, request, receipt } = await setup();
+    // record() already holds the chain's Disputed flag (and an unspecified
+    // backfilled request) from a fresher RPC.
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt, disputed: true },
+    });
+    // The buyer's reason arrives; this action's finalized read still lags
+    // and does not show the dispute yet.
+    readOrder.mockResolvedValue(receipt);
+    await t.action(api.paymentActions.requestRefund, sign(request));
+    const link = await t.query(api.payments.get, { id });
+    expect(link?.refundRequest?.reason).toBe("not_received");
+    // Disputed never regresses, so the stored flag survives the lagging read.
+    expect(link?.receipt?.disputed).toBe(true);
   });
   it("records the refund outcome only when a request existed", async () => {
     const { t, id, request, receipt } = await setup();

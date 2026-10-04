@@ -271,15 +271,25 @@ export const requestRefund = internalMutation({
     // order is accepted even when this request lands after expiry.
     if (receipt.expiresAt <= Date.now() && !receipt.disputed && !disputed)
       throw new ConvexError("The protection period has ended.");
+    // Disputed never regresses, so keep the flag if any source has it: the
+    // action's confirmed read, this finalized receipt, or the stored one
+    // (record() may already hold it from a fresher RPC). Storing a lagging
+    // finalized receipt verbatim would otherwise clear it.
+    const stored = {
+      ...receipt,
+      ...(receipt.disputed || disputed || link.receipt?.disputed
+        ? { disputed: true }
+        : {}),
+    };
     await ctx.db.patch(id, {
-      receipt,
+      receipt: stored,
       refundRequest: {
         reason,
         requestedAt: existing?.requestedAt ?? Date.now(),
       },
       refundPending: true,
     });
-    await notifyOrder(ctx, { ...link, receipt }, "refund_requested", [
+    await notifyOrder(ctx, { ...link, receipt: stored }, "refund_requested", [
       link.merchant,
       receipt.buyer,
     ]);
