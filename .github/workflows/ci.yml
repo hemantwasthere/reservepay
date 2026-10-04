@@ -100,17 +100,11 @@ jobs:
       - run: bun run --filter @reservepay/core build # tests import apps/web/src/* which import @reservepay/core → dist/
       - id: build
         name: Build the program
-        # --ignore-keys: CI generates a throwaway program keypair; the validator
-        # loads the program at the Anchor.toml address. cargo-build-sbf only
-        # warns when an instruction frame exceeds the 4096-byte stack limit, so
-        # fail the job ourselves when the log contains "Stack offset".
-        run: |
-          set -o pipefail
-          anchor build --ignore-keys 2>&1 | tee /tmp/anchor-build.log
-          if grep -q "Stack offset" /tmp/anchor-build.log; then
-            echo "::error::an instruction frame exceeds the 4096-byte stack limit (see above)"
-            exit 1
-          fi
+        # Shared with `bun run test:program` and devnet redeploys: builds with
+        # --ignore-keys (CI's throwaway program keypair; the validator loads the
+        # program at the Anchor.toml address) and fails when cargo-build-sbf
+        # reports a frame over the 4096-byte stack limit.
+        run: bun run build:program
       - id: idlcheck
         run: bun run idl:check
       # Run the tests even when idl:check failed, so drift and test failures
