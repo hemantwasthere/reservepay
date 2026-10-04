@@ -9,7 +9,9 @@ Connect the wallet that paid, choose **Request refund**, select a public reason,
 Two exceptions to those rules:
 
 - **Reason not provided.** A dispute raised directly on-chain is recorded with the placeholder reason *Reason not provided*. The buyer's own signed reason may replace that placeholder (keeping the original request time) while the order is still open. Once the resolver has decided, a late reason is refused with *already resolved*, and the outcome stays recorded without one. Replacing the placeholder does not send a second inbox notification: the resolver sees the reason on the Disputes page.
-- **Disputed before the deadline.** If the order was flagged `Disputed` on-chain before protection ended, the buyer can still add a reason after the deadline, because the program already enforced the window when the dispute was raised. The backend counts the dispute if the stored receipt or the finalized chain read shows it, and otherwise checks a confirmed read, since both can lag a fresh dispute by a few seconds. An undisputed request is never accepted later than 60 seconds after the deadline, because the keeper may already have released the order.
+- **Disputed before the deadline.** If the order was flagged `Disputed` on-chain before protection ended, the buyer can still add a reason after the deadline, because the program already enforced the window when the dispute was raised. The backend counts the dispute if the stored receipt or either of its two chain reads (finalized and confirmed, made together) shows it, since the stored receipt and the finalized read can lag a fresh dispute by a few seconds.
+
+There is no grace period for buyers: an undisputed request must be made before the deadline. One made just before it still counts if it is recorded within 60 seconds of the deadline, which covers a slow chain read; after that it is refused, because the keeper may be about to release the order.
 
 `REQUIRE_ONCHAIN_DISPUTE=1` (Convex environment) refuses signed reasons for orders that are not yet `Disputed` on-chain, with *Submit the on-chain dispute first*. Leave it unset until the app's Request refund button sends the dispute transaction.
 
