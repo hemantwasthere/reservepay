@@ -118,19 +118,19 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
             } as React.CSSProperties
           }
         >
-          <a
-            className={
-              "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-background p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
-            }
-            href="#merchant-main"
-          >
-            Skip to dashboard
-          </a>
           <header
             className={
               "merchant-header max-[380px]:gap-1 min-h-[88px] flex items-center gap-[34px] py-[20px] px-[34px] [border-bottom:1px_solid_var(--line)] bg-card max-[860px]:min-h-[78px] max-[860px]:py-[16px] max-[860px]:px-[24px] max-[640px]:px-3 max-[640px]:py-4 max-[640px]:gap-[8px] max-[640px]:[&_.brand]:text-[17px] max-[380px]:[&_.brand]:text-[14px] max-[380px]:px-2 max-[380px]:[&_.wallet-button]:px-2 max-[640px]:[&_.brand-mark]:w-[24px] max-[640px]:[&_.brand-mark]:h-[24px] max-[640px]:[&_.wallet-button]:min-h-[37px] max-[640px]:[&_.wallet-button]:text-[10px] max-[640px]:[&_.wallet-button]:gap-[6px] max-[640px]:[&_.wallet-button]:py-0 max-[640px]:[&_.wallet-button]:px-[10px] sticky top-0 z-30 h-[88px] shrink-0"
             }
           >
+            <a
+              className={
+                "skip-link [clip-path:inset(50%)] fixed left-[16px] top-[-60px] z-[10] bg-foreground text-background p-[12px] [&:focus]:[clip-path:none] [&:focus]:top-[12px]"
+              }
+              href="#merchant-main"
+            >
+              Skip to dashboard
+            </a>
             <div className="flex shrink-0 items-center gap-4 max-[640px]:gap-2 max-[380px]:gap-1">
               <a
                 className={

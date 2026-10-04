@@ -54,120 +54,121 @@ export function WorkspaceSidebar({
     <Sidebar
       collapsible="icon"
       className="top-[88px] h-[calc(100svh-88px)] border-line"
-      aria-label="Workspace navigation"
     >
-      <SidebarContent className="gap-6 overflow-x-hidden px-[11px] pt-7">
-        {isMobile && (
-          <div className="flex items-center justify-between px-2">
-            <span className="text-sm font-medium">Your workspace</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Close navigation"
-              onClick={() => setOpenMobile(false)}
+      <nav aria-label="Workspace navigation" className="flex h-full flex-col">
+        <SidebarContent className="gap-6 overflow-x-hidden px-[11px] pt-7">
+          {isMobile && (
+            <div className="flex items-center justify-between px-2">
+              <span className="text-sm font-medium">Your workspace</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Close navigation"
+                onClick={() => setOpenMobile(false)}
+              >
+                <X />
+              </Button>
+            </div>
+          )}
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel
+              className={`${labelClasses} mb-4 w-[212px] px-3 font-mono text-[9px] tracking-[1.2px] text-muted-foreground group-data-[collapsible=icon]:mt-0`}
             >
-              <X />
-            </Button>
-          </div>
-        )}
-        <SidebarGroup className="p-0">
-          <SidebarGroupLabel
-            className={`${labelClasses} mb-4 w-[212px] px-3 font-mono text-[9px] tracking-[1.2px] text-muted-foreground group-data-[collapsible=icon]:mt-0`}
-          >
-            YOUR WORKSPACE
-          </SidebarGroupLabel>
-          <SidebarMenu className="gap-2">
-            {[
-              {
-                page: "overview",
-                href: "/app",
-                label: "Overview",
-                icon: ChartNoAxesCombined,
-              },
-              {
-                page: "payments",
-                href: "/app/payments",
-                label: "Payment links",
-                icon: Link2,
-              },
-              {
-                page: "profile",
-                href: "/app/profile",
-                label: "Profile",
-                icon: Store,
-              },
-              ...(showDisputes
-                ? [
-                    {
-                      page: "disputes",
-                      href: "/app/disputes",
-                      label: "Disputes",
-                      icon: Scale,
-                    },
-                  ]
-                : []),
-            ].map((item) => (
-              <SidebarMenuItem key={item.page}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={page === item.page}
-                  tooltip={item.label}
-                  className={`${menuClasses} text-[13px] data-[active=true]:border-[light-dark(#d9e1ce,var(--border))] data-[active=true]:bg-[light-dark(#e8eddf,var(--secondary))] data-[active=true]:text-primary`}
-                >
-                  <a
-                    href={item.href}
-                    aria-label={item.label}
-                    aria-current={page === item.page ? "page" : undefined}
-                    onClick={() => setOpenMobile(false)}
+              YOUR WORKSPACE
+            </SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {[
+                {
+                  page: "overview",
+                  href: "/app",
+                  label: "Overview",
+                  icon: ChartNoAxesCombined,
+                },
+                {
+                  page: "payments",
+                  href: "/app/payments",
+                  label: "Payment links",
+                  icon: Link2,
+                },
+                {
+                  page: "profile",
+                  href: "/app/profile",
+                  label: "Profile",
+                  icon: Store,
+                },
+                ...(showDisputes
+                  ? [
+                      {
+                        page: "disputes",
+                        href: "/app/disputes",
+                        label: "Disputes",
+                        icon: Scale,
+                      },
+                    ]
+                  : []),
+              ].map((item) => (
+                <SidebarMenuItem key={item.page}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={page === item.page}
+                    tooltip={item.label}
+                    className={`${menuClasses} text-[13px] data-[active=true]:border-[light-dark(#d9e1ce,var(--border))] data-[active=true]:bg-[light-dark(#e8eddf,var(--secondary))] data-[active=true]:text-primary`}
                   >
-                    <item.icon className="size-4" aria-hidden="true" />
-                    <span className={labelClasses} aria-hidden="true">
-                      {item.label}
-                    </span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter className="gap-6 overflow-hidden px-[11px] pb-8">
-        <div
-          className={`${fadeClasses} shrink-0`}
-          aria-hidden={!isMobile && state === "collapsed"}
-        >
-          <div className="w-[212px] px-3">
-            <ShieldCheck className="mb-4 size-[22px] text-[light-dark(#779469,var(--primary))]" />
-            <strong className="text-[15px] font-medium leading-relaxed">
-              A little reserve.
-              <br />A lot of trust.
-            </strong>
-            <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-              Collateral stays in your on-chain reserve, ready to protect your
-              customers.
-            </p>
+                    <a
+                      href={item.href}
+                      aria-label={item.label}
+                      aria-current={page === item.page ? "page" : undefined}
+                      onClick={() => setOpenMobile(false)}
+                    >
+                      <item.icon className="size-4" aria-hidden="true" />
+                      <span className={labelClasses} aria-hidden="true">
+                        {item.label}
+                      </span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter className="gap-6 overflow-hidden px-[11px] pb-8">
+          <div
+            className={`${fadeClasses} shrink-0`}
+            aria-hidden={!isMobile && state === "collapsed"}
+          >
+            <div className="w-[212px] px-3">
+              <ShieldCheck className="mb-4 size-[22px] text-[light-dark(#779469,var(--primary))]" />
+              <strong className="text-[15px] font-medium leading-relaxed">
+                A little reserve.
+                <br />A lot of trust.
+              </strong>
+              <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                Collateral stays in your on-chain reserve, ready to protect your
+                customers.
+              </p>
+            </div>
           </div>
-        </div>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              tooltip="How ReservePay works"
-              className={`${menuClasses} text-[10px]`}
-            >
-              <a href="/#faq-title" aria-label="How ReservePay works">
-                <CircleHelp className="size-4" aria-hidden="true" />
-                <span
-                  className={`${labelClasses} flex items-center gap-2`}
-                  aria-hidden="true"
-                >
-                  How ReservePay works <ArrowUpRight className="size-3" />
-                </span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                tooltip="How ReservePay works"
+                className={`${menuClasses} text-[10px]`}
+              >
+                <a href="/#faq-title" aria-label="How ReservePay works">
+                  <CircleHelp className="size-4" aria-hidden="true" />
+                  <span
+                    className={`${labelClasses} flex items-center gap-2`}
+                    aria-hidden="true"
+                  >
+                    How ReservePay works <ArrowUpRight className="size-3" />
+                  </span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+      </nav>
     </Sidebar>
   );
 }
