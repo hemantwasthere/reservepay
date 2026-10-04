@@ -6,6 +6,7 @@ import bs58 from "bs58";
 import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
 import { refundApproval, type RefundApproval } from "../src/payments/refunds";
+import { RELEASE_GRACE_MS } from "../src/payments/keeper";
 const { readOrder } = vi.hoisted(() => ({ readOrder: vi.fn() }));
 vi.mock("../src/payments/chain", () => ({
   paymentClient: () => ({ readOrder }),
@@ -248,8 +249,8 @@ describe("buyer refund requests", () => {
     process.env.REQUIRE_ONCHAIN_DISPUTE = "1";
     try {
       // Convex still says "paid" and protection has even ended, but the
-      // resolver already refunded on-chain: the fresh read's status decides
-      // first, and no confirmed read is wasted on a resolved order.
+      // resolver already refunded on-chain: the fresh reads' status decides
+      // first.
       readOrder.mockResolvedValue({
         ...receipt,
         status: "refunded",
@@ -258,7 +259,7 @@ describe("buyer refund requests", () => {
       await expect(
         t.action(api.paymentActions.requestRefund, sign(request)),
       ).rejects.toThrow("already resolved");
-      expect(readOrder).toHaveBeenCalledTimes(1);
+      expect(readOrder).toHaveBeenCalledTimes(2);
     } finally {
       delete process.env.REQUIRE_ONCHAIN_DISPUTE;
     }
@@ -295,12 +296,38 @@ describe("buyer refund requests", () => {
       delete process.env.REQUIRE_ONCHAIN_DISPUTE;
     }
   });
-  it("reads the chain once when the confirmed read cannot change the outcome", async () => {
+  it("always reads both commitments, in parallel", async () => {
     const { t, request } = await setup();
-    // Gate off and protection still running: the finalized read decides.
+    // Gate off and protection still running: still two reads, because the
+    // confirmed read alone can show a just-confirmed resolution.
     await t.action(api.paymentActions.requestRefund, sign(request));
-    expect(readOrder).toHaveBeenCalledTimes(1);
-    expect(readOrder.mock.calls[0][1]).toBeUndefined();
+    expect(readOrder).toHaveBeenCalledTimes(2);
+    expect(readOrder.mock.calls.map((call) => call[1]).sort()).toEqual([
+      "confirmed",
+      undefined,
+    ]);
+  });
+  it("refuses a request on an order resolved at confirmed, even with the gate off", async () => {
+    const { t, id, request, receipt } = await setup();
+    // Protection still running and REQUIRE_ONCHAIN_DISPUTE unset: finalized
+    // still shows the order open, confirmed already shows the refund.
+    readOrder.mockImplementation(async (_terms, commitment) =>
+      commitment === "confirmed"
+        ? { ...receipt, status: "refunded" as const }
+        : receipt,
+    );
+    await expect(
+      t.action(api.paymentActions.requestRefund, sign(request)),
+    ).rejects.toThrow("already resolved");
+    // No request recorded and no spurious notification.
+    expect((await t.query(api.payments.get, { id }))?.refundRequest).toBe(
+      undefined,
+    );
+    expect(
+      (await t.run((ctx) => ctx.db.query("notifications").collect())).filter(
+        (entry) => entry.kind === "refund_requested",
+      ),
+    ).toHaveLength(0);
   });
   it("keeps a recorded dispute when the refund request's finalized read lags", async () => {
     const { t, id, request, receipt } = await setup();
@@ -340,9 +367,10 @@ describe("buyer refund requests", () => {
     const { t, id, request, receipt } = await setup();
     const near = { ...receipt, expiresAt: Date.now() + 1_000 };
     await t.mutation(internal.payments.record, { id, receipt: near });
-    // The read stalls 62s: by then the keeper may have released the order.
+    // The read stalls past the grace: by then the keeper may have released
+    // the order.
     readOrder.mockImplementation(async () => {
-      vi.advanceTimersByTime(62_000);
+      vi.advanceTimersByTime(RELEASE_GRACE_MS + 2_000);
       return near;
     });
     await expect(
@@ -355,7 +383,7 @@ describe("buyer refund requests", () => {
       undefined,
     );
   });
-  it("trusts a stored dispute with the gate on: one read, no confirmed read", async () => {
+  it("trusts a stored dispute with the gate on when both reads lag", async () => {
     const { t, id, request, receipt } = await setup();
     await t.mutation(internal.payments.record, {
       id,
@@ -363,11 +391,12 @@ describe("buyer refund requests", () => {
     });
     process.env.REQUIRE_ONCHAIN_DISPUTE = "1";
     try {
-      // This node's finalized read still lags the dispute.
+      // Neither of this node's reads shows the dispute yet; the receipt
+      // Convex already stored does, and Disputed never regresses.
       readOrder.mockClear();
       readOrder.mockResolvedValue(receipt);
       await t.action(api.paymentActions.requestRefund, sign(request));
-      expect(readOrder).toHaveBeenCalledTimes(1);
+      expect(readOrder).toHaveBeenCalledTimes(2);
       expect(
         (await t.query(api.payments.get, { id }))?.refundRequest?.reason,
       ).toBe("not_received");

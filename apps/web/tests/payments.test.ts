@@ -6,6 +6,7 @@ import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
+import { RELEASE_GRACE_MS } from "../src/payments/keeper";
 import {
   paymentApproval,
   referenceBytes,
@@ -362,7 +363,7 @@ describe("merchant-approved payment links", () => {
       buyer: "buyer",
       reserveAmount: "50000",
       createdAt: now - 3_600_000,
-      expiresAt: now - 61_000,
+      expiresAt: now - RELEASE_GRACE_MS - 1_000,
       status: "paid" as const,
     };
     // The action checked before expiry, but its chain reads stalled: by now

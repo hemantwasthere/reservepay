@@ -207,27 +207,21 @@ export const requestRefund = action({
         resolvedAtConfirmed = false;
       try {
         const client = paymentClient(rpc);
-        // The stored receipt is always the finalized read.
-        receipt = await client.readOrder(link);
-        disputed ||= receipt?.disputed === true;
-        // Only when the answer can change the outcome — the dispute gate is
-        // on, or protection has ended — and no source already shows the
-        // dispute, also read at confirmed: the buyer signs right after the
-        // dispute transaction confirms, finalized can lag it by ~13s, and
-        // Disputed cannot regress. Otherwise one read is enough.
-        if (
-          receipt &&
-          receipt.status === "paid" &&
-          !disputed &&
-          (requireDispute || receipt.expiresAt <= checkedAt)
-        ) {
-          const confirmed = await client.readOrder(link, "confirmed");
-          disputed = confirmed?.disputed === true;
-          // The confirmed read can also be ahead on resolution: an order
-          // refunded or completed in the few seconds before finalized catches
-          // up is "already resolved", not a missing dispute or lapsed deadline.
-          resolvedAtConfirmed = Boolean(confirmed && confirmed.status !== "paid");
-        }
+        // Both reads, in parallel. The stored receipt is always the finalized
+        // read. The confirmed read can be ~13s ahead of it in either
+        // direction that matters: a just-confirmed dispute, or a resolver's
+        // just-confirmed refund/completion — which must be "already resolved"
+        // whether or not the gate is on or protection has ended. Refund
+        // requests are rare and capped at 5/min per link, so the second read
+        // is cheap; skipping it was a source of wrong outcomes.
+        const [finalized, confirmed] = await Promise.all([
+          client.readOrder(link),
+          client.readOrder(link, "confirmed"),
+        ]);
+        receipt = finalized;
+        disputed ||=
+          finalized?.disputed === true || confirmed?.disputed === true;
+        resolvedAtConfirmed = Boolean(confirmed && confirmed.status !== "paid");
       } catch (error) {
         // An RPC outage must not lock the buyer out of retrying — but a 429
         // keeps the slot: under throttling the buyer's own limit is the
