@@ -16,8 +16,12 @@ export type KeeperLink = { id: string; refundPending: boolean };
 export type ReleasableOrder = KeeperOrder & { linkId?: string };
 
 // A refund request can be committed while receipt.expiresAt (ms) is still in
-// the future. Once wall time is 60 seconds past expiry no new request can
-// appear, so the dispute snapshot is stable and releasing cannot race one.
+// the future. Once wall time is RELEASE_GRACE_MS past expiry no new
+// (undisputed) request can appear — payments.requestRefund refuses one by
+// its own clock — so the dispute snapshot is stable and releasing cannot
+// race one.
+export const RELEASE_GRACE_MS = 60_000;
+
 export function selectReleasable<T extends KeeperOrder>({
   openOrders,
   links,
@@ -34,7 +38,7 @@ export function selectReleasable<T extends KeeperOrder>({
   return openOrders
     .filter((order) => {
       if (order.expiresAt > chainNow) return false;
-      if (order.expiresAt * 1000 + 60_000 > wallNow) return false;
+      if (order.expiresAt * 1000 + RELEASE_GRACE_MS > wallNow) return false;
       return links[`${order.authority}:${order.reference}`]?.refundPending !== true;
     })
     .sort((a, b) => a.expiresAt - b.expiresAt)

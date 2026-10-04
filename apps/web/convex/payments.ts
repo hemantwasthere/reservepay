@@ -10,6 +10,7 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { validateTerms } from "../src/payments/terms";
+import { RELEASE_GRACE_MS } from "../src/payments/keeper";
 import { notifyOrder } from "./notificationEvents";
 import { requireMerchant } from "./session";
 
@@ -275,11 +276,20 @@ export const requestRefund = internalMutation({
     // order — flagged by any source, including the stored receipt — is
     // accepted even when this request lands after expiry. The deadline is
     // compared against the action's clock, not this mutation's.
+    const isDisputed =
+      receipt.disputed === true ||
+      disputed === true ||
+      link.receipt?.disputed === true;
+    // checkedAt keeps a request made just before expiry from being refused
+    // by a mutation that lands just after it. But checkedAt is taken before
+    // the chain reads, which can stall, so this mutation's own clock also
+    // enforces the keeper's guarantee: once wall time is RELEASE_GRACE_MS
+    // past expiry, no undisputed request may appear — the order may already
+    // have been released to the merchant.
     if (
-      receipt.expiresAt <= (checkedAt ?? Date.now()) &&
-      !receipt.disputed &&
-      !disputed &&
-      !link.receipt?.disputed
+      !isDisputed &&
+      (receipt.expiresAt <= (checkedAt ?? Date.now()) ||
+        receipt.expiresAt + RELEASE_GRACE_MS <= Date.now())
     )
       throw new ConvexError("The protection period has ended.");
     // Disputed never regresses, so keep the flag if any source has it: the
@@ -288,9 +298,7 @@ export const requestRefund = internalMutation({
     // finalized receipt verbatim would otherwise clear it.
     const stored = {
       ...receipt,
-      ...(receipt.disputed || disputed || link.receipt?.disputed
-        ? { disputed: true }
-        : {}),
+      ...(isDisputed ? { disputed: true } : {}),
     };
     await ctx.db.patch(id, {
       receipt: stored,

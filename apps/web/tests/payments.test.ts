@@ -333,19 +333,59 @@ describe("merchant-approved payment links", () => {
   it("accepts a request made before expiry even when the mutation runs after it", async () => {
     const t = convexTest(schema, modules);
     const id = await t.mutation(internal.payments.insert, terms());
-    // expiresAt 2000 is long past, but the action checked at 1500.
+    const now = Date.now();
+    // Expired a second ago, but the action checked two seconds ago — inside
+    // the keeper's release grace, so the action's clock decides.
     await t.mutation(internal.payments.requestRefund, {
       id,
       receipt: {
         order: "order",
         buyer: "buyer",
         reserveAmount: "50000",
-        createdAt: 1000,
-        expiresAt: 2000,
+        createdAt: now - 3_600_000,
+        expiresAt: now - 1_000,
         status: "paid" as const,
       },
       reason: "not_received",
-      checkedAt: 1500,
+      checkedAt: now - 2_000,
+    });
+    expect((await t.query(api.payments.get, { id }))?.refundPending).toBe(
+      true,
+    );
+  });
+  it("refuses an undisputed request once the keeper's release grace has passed", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    const now = Date.now();
+    const receipt = {
+      order: "order",
+      buyer: "buyer",
+      reserveAmount: "50000",
+      createdAt: now - 3_600_000,
+      expiresAt: now - 61_000,
+      status: "paid" as const,
+    };
+    // The action checked before expiry, but its chain reads stalled: by now
+    // the keeper may have released the order, so the mutation's own clock
+    // refuses — whatever checkedAt says.
+    await expect(
+      t.mutation(internal.payments.requestRefund, {
+        id,
+        receipt,
+        reason: "not_received",
+        checkedAt: receipt.expiresAt - 1_000,
+      }),
+    ).rejects.toThrow("protection period has ended");
+    expect(
+      (await t.query(api.payments.get, { id }))?.refundRequest,
+    ).toBeUndefined();
+    // A disputed order is held for the resolver, so it is still accepted.
+    await t.mutation(internal.payments.requestRefund, {
+      id,
+      receipt,
+      reason: "not_received",
+      disputed: true,
+      checkedAt: receipt.expiresAt - 1_000,
     });
     expect((await t.query(api.payments.get, { id }))?.refundPending).toBe(
       true,
