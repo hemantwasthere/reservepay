@@ -68,9 +68,9 @@ _Sample devnet payment link. No wallet is connected in this screenshot._
 
 ## Protection has a deadline
 
-A buyer’s signed request records their refund request; it does not transfer funds. **A request does not freeze the order, extend protection, or guarantee a refund.** The configured resolver must approve an on-chain refund while the order remains open.
+A buyer’s signed message records their refund request; it does not transfer funds. The program also supports flagging the order `Disputed` on-chain — the app’s transaction step for that is still rolling out, so UI requests are off-chain for now. **A request does not extend protection or guarantee a refund.** Once an order is disputed on-chain, only the configured resolver can resolve it, and the resolver can still approve an on-chain refund after the deadline.
 
-After protection expires, completion is permissionless in the program; the app offers it to the merchant and resolver, and a configured, funded keeper completes expired undisputed orders automatically. The resolver can also complete early. Once an order is completed, it cannot be refunded through the program.
+For undisputed orders, completion after protection expires is permissionless in the program; the app offers it to the merchant and resolver, and a configured, funded keeper completes expired undisputed orders automatically. The resolver can also complete early. Once an order is completed, it cannot be refunded through the program.
 
 Payment metadata, receipts, and refund reason categories are public. Do not put private customer details in a payment title. The current workflow does not provide private evidence uploads, partial refunds, or email/push notifications. The workspace inbox provides wallet-scoped refund updates and protection reminders. Dispute decisions stay manual; only completion of undisputed expired orders is automatic.
 

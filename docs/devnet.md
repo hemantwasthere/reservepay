@@ -68,15 +68,39 @@ Backend-first is safe for **additive** IDL changes — new instructions, new enu
 
 CI fails the `program` job when `apps/web/src/merchant/` drifts from the build output, so a forgotten `idl:sync` is caught before merge.
 
+### Upgrading for the dispute flag
+
+The dispute-flag upgrade appends the `Disputed` variant to `OrderStatus` (status byte 3) and adds `request_refund`. Existing order accounts decode unchanged, so the program is upgraded in place under the same address.
+
+1. Deploy the backend with the new IDL **first** (`REQUIRE_ONCHAIN_DISPUTE` unset). A backend on the old IDL cannot decode status byte 3, and nothing can be Disputed yet, so this order is safe.
+2. Check headroom before upgrading: the ProgramData account allocates 375,424 bytes. If the new `target/deploy/reservepay.so` is larger, extend first with `solana program extend ERFq8y9tC4bjMk4AbLoM7zZXtvRcxsHdCMa9GpSnwxsU <extra-bytes> --url devnet`.
+3. Upgrade as above, then ship the frontend transaction flow, then set `REQUIRE_ONCHAIN_DISPUTE=1` (below).
+
+**Do not roll the program back once any order is Disputed.** The old binary fails to deserialize status byte 3: that order could never complete or refund, and its `locked_liability` would block `withdraw_reserve` for the merchant. Roll the backend back instead (the new receipt fields are optional) and leave the program.
+
+## On-chain disputes
+
+`request_refund(order, buyer)` flags an open order `Disputed`; it must be called by the buyer before the protection window ends. A disputed order is resolvable only by the protocol resolver (`refund_order` or `complete_order`); the keeper never releases it. New program errors: `DisputeWindowClosed` (6007, dispute raised after expiry) and `OrderUnderDispute` (6008, non-resolver resolution attempt on a disputed order).
+
+The backend mirrors chain disputes into refund requests: reconciliation records `receipt.disputed: true` and backfills a request with the reason `unspecified` (shown as **Reason not provided**); the buyer's signed reason can still replace it afterwards, keeping the original request time. While the env var `REQUIRE_ONCHAIN_DISPUTE` is unset, the signed-message `requestRefund` action also accepts requests without an on-chain dispute (rollout mode, until the frontend sends the dispute transaction). Set it to `1` once the frontend ships:
+
+```bash
+bunx convex env set REQUIRE_ONCHAIN_DISPUTE 1
+```
+
+With it set, the buyer's message is rejected with "Submit the on-chain dispute first." unless a `confirmed` read shows the order Disputed.
+
+**Known limitation (devnet):** a buyer can keep a merchant's reserve locked indefinitely by disputing just before expiry — only the resolver can clear a dispute and there is no grace period. Accepted on devnet; a resolver-inaction timeout is planned before mainnet.
+
 ## Keeper
 
-A Convex cron runs the keeper every 5 minutes. It completes orders whose protection expired (chain clock past expiry, and wall clock at least 60 seconds past it, so no new refund request can still arrive) and that have no pending refund request. It also syncs disputes whose on-chain resolution was never recorded. The keeper never pays rent: orders whose merchant token account is missing are left for manual release from the receipt page.
+A Convex cron runs the keeper every 5 minutes. It completes orders whose protection expired (chain clock past expiry, and wall clock at least 60 seconds past it, so no new refund request can still arrive) and that have no pending refund request. Disputed orders are never completed by the keeper: only open orders are release candidates. It also syncs disputes whose on-chain resolution was never recorded, treating chain-disputed orders as still open. The keeper never pays rent: orders whose merchant token account is missing are left for manual release from the receipt page.
 
 ## Reconciliation
 
 A separate Convex cron reconciles payment receipts with Solana every 2 minutes. It needs no `KEEPER_SECRET_KEY` and keeps running when the keeper is unconfigured. Each run:
 
-1. scans open orders on-chain and records receipts for links paid while no client was watching (for example a buyer who closed the tab right after sending);
+1. scans open and disputed orders on-chain and records receipts for links paid while no client was watching (for example a buyer who closed the tab right after sending); disputed orders whose links were not flagged yet get `receipt.disputed: true` and an `unspecified` refund request;
 2. syncs disputes whose on-chain resolution was never recorded;
 3. re-checks a page of links whose receipt says "paid" but whose order is no longer open, recording completed or refunded outcomes;
 4. sweeps a page of links with no receipt at all, catching orders paid and resolved before anyone synced.
@@ -132,7 +156,7 @@ Anonymous endpoints are bounded so no caller can spend unlimited RPC reads or wr
 
 `null` means the call verified nothing. Checkout preserves any accumulated retry backoff when a call is coalesced; only a verified response resets the polling interval. Independent pending-transaction confirmation checks continue during coalesced calls.
 
-`requestRefund` refuses cheaply before spending its bucket or a chain read: unknown or unsynced payments, non-buyer signatures, repeat requests (a same-reason retry is a no-op even after resolution), already-resolved orders, lapsed protection, and stale approvals. The 5/min bucket is spent only when the request reaches the chain read, and a transient RPC failure returns it (except 429, as above).
+`requestRefund` refuses cheaply before spending its bucket or a chain read: unknown or unsynced payments, non-buyer signatures, repeat requests (a same-reason retry is a no-op even after resolution), already-resolved orders, and stale approvals. The 5/min bucket is spent only when the request reaches the chain read, and a transient RPC failure returns it (except 429, as above). Expiry and the on-chain-dispute gate are decided from that read (at confirmed, in parallel with the finalized receipt read) because the stored receipt can lag an in-time dispute; a "submit the on-chain dispute first" refusal also returns the slot, so retrying after the dispute confirms is never locked out.
 
 `paymentActions.requirePayable`, `payments.get`, the refund queue and `authActions.requestNonce` stay unlimited: they are read-only or stateless and perform no write or chain read.
 
