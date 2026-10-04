@@ -198,21 +198,27 @@ export const requestRefund = action({
         throw new Error("This approval expired. Request the refund again.");
       const claim = await enforce(ctx, "refund", link._id, 5, 60_000);
       const requireDispute = process.env.REQUIRE_ONCHAIN_DISPUTE === "1";
-      let receipt, disputed;
+      // One timestamp for the whole request, shared with the mutation: a
+      // request made before expiry counts even when the mutation lands after
+      // it. The stored receipt's flag counts too — no read needed for it.
+      const checkedAt = Date.now();
+      let receipt,
+        disputed = link.receipt.disputed === true;
       try {
         const client = paymentClient(rpc);
         // The stored receipt is always the finalized read.
         receipt = await client.readOrder(link);
-        disputed = receipt?.disputed === true;
+        disputed ||= receipt?.disputed === true;
         // Only when the answer can change the outcome — the dispute gate is
-        // on, or protection has ended — and finalized doesn't already show
-        // the dispute, also read at confirmed: the buyer signs right after
-        // the dispute transaction confirms, finalized can lag it by ~13s, and
+        // on, or protection has ended — and no source already shows the
+        // dispute, also read at confirmed: the buyer signs right after the
+        // dispute transaction confirms, finalized can lag it by ~13s, and
         // Disputed cannot regress. Otherwise one read is enough.
         if (
           receipt &&
+          receipt.status === "paid" &&
           !disputed &&
-          (requireDispute || receipt.expiresAt <= Date.now())
+          (requireDispute || receipt.expiresAt <= checkedAt)
         )
           disputed =
             (await client.readOrder(link, "confirmed"))?.disputed === true;
@@ -232,19 +238,25 @@ export const requestRefund = action({
         throw new Error(
           "Only the verified buyer can request a refund for this order.",
         );
+      // The fresh read decides resolution, not the cached receipt: a resolver
+      // refund that has not synced yet is "already resolved", not a missing
+      // dispute or a lapsed deadline.
+      if (receipt.status !== "paid")
+        throw new Error("This order is already resolved.");
       // A deterministic refusal keeps the slot, like every other non-transient
       // failure: returning it would let a buyer who never disputes replay a
       // signed approval for unlimited chain reads. Five per minute is plenty
       // to retry once the dispute confirms.
       if (requireDispute && !disputed)
         throw new ConvexError("Submit the on-chain dispute first.");
-      if (!disputed && receipt.expiresAt <= Date.now())
+      if (!disputed && receipt.expiresAt <= checkedAt)
         throw new Error("The protection period has ended.");
       await ctx.runMutation(internal.payments.requestRefund, {
         id: link._id,
         receipt,
         reason: request.reason,
         disputed,
+        checkedAt,
       });
     } catch (error) {
       throw new ConvexError(

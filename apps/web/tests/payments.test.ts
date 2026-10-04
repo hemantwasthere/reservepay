@@ -330,6 +330,55 @@ describe("merchant-approved payment links", () => {
       ),
     ).toHaveLength(2);
   });
+  it("accepts a request made before expiry even when the mutation runs after it", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    // expiresAt 2000 is long past, but the action checked at 1500.
+    await t.mutation(internal.payments.requestRefund, {
+      id,
+      receipt: {
+        order: "order",
+        buyer: "buyer",
+        reserveAmount: "50000",
+        createdAt: 1000,
+        expiresAt: 2000,
+        status: "paid" as const,
+      },
+      reason: "not_received",
+      checkedAt: 1500,
+    });
+    expect((await t.query(api.payments.get, { id }))?.refundPending).toBe(
+      true,
+    );
+  });
+  it("honors the stored dispute flag for the expiry check", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    const receipt = {
+      order: "order",
+      buyer: "buyer",
+      reserveAmount: "50000",
+      createdAt: 1000,
+      expiresAt: 86401000,
+      status: "paid" as const,
+    };
+    // record() already holds the chain's Disputed flag (and the backfill).
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt, disputed: true },
+    });
+    // The buyer's reason arrives with a lagging finalized receipt: expired
+    // and unflagged, with no confirmed-read result either. The stored flag
+    // still wins.
+    await t.mutation(internal.payments.requestRefund, {
+      id,
+      receipt: { ...receipt, expiresAt: 1001 },
+      reason: "not_received",
+    });
+    const link = await t.query(api.payments.get, { id });
+    expect(link?.refundRequest?.reason).toBe("not_received");
+    expect(link?.receipt?.disputed).toBe(true);
+  });
   it("lets a disputed receipt request a refund after expiry", async () => {
     const t = convexTest(schema, modules);
     const id = await t.mutation(internal.payments.insert, terms());

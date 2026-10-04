@@ -243,6 +243,26 @@ describe("buyer refund requests", () => {
       ),
     ).rejects.toThrow("already been requested");
   });
+  it("reports an on-chain resolution not yet synced as already resolved", async () => {
+    const { t, request, receipt } = await setup();
+    process.env.REQUIRE_ONCHAIN_DISPUTE = "1";
+    try {
+      // Convex still says "paid" and protection has even ended, but the
+      // resolver already refunded on-chain: the fresh read's status decides
+      // first, and no confirmed read is wasted on a resolved order.
+      readOrder.mockResolvedValue({
+        ...receipt,
+        status: "refunded",
+        expiresAt: Date.now() - 1,
+      });
+      await expect(
+        t.action(api.paymentActions.requestRefund, sign(request)),
+      ).rejects.toThrow("already resolved");
+      expect(readOrder).toHaveBeenCalledTimes(1);
+    } finally {
+      delete process.env.REQUIRE_ONCHAIN_DISPUTE;
+    }
+  });
   it("keeps the rate-limit slot when the on-chain dispute is missing", async () => {
     vi.useFakeTimers();
     const { t, id, request, receipt } = await setup();

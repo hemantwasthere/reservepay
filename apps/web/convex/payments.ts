@@ -245,11 +245,15 @@ export const requestRefund = internalMutation({
     id: v.id("paymentLinks"),
     receipt: v.object(receiptFields),
     reason: refundReason,
-    // The confirmed-read result from the action: the buyer signs right after
-    // the dispute confirms, which a finalized receipt read can lag behind.
+    // Dispute state as decided by the action: the stored receipt's flag, the
+    // finalized receipt, or — when it can change the outcome — a confirmed
+    // read (finalized can lag a just-confirmed dispute by ~13s).
     disputed: v.optional(v.boolean()),
+    // The action's clock, so a request made before expiry is not refused by
+    // a mutation that runs after it.
+    checkedAt: v.optional(v.number()),
   },
-  handler: async (ctx, { id, receipt, reason, disputed }) => {
+  handler: async (ctx, { id, receipt, reason, disputed, checkedAt }) => {
     const link = await ctx.db.get(id);
     if (!link) throw new ConvexError("Payment link not found.");
     const existing = link.refundRequest;
@@ -268,8 +272,15 @@ export const requestRefund = internalMutation({
     )
       throw new ConvexError("This order is already resolved.");
     // The chain enforced the dispute window at dispute time, so a disputed
-    // order is accepted even when this request lands after expiry.
-    if (receipt.expiresAt <= Date.now() && !receipt.disputed && !disputed)
+    // order — flagged by any source, including the stored receipt — is
+    // accepted even when this request lands after expiry. The deadline is
+    // compared against the action's clock, not this mutation's.
+    if (
+      receipt.expiresAt <= (checkedAt ?? Date.now()) &&
+      !receipt.disputed &&
+      !disputed &&
+      !link.receipt?.disputed
+    )
       throw new ConvexError("The protection period has ended.");
     // Disputed never regresses, so keep the flag if any source has it: the
     // action's confirmed read, this finalized receipt, or the stored one
