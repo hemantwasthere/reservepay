@@ -94,8 +94,8 @@ export const run = internalAction({
       summary.scanFailed = true;
       skip("scan");
     }
-    // Disputes are never paged, so a resolved dispute always clears within
-    // one run.
+    // Prioritize the earliest 200 disputes each run. The paginated paid
+    // sweep below also reconciles disputes beyond this priority batch.
     if (openSet && !outOfTime()) {
       const disputes = await ctx.runQuery(internal.keeper.openDisputes, {});
       const resolved = disputes.filter(

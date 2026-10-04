@@ -253,6 +253,34 @@ describe("reconcile run", () => {
       await t.query(internal.reconcile.getCursor, { name: "unsynced" }),
     ).toBeNull();
   });
+  it("resumes after receipt writes remove the previous page from the index", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await insertLinks(t, 201, 2500);
+    readOrders.mockImplementation(
+      async (items: { id: string }[]) =>
+        new Map(
+          items.map(({ id }) => [
+            id,
+            receipt(Keypair.generate().publicKey.toBase58(), "completed"),
+          ]),
+        ),
+    );
+    const first = await t.action(internal.reconcileActions.run, {});
+    expect(first.synced).toBe(200);
+    expect(
+      await t.query(internal.reconcile.getCursor, { name: "unsynced" }),
+    ).not.toBeNull();
+    const second = await t.action(internal.reconcileActions.run, {});
+    expect(second.synced).toBe(1);
+    expect(
+      await t.query(internal.reconcile.getCursor, { name: "unsynced" }),
+    ).toBeNull();
+    for (const id of ids)
+      expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
+        "completed",
+      );
+    expect(readOrders.mock.calls.flatMap(([items]) => items)).toHaveLength(201);
+  });
   it("does not advance the cursor when a chunk read fails", async () => {
     const t = convexTest(schema, modules);
     await insertLinks(t, 201, 3000);

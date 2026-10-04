@@ -29,9 +29,9 @@ Receipts poll while open. Use **Refresh orders** or the Disputes page’s **Refr
 
 ## Reconciliation and retries
 
-Solana is the source of truth for funds and settlement; Convex receipts are a cache of the finalized chain state. A keyless Convex cron reconciles that cache with Solana every 2 minutes (see [devnet operations](devnet.md#reconciliation)): it records receipts for orders paid while no client was watching, clears disputes resolved outside the app, advances stale "paid" receipts whose orders completed or refunded, and sweeps links that were never synced at all. Receipts are only written from finalized chain reads and never regress, so refreshing the page, closing a tab, or losing connectivity cannot create an incorrect payment state — the next run repairs it.
+Solana is the source of truth for funds and settlement; Convex receipts are a cache of the finalized chain state. A keyless Convex cron reconciles that cache with Solana every 2 minutes (see [devnet operations](devnet.md#reconciliation)): it records receipts for orders paid while no client was watching, clears disputes resolved outside the app, advances stale "paid" receipts whose orders completed or refunded, and sweeps links that were never synced at all. Receipts are only written from finalized chain reads and never regress, so refreshing the page, closing a tab, or losing connectivity cannot create an incorrect payment state — subsequent successful runs repair stale receipts as the sweeps advance.
 
-Transient RPC failures (rate limits, bad gateways, dropped connections) are retried with jittered exponential backoff on every read, in the browser and on the backend. Checkout status polling backs off after consecutive failures (10 → 20 → 40 → 60 seconds) and checks again immediately when the tab becomes visible or the network returns.
+Transient RPC failures (rate limits, bad gateways, dropped connections) are retried with jittered exponential backoff on payment-status, balance, order-list, and reconciliation reads in the browser and on the backend. Checkout status polling backs off after consecutive failures (10 → 20 → 40 → 60 seconds) and checks again immediately when the tab becomes visible or the network returns.
 
 ## Validation
 

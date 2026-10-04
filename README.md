@@ -44,7 +44,7 @@ The app also includes a collapsible sidebar (⌘B), mobile navigation, System/Li
 
 The overview separates total reserve, funds backing open orders, and funds available to withdraw, with an on-chain order list filtered by open, completed, or refunded status. Payment links live on their own page. Sign a wallet message to access your link history and merchant profile; this login does not transfer funds.
 
-At `/app/profile`, save a merchant name, image and website for buyers to see at checkout. Upload a PNG, JPG or WebP image (up to 2 MB); the app optimizes it before storing it in Convex. Images also appear on payment receipts. Contact email and description stay private to your signed-in wallet. Sessions last up to seven days; disconnecting signs out and cancels any pending login. Navigation between the landing page and workspace keeps the wallet, session and Convex subscriptions mounted, so switching sections or returning home preserves loaded data and unsaved profile edits. A full browser reload reconnects and validates the session; refreshing is not required to receive updates. Profile and payment-link updates arrive through Convex subscriptions. Solana balances and order accounts share a background RPC refresh; there is no chain indexer yet.
+At `/app/profile`, save a merchant name, image and website for buyers to see at checkout. Upload a PNG, JPG or WebP image (up to 2 MB); the app optimizes it before storing it in Convex. Images also appear on payment receipts. Contact email and description stay private to your signed-in wallet. Sessions last up to seven days; disconnecting signs out and cancels any pending login. Navigation between the landing page and workspace keeps the wallet, session and Convex subscriptions mounted, so switching sections or returning home preserves loaded data and unsaved profile edits. A full browser reload reconnects and validates the session; refreshing is not required to receive updates. Profile and payment-link updates arrive through Convex subscriptions. Solana balances and order accounts share a background RPC refresh; the backend also reconciles finalized payment receipts every two minutes.
 
 ![Merchant overview with reserve balances, setup steps, and collateral controls in the disconnected-wallet state](docs/images/overview.png)
 
@@ -62,7 +62,7 @@ _Sample devnet payment link. No wallet is connected in this screenshot._
 
 A buyer’s signed request records their refund request; it does not transfer funds. **A request does not freeze the order, extend protection, or guarantee a refund.** The configured resolver must approve an on-chain refund while the order remains open.
 
-After protection expires, completion is permissionless in the program; the app offers it to the merchant and resolver, and a keeper completes expired undisputed orders automatically. The resolver can also complete early. Once an order is completed, it cannot be refunded through the program.
+After protection expires, completion is permissionless in the program; the app offers it to the merchant and resolver, and a configured, funded keeper completes expired undisputed orders automatically. The resolver can also complete early. Once an order is completed, it cannot be refunded through the program.
 
 Payment metadata, receipts, and refund reason categories are public. Do not put private customer details in a payment title. The current workflow does not provide private evidence uploads, partial refunds, or notifications. Dispute decisions stay manual; only completion of undisputed expired orders is automatic.
 
@@ -189,7 +189,7 @@ The payment-link rollout preserves `payments.list({ merchant })` and `payments.l
 
 - **Single-use USDC links:** up to 10,000 USDC with 1 hour, 1 day, or 7 days of protection in the current UI.
 - **Recent history:** the latest 50 merchant links; the resolver's dispute queue paginates.
-- **Receipt updates:** polling and manual refresh, plus a keeper cron that releases expired undisputed orders and reconciles resolved disputes.
+- **Receipt updates:** background reconciliation every two minutes, browser polling, and manual refresh. A configured keeper also releases expired undisputed orders.
 - **Resolver-based refunds:** full refunds only, with wallet approval.
 - **Test network:** mainnet launch, operational monitoring, and a security audit remain separate work.
 
