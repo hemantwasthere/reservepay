@@ -8,6 +8,7 @@ import {
   WorkspaceSidebarTrigger,
   type WorkspacePage,
 } from "./WorkspaceSidebar";
+import { WorkspaceInbox } from "./WorkspaceInbox";
 import { BackgroundStatus } from "./BackgroundStatus";
 import { MerchantPayments } from "./MerchantPayments";
 import { MerchantProfile } from "./MerchantProfile";
@@ -171,6 +172,11 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
               >
                 <span /> Devnet
               </span>
+              <WorkspaceInbox
+                key={active?.account.address ?? "disconnected"}
+                active={active}
+                session={session}
+              />
               <ThemeControl />
               <WalletControl
                 onChange={onChange}

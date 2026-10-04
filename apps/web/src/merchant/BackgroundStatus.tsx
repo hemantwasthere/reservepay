@@ -49,15 +49,19 @@ function LiveStatus() {
       className="mt-7 flex flex-col gap-3 p-4 shadow-none"
       aria-label="Payment service status"
     >
-      <h2 className="text-sm font-medium leading-normal tracking-normal">Payment service status</h2>
+      <h2 className="text-sm font-medium leading-normal tracking-normal">
+        Payment service status
+      </h2>
       {workers ? (
-        <dl className="grid gap-4 text-xs sm:grid-cols-2">
+        <dl className="grid gap-4 text-xs sm:grid-cols-3">
           {workers.map((worker) => (
             <div key={worker.name} className="space-y-1">
               <dt className="font-medium">
                 {worker.name === "keeper"
                   ? "Automatic releases"
-                  : "Payment updates"}
+                  : worker.name === "notifications"
+                    ? "Inbox reminders"
+                    : "Payment updates"}
               </dt>
               <dd className="text-muted-foreground" aria-live="polite">
                 {describeWorker(worker, now)}
@@ -76,10 +80,10 @@ function LiveStatus() {
         </p>
       )}
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Payment updates run every 2 minutes; automatic releases run every 5
-        minutes. If delayed, refresh a receipt to check its latest status.
-        Expired orders can still be completed manually. Pending refund requests
-        require a resolver.
+        Payment updates and inbox reminders run every 2 minutes; automatic
+        releases run every 5 minutes. If delayed, refresh a receipt to check its
+        latest status. Expired orders can still be completed manually. Pending
+        refund requests require a resolver.
       </p>
     </Card>
   );

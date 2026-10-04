@@ -24,4 +24,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "deliver refund updates and protection reminders",
+  { minutes: 2 },
+  internal.notificationActions.run,
+  {},
+);
+
 export default crons;

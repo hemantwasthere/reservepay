@@ -36,3 +36,8 @@ Transient RPC failures (rate limits, bad gateways, dropped connections) are retr
 ## Validation
 
 `bun run check` covers type checking, unit and Convex tests, production build, SEO and routing. `bun run test:program` runs the Anchor integration suite against a local validator. The suite uses test tokens and checks the actual browser transaction builders, authorization failures, full-refund accounting, reserve release, and duplicate resolution refusal.
+
+
+## Inbox updates
+
+The workspace header bell opens the signed-in wallet's inbox. Buyers and merchants receive refund-request and finalized resolution updates; the current resolver receives pending-dispute updates through the reminder worker. Reminder checks run every two minutes, with one update in the final hour of protection and one after the deadline for orders still recorded as open. Notifications may arrive late during backlog or RPC outages and never extend protection or submit a transaction. Open the linked receipt for the latest state. Read/unread state is private to the wallet; email and push delivery are not enabled.

@@ -11,7 +11,7 @@ afterEach(() => vi.useRealTimers());
 it("reports unknown status before the first run without exposing internal fields", async () => {
   const t = convexTest(schema, modules);
   expect(await t.query(api.workers.status, {})).toEqual(
-    ["reconcile", "keeper"].map((name) => ({
+    ["reconcile", "keeper", "notifications"].map((name) => ({
       name,
       startedAt: null,
       finishedAt: null,

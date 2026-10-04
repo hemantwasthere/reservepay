@@ -78,9 +78,9 @@ One run attempts at most 5 releases and stops starting new work after 4 minutes.
 
 ## Service health and recovery
 
-The merchant workspace shows **Payment updates** and **Automatic releases**, their current status, and time since the last successful run. The backend stores one heartbeat per worker in `workerHealth`; public status exposes fixed issue codes and timestamps only. An overlapping older run cannot overwrite a newer result. Unexpected action errors count as failures; raw RPC errors are never saved or logged by these workers.
+The merchant workspace shows **Payment updates**, **Automatic releases**, and **Inbox reminders**, their current status, and time since the last successful run. The backend stores one heartbeat per worker in `workerHealth`; public status exposes fixed issue codes and timestamps only. An overlapping older run cannot overwrite a newer result. Unexpected action errors count as failures; raw RPC errors are never saved or logged by these workers.
 
-- Payment updates become delayed after 6 minutes without a new run, or when an unfinished run exceeds 2 minutes.
+- Payment updates and inbox reminders become delayed after 6 minutes without a new run, or when an unfinished run exceeds 2 minutes.
 - Automatic releases become delayed after 15 minutes without a new run, or when an unfinished run exceeds 5 minutes.
 - A keeper balance below 0.001 devnet SOL shows **Fee wallet needs funding**. Top up the public keeper address with test SOL, then the next successful run clears the warning.
 - Missing configuration shows **Not enabled**. A failed or incomplete run stays visible until a later run succeeds. Unpaid links with no on-chain order are normal and do not trigger a warning.
@@ -91,8 +91,20 @@ Inspect or verify recovery from `apps/web`:
 bunx convex run workers:status '{}'
 bunx convex run reconcileActions:run '{}'
 bunx convex run keeperActions:run '{}'
+bunx convex run notificationActions:run '{}'
 ```
 
 A keeper invocation can release eligible devnet orders. If runs fail repeatedly, check Convex cron execution and backend RPC configuration. Missing merchant token accounts require manual completion, which can create the account with wallet approval. For failed token transfers, inspect the merchant token account before retrying. Buyers can refresh their receipt while background updates recover; merchants and resolvers retain manual resolution controls.
 
-These are dashboard health indicators. External paging, refund notifications and deadline reminders are the next milestone; no email or push notification is sent yet.
+These are dashboard health indicators. In-app refund notifications and deadline reminders are enabled; external paging and email/push delivery remain separate work.
+
+
+## Inbox delivery
+
+`notificationActions.run` runs every two minutes without a keeper key. It reads the resolver from the finalized on-chain protocol account and processes two independent pages of at most 200 links: pending disputes, and paid orders with protection ending within an hour (including overdue orders). Each sweep saves its `notifications:disputes` or `notifications:deadlines` cursor in `syncState` in the same transaction as its notification writes. Retries cannot duplicate an event or reset its read state; an invalid cursor resets and is reported as an incomplete run.
+
+Refund-request writes notify the merchant and buyer atomically with the request. Finalized completion/refund writes notify the merchant, buyer and the resolver most recently notified about that dispute. The sweep backfills existing pending requests and notifies a new resolver after rotation. Orders already resolved before this rollout are not backfilled. The one-hour reminder is skipped if an order is first seen after expiry; it receives the deadline-passed update instead. Reminders use the verified receipt cache and can lag Solana until reconciliation catches up.
+
+Delivery is deduplicated by wallet, link and event kind in `notifications`. Read state is changed only through an authenticated wallet session. Public callers cannot enqueue notifications, supply the resolver or mark another wallet's updates read. The inbox caps displayed unread counts at 99+ and paginates history. Records are retained; deleting them would also remove their delivery-deduplication keys, so do not manually prune without a retention design.
+
+If resolver RPC reads fail, merchant and buyer reminders continue, the worker records a failed health status, and resolver delivery catches up on subsequent passes. No private RPC error messages are logged. A healthy run means the bounded sweep completed; it does not promise that an arbitrarily large backlog was drained in one run. Check protection deadlines directly on receipts, especially during outages.

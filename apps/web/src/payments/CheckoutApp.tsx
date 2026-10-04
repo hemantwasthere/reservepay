@@ -918,7 +918,12 @@ function Receipt({
         }
       >
         Keep this URL as your receipt. The merchant can see the same confirmed
-        order in their dashboard.
+        order in their dashboard. For refund updates and deadline reminders,
+        open the{" "}
+        <a className="text-primary underline underline-offset-4" href="/app">
+          workspace inbox
+        </a>{" "}
+        and sign in with your wallet.
       </p>
     </Card>
   );

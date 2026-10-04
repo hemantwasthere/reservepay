@@ -5,7 +5,7 @@ type Issue = "unconfigured" | "failed" | "incomplete" | "low_funds" | null;
 
 export async function trackWorker<T>(
   ctx: ActionCtx,
-  name: "keeper" | "reconcile",
+  name: "keeper" | "reconcile" | "notifications",
   work: () => Promise<{ result: T; issue: Issue }>,
 ): Promise<T> {
   const generation: number = await ctx.runMutation(internal.workers.start, {

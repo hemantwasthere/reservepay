@@ -50,6 +50,14 @@ At `/app/profile`, save a merchant name, image and website for buyers to see at 
 
 _Live devnet UI, shown before connecting a wallet._
 
+### Inbox and reminders
+
+Open the bell in the workspace header and sign in with your wallet. Merchants and buyers receive refund-request acknowledgements and finalized refund/completion updates for their orders. The current on-chain resolver receives pending-dispute notifications on the background sweep. No merchant registration is needed to read a buyer's inbox.
+
+Protection reminders are generated once within the final hour and once after the deadline if the cached order remains open. The worker checks every two minutes and resumes through large queues; backlog or network delays can make reminders late. A refund request does not extend protection. Always use the receipt for current status and deadlines.
+
+Unread counts update live (capped at **99+**); opening the inbox does not mark anything read. Mark an individual update or the displayed batch as read, and load older updates as needed. Inbox contents and read state belong to the signed-in wallet and persist across devices. Historical updates can describe an order that has since resolved. Email and push delivery are not enabled.
+
 ### Buyer checkout
 
 Each link shows the amount, merchant name (when configured), wallet, network, and protection period. After payment, the same URL becomes the receipt and the entry point for refund requests and order resolution.
@@ -64,7 +72,7 @@ A buyer’s signed request records their refund request; it does not transfer fu
 
 After protection expires, completion is permissionless in the program; the app offers it to the merchant and resolver, and a configured, funded keeper completes expired undisputed orders automatically. The resolver can also complete early. Once an order is completed, it cannot be refunded through the program.
 
-Payment metadata, receipts, and refund reason categories are public. Do not put private customer details in a payment title. The current workflow does not provide private evidence uploads, partial refunds, or notifications. Dispute decisions stay manual; only completion of undisputed expired orders is automatic.
+Payment metadata, receipts, and refund reason categories are public. Do not put private customer details in a payment title. The current workflow does not provide private evidence uploads, partial refunds, or email/push notifications. The workspace inbox provides wallet-scoped refund updates and protection reminders. Dispute decisions stay manual; only completion of undisputed expired orders is automatic.
 
 See [refund and completion behavior](docs/order-resolution.md) for the complete workflow and recovery details.
 
@@ -189,7 +197,7 @@ The payment-link rollout preserves `payments.list({ merchant })` and `payments.l
 
 - **Single-use USDC links:** up to 10,000 USDC with 1 hour, 1 day, or 7 days of protection in the current UI.
 - **Recent history:** the latest 50 merchant links; the resolver's dispute queue paginates.
-- **Receipt updates:** background reconciliation every two minutes, browser polling, and manual refresh. The hosted devnet keeper releases expired undisputed orders. Workspace service status shows failed, delayed, disabled and underfunded background workers.
+- **Receipt updates:** background reconciliation every two minutes, browser polling, and manual refresh. The hosted devnet keeper releases expired undisputed orders. Workspace service status covers receipt synchronization, reserve releases and inbox reminders, including failed or delayed runs.
 - **Resolver-based refunds:** full refunds only, with wallet approval.
 - **Test network:** mainnet launch, external alerting, and a security audit remain separate work.
 

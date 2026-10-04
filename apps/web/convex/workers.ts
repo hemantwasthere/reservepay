@@ -47,7 +47,7 @@ export const status = query({
   args: {},
   handler: async (ctx) => {
     return await Promise.all(
-      (["reconcile", "keeper"] as const).map(async (name) => {
+      (["reconcile", "keeper", "notifications"] as const).map(async (name) => {
         const row = await ctx.db
           .query("workerHealth")
           .withIndex("by_name", (q) => q.eq("name", name))

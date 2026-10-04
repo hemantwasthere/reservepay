@@ -10,6 +10,7 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { validateTerms } from "../src/payments/terms";
+import { notifyOrder } from "./notificationEvents";
 import { requireMerchant } from "./session";
 
 import { termsFields, receiptFields, refundReason } from "./paymentValidators";
@@ -206,6 +207,12 @@ export const record = internalMutation({
           }
         : {}),
     });
+    if (receipt.status !== "paid")
+      await notifyOrder(ctx, { ...link, receipt }, receipt.status, [
+        link.merchant,
+        receipt.buyer,
+        link.refundNotifiedResolver,
+      ]);
     return receipt;
   },
 });
@@ -256,5 +263,9 @@ export const requestRefund = internalMutation({
       refundRequest: { reason, requestedAt: Date.now() },
       refundPending: true,
     });
+    await notifyOrder(ctx, { ...link, receipt }, "refund_requested", [
+      link.merchant,
+      receipt.buyer,
+    ]);
   },
 });
