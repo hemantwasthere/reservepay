@@ -83,11 +83,17 @@ Anonymous endpoints are bounded so no caller can spend unlimited RPC reads or wr
 | Endpoint | Limit | When exceeded |
 | --- | --- | --- |
 | `demoOrders.create` | 20/min per session key, 60/min globally | rejected |
-| `paymentActions.sync` | 1 chain read per 5s per link | coalesced, not denied: returns the recorded receipt state (`true`), or `null` when nothing is recorded — no new RPC read |
+| `paymentActions.sync` | 1 claimed chain read per 5s per link (see below) | coalesced, not denied: returns `true` when a receipt is recorded, otherwise `null` ("not checked") — no new RPC read |
 | `authActions.signIn` | 10/min per wallet | rejected |
 | `paymentActions.requestRefund` | 5/min per link, after the recorded receipt proves the caller is the buyer | rejected |
 
-`sync` coalescing means checkout polling, multiple tabs, and merchant refreshes all keep working while backend cost stays capped at one chain read and one receipt write per 5 seconds per link; internal paths (`syncById`, the reconciler, the keeper) are unaffected. If the chain read fails transiently (gateway, network), the slot is returned so the next caller retries; on a 429 the slot is kept, so polling backs off while devnet is throttling instead of amplifying it. Deterministic failures (a mismatched on-chain order) also keep the slot.
+`sync` coalescing keeps checkout polling, multiple tabs and merchant refreshes working while bounding backend work per link. Internal paths (`syncById`, the reconciler, the keeper) are not limited. What happens when the claimed read fails decides the bound:
+
+- **Success, or a deterministic failure** (for example an on-chain order whose amount does not match the link): the claim is kept, so the link costs at most one chain read and one receipt write per 5 seconds.
+- **429 from the RPC:** the claim is kept, so during throttling the link still costs at most one read per 5 seconds instead of every caller adding load.
+- **Server or network failure (502/503/504, fetch errors):** the claim is returned so the next caller can retry immediately. During such an outage reads are **not** capped at one per 5 seconds; each attempt is a single read wrapped in up to 4 RPC calls by the retry helper (`src/lib/retry.ts`).
+
+`null` means the call verified nothing. The checkout client currently treats `null` like a fresh `false` and does not lengthen its polling interval for it; client-side backoff on coalesced results is a pending frontend change.
 
 `requestRefund` refuses cheaply before spending its bucket or a chain read: unknown or unsynced payments, non-buyer signatures, repeat requests (a same-reason retry is a no-op even after resolution), already-resolved orders, lapsed protection, and stale approvals. The 5/min bucket is spent only when the request reaches the chain read, and a transient RPC failure returns it (except 429, as above).
 
