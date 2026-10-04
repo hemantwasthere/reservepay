@@ -11,6 +11,8 @@
     "typecheck": "bun run --filter @reservepay/core build && bun run --filter \"*\" typecheck",
     "test": "bun run --filter @reservepay/core build && bun run --filter \"*\" test",
     "test:program": "anchor test",
+    "idl:sync": "bun apps/web/scripts/idl.ts sync",
+    "idl:check": "bun apps/web/scripts/idl.ts check",
     "check": "bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
