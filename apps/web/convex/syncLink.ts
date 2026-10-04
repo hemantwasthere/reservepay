@@ -38,40 +38,32 @@ export async function syncLinks(
   ctx: ActionCtx,
   links: Doc<"paymentLinks">[],
   connection: Connection,
-  // Checked before each receipt write; links left unwritten count as
-  // deferred (retried on a later run), not failed.
+  // Checked before each receipt write only: reads that failed, mismatched
+  // or found nothing are still counted as such. Receipts left unwritten
+  // count as deferred (retried on a later run), not failed.
   shouldStop?: () => boolean,
 ): Promise<SyncResult> {
-  let receipts: Map<string, OrderReceipt | null | Error>;
-  try {
-    receipts = await paymentClient(connection).readOrders(
-      links.map((link) => ({ id: link._id as string, terms: link })),
-    );
-  } catch {
-    return {
-      synced: 0,
-      missing: 0,
-      mismatched: 0,
-      failed: links.length,
-      deferred: 0,
-    };
-  }
-  const summary = {
+  const summary: SyncResult = {
     synced: 0,
     missing: 0,
     mismatched: 0,
     failed: 0,
     deferred: 0,
   };
-  for (const [index, link] of links.entries()) {
-    if (shouldStop?.()) {
-      summary.deferred = links.length - index;
-      break;
-    }
+  let receipts: Map<string, OrderReceipt | null | Error>;
+  try {
+    receipts = await paymentClient(connection).readOrders(
+      links.map((link) => ({ id: link._id as string, terms: link })),
+    );
+  } catch {
+    return { ...summary, failed: links.length };
+  }
+  for (const link of links) {
     const receipt = receipts.get(link._id);
     if (receipt === undefined) summary.failed += 1;
     else if (receipt instanceof Error) summary.mismatched += 1;
     else if (!receipt) summary.missing += 1;
+    else if (shouldStop?.()) summary.deferred += 1;
     else {
       await ctx.runMutation(internal.payments.record, {
         id: link._id,

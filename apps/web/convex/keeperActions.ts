@@ -63,7 +63,9 @@ export const run = internalAction({
       let released = 0,
         skipped = 0,
         failed = 0,
-        synced = 0;
+        synced = 0,
+        // Receipt writes left for the next run when the budget ran out.
+        deferred = 0;
       let lowFunds = false;
       try {
         lowFunds = (await chain.balance(keeper.publicKey)) < 1_000_000;
@@ -226,6 +228,7 @@ export const run = internalAction({
           const result = await syncLinks(ctx, staleDisputes, rpc, outOfTime);
           synced += result.synced;
           failed += result.failed + result.mismatched;
+          deferred += result.deferred;
         }
       } catch {
         failed += 1;
@@ -237,7 +240,7 @@ export const run = internalAction({
           ? "low_funds"
           : failed > 0
             ? "failed"
-            : outOfTime() || skipped > 0
+            : outOfTime() || skipped > 0 || deferred > 0
               ? "incomplete"
               : null,
       };

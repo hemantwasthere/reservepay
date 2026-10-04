@@ -1,10 +1,23 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { convexTest } from "convex-test";
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
-import { selectReleasable, type KeeperOrder } from "../src/payments/keeper";
+import {
+  RELEASE_GRACE_MS,
+  RELEASE_MARGIN_MS,
+  selectReleasable,
+  type KeeperOrder,
+} from "../src/payments/keeper";
 
 const fns = vi.hoisted(() => ({
   balance: vi.fn(),
@@ -72,6 +85,14 @@ async function insertLink(
   return id;
 }
 
+// keeperActions pulls in @solana/web3.js, anchor and the program IDL. Load
+// it once up front with a generous timeout, so whichever test happens to run
+// first doesn't pay that cold import inside its own 5s budget (it timed out
+// under a full parallel run).
+beforeAll(async () => {
+  await import("../convex/keeperActions");
+}, 30_000);
+
 beforeEach(() => {
   process.env.KEEPER_SECRET_KEY = SECRET;
   for (const fn of Object.values(fns)) fn.mockReset();
@@ -108,7 +129,8 @@ describe("selectReleasable", () => {
     expiresAt,
     ...extra,
   });
-  it("selects only when the chain clock passed expiry and wall time is 60s past it", () => {
+  it("selects only when the chain clock passed expiry and wall time is past grace + margin", () => {
+    const boundary = 1_000_000 + RELEASE_GRACE_MS + RELEASE_MARGIN_MS;
     // The chain clock has not reached expiry; the program would reject it.
     expect(
       selectReleasable({
@@ -118,13 +140,14 @@ describe("selectReleasable", () => {
         wallNow: 2_000_000,
       }),
     ).toHaveLength(0);
-    // Expired on-chain, but a refund request could still be committed.
+    // Expired on-chain, but a refund request could still be committing: the
+    // mutation's cutoff is the grace, and the keeper waits a margin beyond it.
     expect(
       selectReleasable({
         openOrders: [order(1000)],
         links: {},
         chainNow: 1000,
-        wallNow: 1_059_999,
+        wallNow: 1_000_000 + RELEASE_GRACE_MS,
       }),
     ).toHaveLength(0);
     expect(
@@ -132,7 +155,15 @@ describe("selectReleasable", () => {
         openOrders: [order(1000)],
         links: {},
         chainNow: 1000,
-        wallNow: 1_060_000,
+        wallNow: boundary - 1,
+      }),
+    ).toHaveLength(0);
+    expect(
+      selectReleasable({
+        openOrders: [order(1000)],
+        links: {},
+        chainNow: 1000,
+        wallNow: boundary,
       }),
     ).toHaveLength(1);
   });
@@ -446,6 +477,12 @@ describe("keeper run", () => {
     const result = await t.action(internal.keeperActions.run, {});
     expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 0 });
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(1);
+    // Deferred writes are not a failure, but the run did not finish.
+    expect(
+      (await t.query(api.workers.status, {})).find(
+        (worker) => worker.name === "keeper",
+      )?.issue,
+    ).toBe("incomplete");
     // The next run, with time to spare, writes it.
     readOrders.mockResolvedValue(
       new Map([[id, receipt(orderAddress, "refunded")]]),
@@ -457,6 +494,23 @@ describe("keeper run", () => {
       synced: 1,
     });
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(0);
+  });
+  it("still counts a mismatched read as failed after the budget runs out", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const orderAddress = Keypair.generate().publicKey.toBase58();
+    const id = await insertLink(t, orderAddress, true);
+    // Only receipt writes are deferred; a read that failed is still a failure.
+    readOrders.mockImplementation(async () => {
+      vi.advanceTimersByTime(4 * 60_000 + 1);
+      return new Map([[id, new Error("does not match")]]);
+    });
+    expect(await t.action(internal.keeperActions.run, {})).toEqual({
+      released: 0,
+      skipped: 0,
+      failed: 1,
+      synced: 0,
+    });
   });
   it("counts a race with a fresh dispute as skipped, not failed", async () => {
     const t = convexTest(schema, modules);
