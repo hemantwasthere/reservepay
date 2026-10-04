@@ -119,21 +119,35 @@ export const run = internalAction({
             links,
             chainNow,
             wallNow,
-            limit: RELEASE_LIMIT,
+            limit: candidates.length,
           })
         : [];
+      // Missing token accounts need manual release. Check eligibility before
+      // applying the send cap, or the oldest skipped orders starve the queue.
+      const ready: typeof selected = [];
+      const tokenAccounts = new Map<string, boolean>();
+      for (const order of selected) {
+        if (outOfTime() || ready.length >= RELEASE_LIMIT) break;
+        const key = `${order.mint}:${order.authority}`;
+        if (!tokenAccounts.has(key))
+          tokenAccounts.set(
+            key,
+            await chain.ataExists(
+              new PublicKey(order.mint),
+              new PublicKey(order.authority),
+            ),
+          );
+        if (!tokenAccounts.get(key)) {
+          skipped += 1;
+          continue;
+        }
+        ready.push(order);
+      }
       const attempts = await Promise.allSettled(
-        selected.map(async (order) => {
+        ready.map(async (order) => {
+          if (outOfTime()) return "skipped" as const;
           const authority = new PublicKey(order.authority);
           const mint = new PublicKey(order.mint);
-          // The keeper never pays rent: without the merchant's token account
-          // the order is left for manual release.
-          if (!(await chain.ataExists(mint, authority))) {
-            console.log(
-              `keeper: skipping order ${order.order}; the merchant token account does not exist.`,
-            );
-            return "skipped" as const;
-          }
           const instructions = await completeOrderInstructions(rpc, {
             order: new PublicKey(order.order),
             merchantPda: new PublicKey(order.merchantPda),

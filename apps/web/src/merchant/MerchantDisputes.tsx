@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAction, usePaginatedQuery } from "convex/react";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,16 @@ function Disputes() {
   const sync = useAction(api.paymentActions.sync);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const now = Date.now();
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    const timer = window.setInterval(update, 15_000);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, []);
   const refresh = async () => {
     if (busy || !links.length) return;
     setBusy(true);
