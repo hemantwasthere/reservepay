@@ -19,6 +19,8 @@ import type * as merchants from "../merchants.js";
 import type * as paymentActions from "../paymentActions.js";
 import type * as paymentValidators from "../paymentValidators.js";
 import type * as payments from "../payments.js";
+import type * as reconcile from "../reconcile.js";
+import type * as reconcileActions from "../reconcileActions.js";
 import type * as session from "../session.js";
 import type * as signInNonce from "../signInNonce.js";
 import type * as syncLink from "../syncLink.js";
@@ -41,6 +43,8 @@ declare const fullApi: ApiFromModules<{
   paymentActions: typeof paymentActions;
   paymentValidators: typeof paymentValidators;
   payments: typeof payments;
+  reconcile: typeof reconcile;
+  reconcileActions: typeof reconcileActions;
   session: typeof session;
   signInNonce: typeof signInNonce;
   syncLink: typeof syncLink;

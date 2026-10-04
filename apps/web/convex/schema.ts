@@ -23,7 +23,19 @@ export default defineSchema({
     .index("by_refund", ["refundPending"])
     .index("by_refund_expiry", ["refundPending", "receipt.expiresAt"])
     .index("by_merchant", ["merchant"])
-    .index("by_reference", ["merchant", "reference"]),
+    .index("by_reference", ["merchant", "reference"])
+    // Maps a chain order to its links with no merchant RPC (reconciler).
+    .index("by_reference_only", ["reference"])
+    // "paid" pages and — via eq(undefined), which matches a missing receipt —
+    // the never-synced sweep.
+    .index("by_receipt_status", ["receipt.status"]),
+  // Reconciler pagination cursors, so a run that stops mid-sweep resumes
+  // where it left off instead of skipping or restarting.
+  syncState: defineTable({
+    name: v.string(),
+    cursor: v.union(v.string(), v.null()),
+    updatedAt: v.number(),
+  }).index("by_name", ["name"]),
   usedNonces: defineTable({
     nonce: v.string(),
     expiresAt: v.number(),

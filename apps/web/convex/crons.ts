@@ -17,4 +17,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "reconcile payments with Solana",
+  { minutes: 2 },
+  internal.reconcileActions.run,
+  {},
+);
+
 export default crons;
