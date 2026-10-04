@@ -41,6 +41,12 @@ describe("programError", () => {
     expect(programError({ InstructionError: [1, { Custom: 6004 }] })).toBe(
       "OrderStillProtected",
     );
+    expect(programError({ InstructionError: [1, { Custom: 6007 }] })).toBe(
+      "DisputeWindowClosed",
+    );
+    expect(programError({ InstructionError: [1, { Custom: 6008 }] })).toBe(
+      "OrderUnderDispute",
+    );
     expect(programError({ InstructionError: [1, { Custom: 9999 }] })).toBeNull();
     expect(programError({ InstructionError: [1, "Other"] })).toBeNull();
     expect(programError(null)).toBeNull();

@@ -32,7 +32,7 @@ function loadKeeper(): Keypair | null {
 // keeper's read and its send; both outcomes are expected races.
 function isResolutionRace(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /OrderClosed|OrderStillProtected|already been resolved|still open/.test(
+  return /OrderClosed|OrderStillProtected|OrderUnderDispute|already been resolved|still open/.test(
     message,
   );
 }

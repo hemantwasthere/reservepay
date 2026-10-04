@@ -229,6 +229,7 @@ describe("transaction recovery", () => {
 describe("on-chain order status", () => {
   it("maps the chain variants to merchant-facing statuses", () => {
     expect(orderStatus({ open: {} })).toBe("paid");
+    expect(orderStatus({ disputed: {} })).toBe("paid");
     expect(orderStatus({ completed: {} })).toBe("completed");
     expect(orderStatus({ refunded: {} })).toBe("refunded");
   });
@@ -243,7 +244,11 @@ describe("merchant order reads", () => {
     reserveAmount: number;
     createdAt: number;
     expiresAt: number;
-    status: { open: object } | { completed: object } | { refunded: object };
+    status:
+      | { open: object }
+      | { completed: object }
+      | { refunded: object }
+      | { disputed: object };
   }) => ({
     merchant: PublicKey.default,
     buyer,

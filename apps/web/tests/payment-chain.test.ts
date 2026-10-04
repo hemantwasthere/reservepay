@@ -111,7 +111,16 @@ describe("real checkout transaction", () => {
       reserveAmount: "50000",
       expiresAt: 86500000,
       status: "paid",
+      disputed: false,
     });
+    vi.mocked(connection.getAccountInfo).mockResolvedValue(
+      await account({ status: { disputed: {} } }),
+    );
+    expect(await client.readOrder(terms)).toMatchObject({
+      status: "paid",
+      disputed: true,
+    });
+    vi.mocked(connection.getAccountInfo).mockResolvedValue(await account());
     expect(connection.getAccountInfo).toHaveBeenCalledWith(
       client.addresses(terms).order,
       "finalized",

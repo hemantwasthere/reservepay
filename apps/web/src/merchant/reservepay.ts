@@ -473,6 +473,22 @@ export type Reservepay = {
       args: [];
     },
     {
+      name: "requestRefund";
+      discriminator: [155, 77, 126, 53, 47, 81, 144, 82];
+      accounts: [
+        {
+          name: "order";
+          writable: true;
+        },
+        {
+          name: "buyer";
+          signer: true;
+          relations: ["order"];
+        },
+      ];
+      args: [];
+    },
+    {
       name: "setMerchantReserveRate";
       discriminator: [229, 162, 56, 45, 100, 227, 105, 30];
       accounts: [
@@ -616,6 +632,10 @@ export type Reservepay = {
       discriminator: [224, 1, 229, 63, 254, 60, 190, 159];
     },
     {
+      name: "orderDisputed";
+      discriminator: [186, 104, 120, 36, 95, 130, 173, 128];
+    },
+    {
       name: "orderRefunded";
       discriminator: [120, 155, 10, 169, 7, 98, 202, 187];
     },
@@ -671,6 +691,16 @@ export type Reservepay = {
       code: 6006;
       name: "mathOverflow";
       msg: "A numeric operation overflowed";
+    },
+    {
+      code: 6007;
+      name: "disputeWindowClosed";
+      msg: "The protection window has ended; the order can no longer be disputed";
+    },
+    {
+      code: 6008;
+      name: "orderUnderDispute";
+      msg: "The order is under dispute; only the resolver can resolve it";
     },
   ];
   types: [
@@ -871,6 +901,30 @@ export type Reservepay = {
       };
     },
     {
+      name: "orderDisputed";
+      type: {
+        kind: "struct";
+        fields: [
+          {
+            name: "order";
+            type: "pubkey";
+          },
+          {
+            name: "merchant";
+            type: "pubkey";
+          },
+          {
+            name: "buyer";
+            type: "pubkey";
+          },
+          {
+            name: "disputedAt";
+            type: "i64";
+          },
+        ];
+      };
+    },
+    {
       name: "orderRefunded";
       type: {
         kind: "struct";
@@ -907,6 +961,9 @@ export type Reservepay = {
           },
           {
             name: "refunded";
+          },
+          {
+            name: "disputed";
           },
         ];
       };

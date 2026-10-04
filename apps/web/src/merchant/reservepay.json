@@ -415,6 +415,22 @@
       "args": []
     },
     {
+      "name": "request_refund",
+      "discriminator": [155, 77, 126, 53, 47, 81, 144, 82],
+      "accounts": [
+        {
+          "name": "order",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "signer": true,
+          "relations": ["order"]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "set_merchant_reserve_rate",
       "discriminator": [229, 162, 56, 45, 100, 227, 105, 30],
       "accounts": [
@@ -558,6 +574,10 @@
       "discriminator": [224, 1, 229, 63, 254, 60, 190, 159]
     },
     {
+      "name": "OrderDisputed",
+      "discriminator": [186, 104, 120, 36, 95, 130, 173, 128]
+    },
+    {
       "name": "OrderRefunded",
       "discriminator": [120, 155, 10, 169, 7, 98, 202, 187]
     },
@@ -613,6 +633,16 @@
       "code": 6006,
       "name": "MathOverflow",
       "msg": "A numeric operation overflowed"
+    },
+    {
+      "code": 6007,
+      "name": "DisputeWindowClosed",
+      "msg": "The protection window has ended; the order can no longer be disputed"
+    },
+    {
+      "code": 6008,
+      "name": "OrderUnderDispute",
+      "msg": "The order is under dispute; only the resolver can resolve it"
     }
   ],
   "types": [
@@ -813,6 +843,30 @@
       }
     },
     {
+      "name": "OrderDisputed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "disputed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "OrderRefunded",
       "type": {
         "kind": "struct",
@@ -849,6 +903,9 @@
           },
           {
             "name": "Refunded"
+          },
+          {
+            "name": "Disputed"
           }
         ]
       }

@@ -210,6 +210,58 @@ describe("order resolution transactions", () => {
       status: { completed: {} } as never,
     });
     expect(completed[ORDER_STATUS_OFFSET]).toBe(1);
+    const refunded = await coder.encode("order", {
+      ...state,
+      status: { refunded: {} } as never,
+    });
+    expect(refunded[ORDER_STATUS_OFFSET]).toBe(2);
+    const disputed = await coder.encode("order", {
+      ...state,
+      status: { disputed: {} } as never,
+    });
+    expect(disputed[ORDER_STATUS_OFFSET]).toBe(3);
+  });
+  it("leaves disputed orders to the resolver alone", async () => {
+    const disputed = await setup({ now: 3700, status: { disputed: {} } as never });
+    await expect(
+      disputed.client.prepareResolution(terms, merchant.publicKey, "complete"),
+    ).rejects.toThrow("under dispute");
+    await expect(
+      disputed.client.prepareResolution(terms, buyer.publicKey, "complete"),
+    ).rejects.toThrow("under dispute");
+    await expect(
+      disputed.client.prepareResolution(terms, merchant.publicKey, "refund"),
+    ).rejects.toThrow("Only the configured resolver");
+    for (const action of ["refund", "complete"] as const)
+      await expect(
+        disputed.client.prepareResolution(terms, resolver.publicKey, action),
+      ).resolves.toBeTruthy();
+  });
+  it("builds the buyer's on-chain dispute transaction only inside the window", async () => {
+    const { client, rpc } = await setup();
+    const { transaction } = await client.prepareRefundRequest(
+      terms,
+      buyer.publicKey,
+    );
+    const ix = transaction.instructions.at(-1)!;
+    expect(ix.programId.equals(PROGRAM_ID)).toBe(true);
+    expect(ix.keys[0].pubkey.equals(client.addresses(terms).order)).toBe(true);
+    expect(ix.keys[1].pubkey.equals(buyer.publicKey)).toBe(true);
+    expect(ix.keys[1].isSigner).toBe(true);
+    transaction.sign(buyer);
+    expect(transaction.verifySignatures()).toBe(true);
+    await expect(
+      client.prepareRefundRequest(terms, merchant.publicKey),
+    ).rejects.toThrow("Only the buyer");
+    const expired = await setup({ now: 3700 });
+    await expect(
+      expired.client.prepareRefundRequest(terms, buyer.publicKey),
+    ).rejects.toThrow("protection period has ended");
+    const disputed = await setup({ status: { disputed: {} } as never });
+    await expect(
+      disputed.client.prepareRefundRequest(terms, buyer.publicKey),
+    ).rejects.toThrow("already resolved");
+    expect(rpc.getBalance).toHaveBeenCalled();
   });
   it("decodes the chain clock unix timestamp", async () => {
     const { rpc } = await setup({ now: 1234 });

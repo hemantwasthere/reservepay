@@ -26,7 +26,7 @@ import { DEVNET_USDC, merchantClient } from "../merchant/client";
 import type { Reservepay } from "../merchant/reservepay";
 import idl from "../merchant/reservepay.json";
 import { referenceBytes, validateTerms, type PaymentTerms } from "./terms";
-import { orderStatus, type OrderStatus } from "./order-status";
+import { isDisputed, orderStatus, type OrderStatus } from "./order-status";
 import { withRetry } from "../lib/retry";
 
 // Byte offset of the 1-byte status enum inside a serialized Order account:
@@ -42,12 +42,36 @@ export type OrderReceipt = {
   createdAt: number;
   expiresAt: number;
   status: OrderStatus;
+  // True while the on-chain order is Disputed (status stays "paid").
+  disputed?: boolean;
 };
 
 export async function readChainTime(rpc: Connection): Promise<bigint> {
   const clock = await rpc.getAccountInfo(SYSVAR_CLOCK_PUBKEY, "confirmed");
   if (!clock) throw new Error("Could not read the Solana clock.");
   return clock.data.readBigInt64LE(32);
+}
+
+// Shared tail for the resolution and dispute transactions: fresh blockhash,
+// the signer as fee payer, and a balance check covering the fee plus rent.
+async function withBlockhashAndFee(
+  rpc: Connection,
+  transaction: Transaction,
+  signer: PublicKey,
+  rent = 0,
+) {
+  const lifetime = await rpc.getLatestBlockhash("confirmed");
+  transaction.feePayer = signer;
+  transaction.recentBlockhash = lifetime.blockhash;
+  const fee = await rpc.getFeeForMessage(
+    transaction.compileMessage(),
+    "confirmed",
+  );
+  if ((await rpc.getBalance(signer, "confirmed")) < rent + (fee.value ?? 5200))
+    throw new Error(
+      "Add devnet SOL to cover the network fee and any token account rent.",
+    );
+  return { transaction, ...lifetime };
 }
 
 // Shared by the resolver/merchant resolution flow (createAta: true, the
@@ -154,6 +178,7 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
     createdAt: state.createdAt.toNumber() * 1000,
     expiresAt: state.expiresAt.toNumber() * 1000,
     status: orderStatus(state.status),
+    disputed: isDisputed(state.status),
   });
   const decodeOrder = (
     terms: PaymentTerms,
@@ -231,11 +256,15 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
         this.readState(terms, "confirmed"),
         this.readResolver(),
       ]);
-      if (!state || !("open" in state.status))
+      if (!state || !("open" in state.status || "disputed" in state.status))
         throw new Error("This order is already resolved or has not been paid.");
       if (action === "refund" && !signer.equals(resolver))
         throw new Error("Only the configured resolver can refund an order.");
       if (action === "complete" && !signer.equals(resolver)) {
+        if ("disputed" in state.status)
+          throw new Error(
+            "This order is under dispute; only the resolver can resolve it.",
+          );
         if (!signer.equals(authority))
           throw new Error(
             "Connect the merchant or resolver wallet to complete this order.",
@@ -289,26 +318,35 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
           })),
         );
       }
-      const lifetime = await rpc.getLatestBlockhash("confirmed");
-      transaction.feePayer = signer;
-      transaction.recentBlockhash = lifetime.blockhash;
-      const fee = await rpc.getFeeForMessage(
-        transaction.compileMessage(),
-        "confirmed",
-      );
       const destination =
         action === "complete" ? merchantTokenAccount : state.buyerTokenAccount;
       const rent = !(await rpc.getAccountInfo(destination))
         ? await rpc.getMinimumBalanceForRentExemption(165)
         : 0;
-      if (
-        (await rpc.getBalance(signer, "confirmed")) <
-        rent + (fee.value ?? 5200)
-      )
+      return withBlockhashAndFee(rpc, transaction, signer, rent);
+    },
+    // The buyer's on-chain dispute: flags the order Disputed so only the
+    // resolver can resolve it. Same transaction shape as prepareResolution.
+    async prepareRefundRequest(terms: PaymentTerms, buyer: PublicKey) {
+      const { order } = addresses(terms);
+      const state = await this.readState(terms, "confirmed");
+      if (!state || !("open" in state.status))
+        throw new Error("This order is already resolved or has not been paid.");
+      if (!state.buyer.equals(buyer))
+        throw new Error("Only the buyer can dispute this order.");
+      if ((await readChainTime(rpc)) >= BigInt(state.expiresAt.toString()))
         throw new Error(
-          "Add devnet SOL to cover the network fee and any token account rent.",
+          "The protection period has ended; this order can no longer be disputed.",
         );
-      return { transaction, ...lifetime };
+      const transaction = new Transaction().add(
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1_000 }),
+        await program.methods
+          .requestRefund()
+          .accountsStrict({ order, buyer })
+          .instruction(),
+      );
+      return withBlockhashAndFee(rpc, transaction, buyer);
     },
     async prepare(terms: PaymentTerms, buyer: PublicKey) {
       const { authority, merchant, order, reserveVault, merchantTokenAccount } =

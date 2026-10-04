@@ -633,10 +633,10 @@ pub enum ReservePayError {
     OrderStillProtected,
     #[msg("The order has already been resolved")]
     OrderClosed,
+    #[msg("A numeric operation overflowed")]
+    MathOverflow,
     #[msg("The protection window has ended; the order can no longer be disputed")]
     DisputeWindowClosed,
     #[msg("The order is under dispute; only the resolver can resolve it")]
     OrderUnderDispute,
-    #[msg("A numeric operation overflowed")]
-    MathOverflow,
 }

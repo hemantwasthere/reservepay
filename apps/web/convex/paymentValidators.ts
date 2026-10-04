@@ -19,6 +19,8 @@ export const receiptFields = {
     v.literal("completed"),
     v.literal("refunded"),
   ),
+  // Set once the on-chain order is Disputed; additive for old receipts.
+  disputed: v.optional(v.boolean()),
 };
 
 export const refundReason = v.union(

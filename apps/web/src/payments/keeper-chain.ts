@@ -48,21 +48,36 @@ export function keeperChain(rpc: Connection) {
   const program = new Program<Reservepay>(idl as Reservepay, {
     connection: rpc,
   });
+  // .all() adds the discriminator filter itself; the memcmp matches the
+  // 1-byte status enum (Open = 0, Disputed = 3; programs/reservepay/src/lib.rs).
+  const ordersByStatus = async (
+    statusByte: number,
+  ): Promise<KeeperOpenOrder[]> => {
+    const accounts = await withRetry(() =>
+      program.account.order.all([
+        {
+          memcmp: {
+            offset: ORDER_STATUS_OFFSET,
+            bytes: bs58.encode([statusByte]),
+          },
+        },
+      ]),
+    );
+    return accounts.map(({ publicKey, account }) => ({
+      order: publicKey.toBase58(),
+      merchantPda: account.merchant.toBase58(),
+      reference: Buffer.from(account.reference).toString("hex"),
+      expiresAt: account.expiresAt.toNumber(),
+    }));
+  };
   return {
-    // Open orders only: .all() adds the discriminator filter itself, and
-    // bs58.encode([0]) === "1" is the Open status byte.
     async openOrders(): Promise<KeeperOpenOrder[]> {
-      const accounts = await withRetry(() =>
-        program.account.order.all([
-          { memcmp: { offset: ORDER_STATUS_OFFSET, bytes: bs58.encode([0]) } },
-        ]),
-      );
-      return accounts.map(({ publicKey, account }) => ({
-        order: publicKey.toBase58(),
-        merchantPda: account.merchant.toBase58(),
-        reference: Buffer.from(account.reference).toString("hex"),
-        expiresAt: account.expiresAt.toNumber(),
-      }));
+      return ordersByStatus(0);
+    },
+    // Disputed orders are still open liability, resolvable only by the
+    // resolver, so the keeper must never release them.
+    async disputedOrders(): Promise<KeeperOpenOrder[]> {
+      return ordersByStatus(3);
     },
     async merchant(
       merchantPda: string,
