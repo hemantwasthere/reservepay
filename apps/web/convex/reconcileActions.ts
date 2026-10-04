@@ -106,16 +106,14 @@ export const run = internalAction({
           (link) => link.receipt?.disputed !== true,
         );
         if (unsynced.length + newDisputes.length > 0 && !outOfTime()) {
-          for (const link of [...unsynced, ...newDisputes])
-            syncedInScan.add(link._id);
           // One batched read for both. An order that flips Open → Disputed
-          // between the two scans can land its link in both lists, so dedupe
-          // by id: one read and one count per link.
-          const toSync = [
-            ...new Map(
-              [...unsynced, ...newDisputes].map((link) => [link._id, link]),
-            ).values(),
-          ];
+          // between the two scans can land its link in both lists; one pass
+          // dedupes by id and records it in syncedInScan.
+          const toSync = [...unsynced, ...newDisputes].filter((link) => {
+            if (syncedInScan.has(link._id)) return false;
+            syncedInScan.add(link._id);
+            return true;
+          });
           count(await syncLinks(ctx, toSync, receipts));
         } else if (unsynced.length + newDisputes.length > 0) {
           complete = false;
