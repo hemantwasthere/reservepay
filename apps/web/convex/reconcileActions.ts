@@ -26,6 +26,7 @@ export const run = internalAction({
     const receipts = serverRpc("finalized");
     const summary = {
       scanned: 0,
+      scanFailed: false,
       synced: 0,
       missing: 0,
       mismatched: 0,
@@ -76,6 +77,10 @@ export const run = internalAction({
       }
     } catch {
       openSet = null;
+      // Steps 1–3 skip this run; the scanFailed flag in the summary line
+      // keeps a persistently rate-limited RPC from looking like a quiet run.
+      // The error itself is not logged: RPC messages can embed the URL.
+      summary.scanFailed = true;
     }
     // Disputes are never paged, so a resolved dispute always clears within
     // one run.

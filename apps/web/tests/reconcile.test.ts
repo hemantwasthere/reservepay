@@ -100,6 +100,7 @@ describe("reconcile run", () => {
     const result = await t.action(internal.reconcileActions.run, {});
     expect(result).toMatchObject({
       scanned: 1,
+      scanFailed: false,
       synced: 1,
       mismatched: 0,
       failed: 0,
@@ -284,7 +285,8 @@ describe("reconcile run", () => {
     const unsyncedId = await insertLink(t, wallet, reference(10));
     fns.openOrders.mockRejectedValue(new Error("503 Service Unavailable"));
     const result = await t.action(internal.reconcileActions.run, {});
-    expect(result.scanned).toBe(0);
+    // The failed scan is visible in the summary, not mistaken for a quiet run.
+    expect(result).toMatchObject({ scanned: 0, scanFailed: true });
     // Only the catch-up sweep read anything; the paid link was untouched.
     expect(readOrders).toHaveBeenCalledTimes(1);
     expect(readOrders.mock.calls[0][0].map(({ id }: { id: string }) => id))

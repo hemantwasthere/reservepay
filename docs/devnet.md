@@ -44,7 +44,7 @@ A separate Convex cron reconciles payment receipts with Solana every 2 minutes. 
 3. re-checks a page of links whose receipt says "paid" but whose order is no longer open, recording completed or refunded outcomes;
 4. sweeps a page of links with no receipt at all, catching orders paid and resolved before anyone synced.
 
-Receipts are read at finalized commitment and `payments.record` never regresses a status, so reconciliation can only move a receipt forward or leave it unchanged. Paged steps resume from cursors stored in the `syncState` table; a failed page retries next run instead of skipping links. Each run logs one summary line (counts only, never link documents or env values).
+Receipts are read at finalized commitment and `payments.record` never regresses a status, so reconciliation can only move a receipt forward or leave it unchanged. Paged steps resume from cursors stored in the `syncState` table; a failed page retries next run instead of skipping links. If the open-order scan itself fails, the steps that compare against it skip the run and the summary shows `scanFailed: true`, so a persistently rate-limited RPC is visible rather than mistaken for a quiet run. Each run logs one summary line (counts only, never link documents or env values).
 
 ### Configure
 
