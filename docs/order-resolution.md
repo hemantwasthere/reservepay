@@ -4,7 +4,14 @@ A paid link at `/pay/:id` is also the order-management screen. Merchants can ope
 
 ## Buyer refund requests
 
-Connect the wallet that paid, choose **Request refund**, select a public reason, and sign the request. This message does not move funds. The backend verifies the signature, the finalized on-chain buyer and order, and the protection deadline before storing one immutable request per link. Retrying the same request is safe.
+Connect the wallet that paid, choose **Request refund**, select a public reason, and sign the request. This message does not move funds. The backend verifies the signature, the on-chain buyer and order, and the protection deadline before storing one request per link. Retrying the same request is safe; a different reason is refused once a reason is on file.
+
+Two exceptions to those rules:
+
+- **Reason not provided.** A dispute raised directly on-chain is recorded with the placeholder reason *Reason not provided*. The buyer's own signed reason may replace that placeholder (keeping the original request time) while the order is still open. Once the resolver has decided, a late reason is refused with *already resolved*, and the outcome stays recorded without one. Replacing the placeholder does not send a second inbox notification: the resolver sees the reason on the Disputes page.
+- **Disputed before the deadline.** If the order was flagged `Disputed` on-chain before protection ended, the buyer can still add a reason after the deadline, because the program already enforced the window when the dispute was raised. The backend decides this from a confirmed chain read, since the stored receipt can lag a fresh dispute.
+
+`REQUIRE_ONCHAIN_DISPUTE=1` (Convex environment) refuses signed reasons for orders that are not yet `Disputed` on-chain, with *Submit the on-chain dispute first*. Leave it unset until the app's Request refund button sends the dispute transaction.
 
 The on-chain half of this flow is rolling out: the program already supports `request_refund`, which flags the order `Disputed` before protection expires, but the app's Request refund button does not send that transaction yet (it is being shipped separately). Until then, a UI request is recorded off-chain only and does not by itself block completion — the keeper still skips orders with a pending request by policy. Disputes raised directly on-chain (outside the app) appear in the resolver queue with **Reason not provided** once reconciliation records them.
 

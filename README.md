@@ -68,7 +68,7 @@ _Sample devnet payment link. No wallet is connected in this screenshot._
 
 ## Protection has a deadline
 
-A buyer’s signed message records their refund request; it does not transfer funds. The program also supports flagging the order `Disputed` on-chain — the app’s transaction step for that is still rolling out, so UI requests are off-chain for now. **A request does not extend protection or guarantee a refund.** Once an order is disputed on-chain, only the configured resolver can resolve it, and the resolver can still approve an on-chain refund after the deadline.
+A buyer’s signed message records their refund request; it does not transfer funds. The program also supports flagging the order `Disputed` on-chain — the app’s transaction step for that is still rolling out, so UI requests are off-chain for now. **A request does not move the protection deadline or guarantee a refund.** A dispute must be raised on-chain before the deadline; once it is, the order is held for the resolver even after the deadline passes: only the configured resolver can then complete or refund it, and the resolver can still approve a refund after the deadline.
 
 For undisputed orders, completion after protection expires is permissionless in the program; the app offers it to the merchant and resolver, and a configured, funded keeper completes expired undisputed orders automatically. The resolver can also complete early. Once an order is completed, it cannot be refunded through the program.
 
@@ -155,6 +155,7 @@ Three more server-only backend variables control the order keeper and reconcilia
 | `KEEPER_SECRET_KEY` | Base58 secret of the dedicated keeper keypair; enables automatic release of expired orders           |
 | `SOLANA_RPC_URL`    | Optional dedicated RPC for background reconciliation, order release, and post-release syncs; defaults to public devnet |
 | `KEEPER_RPC_URL`    | Fallback alias for `SOLANA_RPC_URL`                                                                  |
+| `REQUIRE_ONCHAIN_DISPUTE` | Set to `1` to refuse refund reasons for orders not yet `Disputed` on-chain; leave unset until the app sends the dispute transaction |
 
 See [devnet operations](docs/devnet.md) for keeper funding, reconciliation, and protocol setup.
 
