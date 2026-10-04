@@ -87,7 +87,10 @@ beforeEach(() => {
       new Map(items.map(({ id }) => [id, null])),
   );
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("reconcile run", () => {
   it("records a receipt for a link paid while no client was watching", async () => {
@@ -104,6 +107,7 @@ describe("reconcile run", () => {
       synced: 1,
       mismatched: 0,
       failed: 0,
+      skipped: [],
     });
     expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
       "paid",
@@ -267,11 +271,13 @@ describe("reconcile run", () => {
       name: "unsynced",
       cursor: "not-a-real-cursor",
     });
-    await t.action(internal.reconcileActions.run, {});
+    const result = await t.action(internal.reconcileActions.run, {});
     expect(
       await t.query(internal.reconcile.getCursor, { name: "unsynced" }),
     ).toBeNull();
-    // The failed page skipped the sweep, so nothing was read.
+    // The failed page skipped the sweep, so nothing was read — and the
+    // summary names the skipped step instead of looking like a quiet run.
+    expect(result.skipped).toEqual(["unsynced"]);
     expect(readOrders).not.toHaveBeenCalled();
   });
   it("skips the open-order steps when the scan fails and never mass-syncs paid links", async () => {
@@ -286,13 +292,33 @@ describe("reconcile run", () => {
     fns.openOrders.mockRejectedValue(new Error("503 Service Unavailable"));
     const result = await t.action(internal.reconcileActions.run, {});
     // The failed scan is visible in the summary, not mistaken for a quiet run.
-    expect(result).toMatchObject({ scanned: 0, scanFailed: true });
+    expect(result).toMatchObject({
+      scanned: 0,
+      scanFailed: true,
+      skipped: ["scan"],
+    });
     // Only the catch-up sweep read anything; the paid link was untouched.
     expect(readOrders).toHaveBeenCalledTimes(1);
     expect(readOrders.mock.calls[0][0].map(({ id }: { id: string }) => id))
       .toEqual([unsyncedId]);
     expect((await t.query(api.payments.get, { id: paidId }))?.receipt?.status)
       .toBe("paid");
+  });
+  it("names the steps skipped when the time budget runs out", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    await insertLink(t, Keypair.generate(), reference(14));
+    fns.openOrders.mockImplementation(async () => {
+      vi.advanceTimersByTime(91_000);
+      return [];
+    });
+    const result = await t.action(internal.reconcileActions.run, {});
+    expect(result).toMatchObject({
+      scanned: 0,
+      scanFailed: false,
+      skipped: ["disputes", "paid", "unsynced"],
+    });
+    expect(readOrders).not.toHaveBeenCalled();
   });
   it("counts mismatches without failing the batch", async () => {
     const t = convexTest(schema, modules);

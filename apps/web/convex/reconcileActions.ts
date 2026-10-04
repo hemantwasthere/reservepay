@@ -31,12 +31,19 @@ export const run = internalAction({
       missing: 0,
       mismatched: 0,
       failed: 0,
+      skipped: [] as string[],
     };
     const count = (result: SyncSummary) => {
       summary.synced += result.synced;
       summary.missing += result.missing;
       summary.mismatched += result.mismatched;
       summary.failed += result.failed;
+    };
+    // A step that did not run (or did not finish) is named here — step names
+    // only — so a persistently failing sweep or an exhausted time budget
+    // shows up in the summary instead of looking like a quiet run.
+    const skip = (step: string) => {
+      summary.skipped.push(step);
     };
     // Steps 1–3 need the open-order scan: without it every paid link would
     // look "not open" and get mass-synced, so they skip a failed scan. The
@@ -48,11 +55,12 @@ export const run = internalAction({
       summary.scanned = openOrders.length;
       openSet = new Set(openOrders.map((order) => order.order));
       const candidates: Doc<"paymentLinks">[] = [];
-      for (
-        let start = 0;
-        start < openOrders.length && !outOfTime();
-        start += 100
-      ) {
+      let complete = true;
+      for (let start = 0; start < openOrders.length; start += 100) {
+        if (outOfTime()) {
+          complete = false;
+          break;
+        }
         const chunk = openOrders.slice(start, start + 100);
         const byReference = await ctx.runQuery(
           internal.reconcile.linksByReference,
@@ -74,13 +82,17 @@ export const run = internalAction({
       if (unsynced.length > 0 && !outOfTime()) {
         for (const link of unsynced) syncedInScan.add(link._id);
         count(await syncLinks(ctx, unsynced, receipts));
+      } else if (unsynced.length > 0) {
+        complete = false;
       }
+      if (!complete) skip("scan");
     } catch {
       openSet = null;
       // Steps 1–3 skip this run; the scanFailed flag in the summary line
       // keeps a persistently rate-limited RPC from looking like a quiet run.
       // The error itself is not logged: RPC messages can embed the URL.
       summary.scanFailed = true;
+      skip("scan");
     }
     // Disputes are never paged, so a resolved dispute always clears within
     // one run.
@@ -90,6 +102,8 @@ export const run = internalAction({
         (link) => link.receipt && !openSet.has(link.receipt.order),
       );
       if (resolved.length > 0) count(await syncLinks(ctx, resolved, receipts));
+    } else if (openSet) {
+      skip("disputes");
     }
     // A page's cursor is saved only after its reads succeed: a failed chunk
     // retries the same page next run instead of skipping 200 links. An
@@ -115,6 +129,7 @@ export const run = internalAction({
             name,
             cursor: null,
           });
+        skip(name);
         return;
       }
       const links = select(result.page);
@@ -130,10 +145,12 @@ export const run = internalAction({
       await page("paid", internal.reconcile.paidLinks, (links) =>
         links.filter((link) => !openSet.has(link.receipt!.order)),
       );
+    else if (openSet) skip("paid");
     if (!outOfTime())
       await page("unsynced", internal.reconcile.unsyncedLinks, (links) =>
         links.filter((link) => !syncedInScan.has(link._id)),
       );
+    else skip("unsynced");
     // One summary line per run; never log link documents or env values.
     console.log(`reconcile: ${JSON.stringify(summary)}`);
     return summary;
