@@ -52,19 +52,34 @@ jobs:
         id: runner-image
         run: echo "version=${ImageVersion:?runner image version is required}" >> "$GITHUB_OUTPUT"
       - name: Cache Solana toolchain
+        id: solana
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.local/share/solana/install
             ~/.cache/solana
           # Runner image updates can break cached binaries, so key on the image.
-          key: solana-3.1.7-${{ runner.os }}-${{ runner.arch }}-${{ steps.runner-image.outputs.version }}
+          # "tarball" retires caches filled by the old, unverified installer.
+          key: solana-3.1.7-tarball-${{ runner.os }}-${{ runner.arch }}-${{ steps.runner-image.outputs.version }}
       - name: Install Agave 3.1.7
+        if: steps.solana.outputs.cache-hit != 'true'
+        # Download the release tarball itself and check it against the sha256
+        # GitHub publishes for the v3.1.7 asset — verifying only the bootstrap
+        # installer would leave the binaries it downloads unchecked. Laid out
+        # the way agave-install does it, so active_release/bin works the same.
+        # (cargo-build-sbf still fetches platform-tools itself at build time.)
         run: |
-          curl -sSfL https://release.anza.xyz/v3.1.7/install -o /tmp/agave-install
-          echo "cc7cef414c51f911723b63eef0e59a981bf46362201e8e653990958e29918ce4  /tmp/agave-install" | sha256sum -c -
-          sh /tmp/agave-install
+          release="$HOME/.local/share/solana/install/releases/3.1.7"
+          mkdir -p "$release"
+          curl -sSfL -o /tmp/solana-release.tar.bz2 \
+            https://github.com/anza-xyz/agave/releases/download/v3.1.7/solana-release-x86_64-unknown-linux-gnu.tar.bz2
+          echo "8f12c5694f1ac02b1744da810b9c9a15eb334f8ef055f3ac98123dbf539c9f3b  /tmp/solana-release.tar.bz2" | sha256sum -c -
+          tar -xjf /tmp/solana-release.tar.bz2 -C "$release"
+          ln -sfn "$release/solana-release" "$HOME/.local/share/solana/install/active_release"
+      - name: Put Agave on PATH
+        run: |
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - run: solana --version
       - name: Cache anchor-cli
         id: anchor-cli
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
