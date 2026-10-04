@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -20,3 +23,67 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run check
       - run: cargo check
+
+  program:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45 # cold anchor-cli install + lto=fat build can exceed 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: dtolnay/rust-toolchain@1.79.0 # host toolchain per rust-toolchain.toml
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Cache Solana toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana
+          # Runner image updates can break cached binaries, so key on the image.
+          key: solana-3.1.7-${{ runner.os }}-${{ runner.imageVersion }}
+      - name: Install Agave 3.1.7
+        run: |
+          curl -sSfL https://release.anza.xyz/v3.1.7/install -o /tmp/agave-install
+          echo "cc7cef414c51f911723b63eef0e59a981bf46362201e8e653990958e29918ce4  /tmp/agave-install" | sha256sum -c -
+          sh /tmp/agave-install
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Cache anchor-cli
+        id: anchor-cli
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/anchor
+          key: anchor-cli-1.0.2-${{ runner.os }}-${{ runner.imageVersion }}
+      - name: Install anchor-cli 1.0.2
+        if: steps.anchor-cli.outputs.cache-hit != 'true'
+        # Pinned to the commit tagged v1.0.2 (tags can move). anchor's lockfile
+        # needs edition2024 (Rust >=1.85) — this only builds the CLI tool, the
+        # program itself still builds with the pinned platform-tools.
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal
+          cargo +1.90.0 install --git https://github.com/coral-xyz/anchor --rev 1314a6b83b16e6a31947b372d57988fd0e81559c anchor-cli --locked
+      - name: Create a throwaway validator wallet
+        run: solana-keygen new --no-bip39-passphrase -o ~/.config/solana/id.json
+      - run: bun install --frozen-lockfile
+      - run: bun run --filter @reservepay/core build # tests import apps/web/src/* which import @reservepay/core → dist/
+      - id: build
+        name: Build the program
+        # --ignore-keys: CI generates a throwaway program keypair; the validator
+        # loads the program at the Anchor.toml address. cargo-build-sbf only
+        # warns when an instruction frame exceeds the 4096-byte stack limit, so
+        # fail the job ourselves when the log contains "Stack offset".
+        run: |
+          set -o pipefail
+          anchor build --ignore-keys 2>&1 | tee /tmp/anchor-build.log
+          if grep -q "Stack offset" /tmp/anchor-build.log; then
+            echo "::error::an instruction frame exceeds the 4096-byte stack limit (see above)"
+            exit 1
+          fi
+      - id: idlcheck
+        run: bun run idl:check
+      # Run the tests even when idl:check failed, so drift and test failures
+      # surface in the same run instead of hiding behind each other.
+      - if: steps.build.outcome == 'success'
+        run: anchor test --skip-build --validator legacy # anchor 1.0 defaults to surfpool, which isn't installed; legacy = Agave's solana-test-validator
