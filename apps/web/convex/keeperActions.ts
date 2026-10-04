@@ -67,14 +67,21 @@ export const run = internalAction({
       let lowFunds = false;
       try {
         lowFunds = (await chain.balance(keeper.publicKey)) < 1_000_000;
-        const [openOrders, chainTime, disputes] = await Promise.all([
-          chain.openOrders(),
-          chain.chainTime(),
-          ctx.runQuery(internal.keeper.openDisputes, {}),
-        ]);
+        const [openOrders, disputedOrders, chainTime, disputes] =
+          await Promise.all([
+            chain.openOrders(),
+            chain.disputedOrders(),
+            chain.chainTime(),
+            ctx.runQuery(internal.keeper.openDisputes, {}),
+          ]);
         const chainNow = Number(chainTime);
         const wallNow = Date.now();
-        const openSet = new Set(openOrders.map((order) => order.order));
+        // Disputed orders are still open liability: they count as "open" for
+        // the dispute reconcile below, but only openOrders feeds the release
+        // candidates, so a disputed order is never released.
+        const openSet = new Set(
+          [...openOrders, ...disputedOrders].map((order) => order.order),
+        );
         // Merchant accounts give authority and mint; cached once per run.
         const merchants = new Map<
           string,

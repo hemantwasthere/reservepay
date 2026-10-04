@@ -57,26 +57,37 @@ export const run = internalAction({
       let openSet: Set<string> | null = null;
       const syncedInScan = new Set<string>();
       try {
-        const openOrders = await keeperChain(
-          serverRpc("confirmed"),
-        ).openOrders();
-        summary.scanned = openOrders.length;
-        openSet = new Set(openOrders.map((order) => order.order));
+        const chain = keeperChain(serverRpc("confirmed"));
+        const [openOrders, disputedOrders] = await Promise.all([
+          chain.openOrders(),
+          chain.disputedOrders(),
+        ]);
+        summary.scanned = openOrders.length + disputedOrders.length;
+        // Disputed orders count as open for steps 2–3: still unresolved, so a
+        // chain-Disputed link must not be re-synced as "not open" every run.
+        openSet = new Set(
+          [...openOrders, ...disputedOrders].map((order) => order.order),
+        );
         const candidates: Doc<"paymentLinks">[] = [];
+        const disputedCandidates: Doc<"paymentLinks">[] = [];
         let complete = true;
-        for (let start = 0; start < openOrders.length; start += 100) {
+        const scan = [
+          ...openOrders.map((order) => ({ order, disputed: false })),
+          ...disputedOrders.map((order) => ({ order, disputed: true })),
+        ];
+        for (let start = 0; start < scan.length; start += 100) {
           if (outOfTime()) {
             complete = false;
             break;
           }
-          const chunk = openOrders.slice(start, start + 100);
+          const chunk = scan.slice(start, start + 100);
           const byReference = await ctx.runQuery(
             internal.reconcile.linksByReference,
-            { references: chunk.map((order) => order.reference) },
+            { references: chunk.map(({ order }) => order.reference) },
           );
           // Anyone can open an order for a link's reference, so reference alone
           // is not enough: the link's merchant must derive the order's PDA.
-          for (const order of chunk)
+          for (const { order, disputed } of chunk)
             for (const link of byReference[order.reference] ?? [])
               if (
                 merchantAddress(
@@ -84,15 +95,23 @@ export const run = internalAction({
                   DEVNET_USDC,
                 ).toBase58() === order.merchantPda
               )
-                candidates.push(link);
+                (disputed ? disputedCandidates : candidates).push(link);
         }
         // Orders confirmed but not yet finalized read as Open here; their
         // receipts land on a later run, never a wrong one.
         const unsynced = candidates.filter((link) => !link.receipt);
-        if (unsynced.length > 0 && !outOfTime()) {
-          for (const link of unsynced) syncedInScan.add(link._id);
-          count(await syncLinks(ctx, unsynced, receipts));
-        } else if (unsynced.length > 0) {
+        // Disputes raised since a link's last sync: record backfills the
+        // dispute flag and an unspecified refund request.
+        const newDisputes = disputedCandidates.filter(
+          (link) => link.receipt?.disputed !== true,
+        );
+        if (unsynced.length + newDisputes.length > 0 && !outOfTime()) {
+          for (const link of [...unsynced, ...newDisputes])
+            syncedInScan.add(link._id);
+          if (unsynced.length > 0) count(await syncLinks(ctx, unsynced, receipts));
+          if (newDisputes.length > 0)
+            count(await syncLinks(ctx, newDisputes, receipts));
+        } else if (unsynced.length + newDisputes.length > 0) {
           complete = false;
         }
         if (!complete) skip("scan");

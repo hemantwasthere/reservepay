@@ -7,7 +7,10 @@ import schema from "../convex/schema";
 import { DEVNET_USDC } from "../src/merchant/client";
 import { signIn } from "./session";
 
-const fns = vi.hoisted(() => ({ openOrders: vi.fn() }));
+const fns = vi.hoisted(() => ({
+  openOrders: vi.fn(),
+  disputedOrders: vi.fn(),
+}));
 vi.mock("../src/payments/keeper-chain", () => ({ keeperChain: () => fns }));
 const { readOrder, readOrders } = vi.hoisted(() => ({
   readOrder: vi.fn(),
@@ -80,6 +83,8 @@ beforeEach(() => {
   delete process.env.KEEPER_SECRET_KEY;
   fns.openOrders.mockReset();
   fns.openOrders.mockResolvedValue([]);
+  fns.disputedOrders.mockReset();
+  fns.disputedOrders.mockResolvedValue([]);
   readOrder.mockReset();
   readOrders.mockReset();
   readOrders.mockImplementation(
@@ -368,6 +373,59 @@ describe("reconcile run", () => {
     expect((await t.query(api.payments.get, { id: b }))?.receipt?.status).toBe(
       "paid",
     );
+  });
+  it("marks an already-paid link disputed from the chain scan exactly once", async () => {
+    const t = convexTest(schema, modules);
+    const wallet = Keypair.generate();
+    const orderAddress = Keypair.generate().publicKey.toBase58();
+    const id = await insertLink(t, wallet, reference(20));
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: receipt(orderAddress, "paid"),
+    });
+    // The dispute was raised on-chain after the link synced as paid.
+    fns.disputedOrders.mockResolvedValue([
+      openOrder(wallet, reference(20), orderAddress),
+    ]);
+    readOrders.mockResolvedValue(
+      new Map([[id, { ...receipt(orderAddress, "paid"), disputed: true }]]),
+    );
+    const first = await t.action(internal.reconcileActions.run, {});
+    expect(first).toMatchObject({ synced: 1, mismatched: 0, failed: 0 });
+    const link = await t.query(api.payments.get, { id });
+    expect(link?.receipt?.status).toBe("paid");
+    expect(link?.receipt?.disputed).toBe(true);
+    expect(link?.refundPending).toBe(true);
+    expect(link?.refundRequest?.reason).toBe("unspecified");
+    // Next run: the flag is already set and the disputed order counts as
+    // open, so nothing is read or re-synced.
+    readOrders.mockClear();
+    const second = await t.action(internal.reconcileActions.run, {});
+    expect(second).toMatchObject({ synced: 0, failed: 0, skipped: [] });
+    expect(readOrders).not.toHaveBeenCalled();
+  });
+  it("reads a disputed link with no receipt once per run, not again in the sweep", async () => {
+    const t = convexTest(schema, modules);
+    const wallet = Keypair.generate();
+    const orderAddress = Keypair.generate().publicKey.toBase58();
+    const id = await insertLink(t, wallet, reference(21));
+    fns.disputedOrders.mockResolvedValue([
+      openOrder(wallet, reference(21), orderAddress),
+    ]);
+    readOrders.mockResolvedValue(
+      new Map([[id, { ...receipt(orderAddress, "paid"), disputed: true }]]),
+    );
+    const result = await t.action(internal.reconcileActions.run, {});
+    expect(result).toMatchObject({ synced: 1, failed: 0 });
+    const link = await t.query(api.payments.get, { id });
+    expect(link?.receipt?.disputed).toBe(true);
+    expect(link?.refundRequest?.reason).toBe("unspecified");
+    // The scan and the catch-up sweep would both pick this link; the scan's
+    // sync marks it so the sweep does not read it again.
+    const reads = readOrders.mock.calls.flatMap(([items]) =>
+      (items as { id: string }[]).map((item) => item.id),
+    );
+    expect(reads.filter((readId) => readId === id)).toHaveLength(1);
   });
   it("never rolls a resolved receipt back to a stale paid read", async () => {
     const t = convexTest(schema, modules);

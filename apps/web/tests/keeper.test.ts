@@ -9,6 +9,7 @@ import { selectReleasable, type KeeperOrder } from "../src/payments/keeper";
 const fns = vi.hoisted(() => ({
   balance: vi.fn(),
   openOrders: vi.fn(),
+  disputedOrders: vi.fn(),
   merchant: vi.fn(),
   ataExists: vi.fn(),
   chainTime: vi.fn(),
@@ -75,6 +76,7 @@ beforeEach(() => {
   readOrder.mockResolvedValue(null);
   fns.balance.mockResolvedValue(1_000_000_000);
   fns.openOrders.mockResolvedValue([]);
+  fns.disputedOrders.mockResolvedValue([]);
   fns.merchant.mockResolvedValue({
     authority: authority.publicKey.toBase58(),
     mint,
@@ -376,6 +378,40 @@ describe("keeper run", () => {
     );
     result = await t.action(internal.keeperActions.run, {});
     expect(result).toEqual({ released: 0, skipped: 2, failed: 0, synced: 0 });
+  });
+  it("never releases a chain-disputed order, even when Convex lost the refund request", async () => {
+    const t = convexTest(schema, modules);
+    const orderAddress = Keypair.generate().publicKey.toBase58();
+    await insertLink(t, orderAddress);
+    // The order is Disputed on-chain (not Open), so it is not a release
+    // candidate regardless of what Convex says.
+    fns.disputedOrders.mockResolvedValue([openOrder(1_000_000, orderAddress)]);
+    const result = await t.action(internal.keeperActions.run, {});
+    expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 0 });
+    expect(fns.send).not.toHaveBeenCalled();
+  });
+  it("does not re-sync a dispute whose order is disputed on-chain every run", async () => {
+    const t = convexTest(schema, modules);
+    const orderAddress = Keypair.generate().publicKey.toBase58();
+    await insertLink(t, orderAddress, true);
+    // Still Disputed on-chain: counts as open for the reconcile step, so the
+    // link is skipped without an RPC read.
+    fns.disputedOrders.mockResolvedValue([openOrder(1_000_000, orderAddress)]);
+    const result = await t.action(internal.keeperActions.run, {});
+    expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 0 });
+    expect(readOrder).not.toHaveBeenCalled();
+    expect(await t.query(api.payments.refundQueue, {})).toHaveLength(1);
+  });
+  it("counts a race with a fresh dispute as skipped, not failed", async () => {
+    const t = convexTest(schema, modules);
+    fns.openOrders.mockResolvedValue([openOrder(1_000_000)]);
+    fns.send.mockRejectedValue(
+      new Error(
+        "custom program error: OrderUnderDispute: the order is under dispute; only the resolver can resolve it",
+      ),
+    );
+    const result = await t.action(internal.keeperActions.run, {});
+    expect(result).toEqual({ released: 0, skipped: 1, failed: 0, synced: 0 });
   });
   it("reconciles a dispute whose order is no longer open on-chain", async () => {
     const t = convexTest(schema, modules);
