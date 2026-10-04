@@ -145,7 +145,7 @@ Three more server-only backend variables control the order keeper and reconcilia
 | Variable            | Used for                                                                                             |
 | ------------------- | ---------------------------------------------------------------------------------------------------- |
 | `KEEPER_SECRET_KEY` | Base58 secret of the dedicated keeper keypair; enables automatic release of expired orders           |
-| `SOLANA_RPC_URL`    | Optional dedicated RPC for the reconciler, keeper, and receipt syncs; defaults to public devnet      |
+| `SOLANA_RPC_URL`    | Optional dedicated RPC for background reconciliation, order release, and post-release syncs; defaults to public devnet |
 | `KEEPER_RPC_URL`    | Fallback alias for `SOLANA_RPC_URL`                                                                  |
 
 See [devnet operations](docs/devnet.md) for keeper funding, reconciliation, and protocol setup.
