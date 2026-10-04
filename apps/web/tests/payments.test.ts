@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { convexTest } from "convex-test";
 import { anyApi } from "convex/server";
 import { Keypair } from "@solana/web3.js";
@@ -22,6 +22,8 @@ vi.mock("../src/payments/chain", () => ({
   paymentClient: () => ({ readOrder }),
 }));
 const modules = import.meta.glob("../convex/**/*.ts");
+
+afterEach(() => vi.useRealTimers());
 const seller = Keypair.generate();
 const terms = (): PaymentTerms => ({
   merchant: seller.publicKey.toBase58(),
@@ -177,6 +179,7 @@ describe("merchant-approved payment links", () => {
     ).rejects.toThrow("not found");
   });
   it("marks paid only after chain verification and does not regress resolved receipts", async () => {
+    vi.useFakeTimers();
     const t = convexTest(schema, modules),
       value = terms();
     const id = await t.mutation(internal.payments.insert, value);
@@ -184,6 +187,8 @@ describe("merchant-approved payment links", () => {
     expect(await t.action(api.paymentActions.sync, { id })).toBe(false);
     expect((await t.query(api.payments.get, { id }))?.receipt).toBeUndefined();
     readOrder.mockRejectedValue(new Error("order does not match"));
+    // sync coalesces to one chain read per 5s per link; step past the window.
+    vi.advanceTimersByTime(5_000);
     await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
       "does not match",
     );
@@ -197,12 +202,14 @@ describe("merchant-approved payment links", () => {
       status: "paid" as const,
     };
     readOrder.mockResolvedValue(receipt);
+    vi.advanceTimersByTime(5_000);
     expect(await t.action(api.paymentActions.sync, { id })).toBe(true);
     expect((await t.query(api.payments.get, { id }))?.receipt).toEqual(receipt);
     await t.mutation(internal.payments.record, {
       id,
       receipt: { ...receipt, status: "completed" },
     });
+    // A resolved receipt short-circuits before the coalescer: no chain read.
     await t.action(api.paymentActions.sync, { id });
     expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
       "completed",

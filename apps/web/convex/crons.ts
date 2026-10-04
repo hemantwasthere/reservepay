@@ -18,6 +18,13 @@ crons.interval(
 );
 
 crons.interval(
+  "delete stale rate-limit buckets",
+  { minutes: 30 },
+  internal.rateLimit.cleanup,
+  {},
+);
+
+crons.interval(
   "release expired orders and reconcile disputes",
   { minutes: 5 },
   internal.keeperActions.run,

@@ -68,6 +68,14 @@ export default defineSchema({
   })
     .index("by_nonce", ["nonce"])
     .index("by_expires", ["expiresAt"]),
+  // Fixed-window counters for the public-endpoint rate limits (rateLimit.ts).
+  rateLimits: defineTable({
+    key: v.string(),
+    windowStart: v.number(),
+    count: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_window", ["windowStart"]),
   // Legacy: the earlier stored-nonce design. Kept optional so existing rows
   // still validate on deploy; auth.cleanup drains it. Remove once empty.
   authNonces: defineTable({

@@ -22,6 +22,7 @@ import type * as notifications from "../notifications.js";
 import type * as paymentActions from "../paymentActions.js";
 import type * as paymentValidators from "../paymentValidators.js";
 import type * as payments from "../payments.js";
+import type * as rateLimit from "../rateLimit.js";
 import type * as reconcile from "../reconcile.js";
 import type * as reconcileActions from "../reconcileActions.js";
 import type * as rpc from "../rpc.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   paymentActions: typeof paymentActions;
   paymentValidators: typeof paymentValidators;
   payments: typeof payments;
+  rateLimit: typeof rateLimit;
   reconcile: typeof reconcile;
   reconcileActions: typeof reconcileActions;
   rpc: typeof rpc;

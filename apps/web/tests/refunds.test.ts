@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import { Keypair } from "@solana/web3.js";
 import nacl from "tweetnacl";
@@ -11,6 +11,8 @@ vi.mock("../src/payments/chain", () => ({
   paymentClient: () => ({ readOrder }),
 }));
 const modules = import.meta.glob("../convex/**/*.ts");
+
+afterEach(() => vi.useRealTimers());
 const buyer = Keypair.generate(),
   merchant = Keypair.generate();
 const sign = (request: RefundApproval, signer = buyer) => ({
@@ -37,6 +39,9 @@ async function setup() {
     expiresAt: Date.now() + 3600000,
     status: "paid" as const,
   };
+  // The action now proves ownership against the recorded receipt before any
+  // RPC read, so the link must already be synced.
+  await t.mutation(internal.payments.record, { id, receipt });
   readOrder.mockResolvedValue(receipt);
   const request: RefundApproval = {
     id,
@@ -89,6 +94,7 @@ describe("buyer refund requests", () => {
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(0);
   });
   it("rejects stale, future, unpaid, expired and resolved requests", async () => {
+    vi.useFakeTimers();
     const { t, request, receipt } = await setup();
     for (const issuedAt of [Date.now() - 700000, Date.now() + 60000])
       await expect(
@@ -105,6 +111,9 @@ describe("buyer refund requests", () => {
     await expect(
       t.action(api.paymentActions.requestRefund, sign(request)),
     ).rejects.toThrow("period has ended");
+    // The four calls above spent this link's 5-per-minute bucket; the next
+    // window still rejects each resolved status on its own.
+    vi.advanceTimersByTime(60_000);
     for (const status of ["completed", "refunded"]) {
       readOrder.mockResolvedValue({ ...receipt, status });
       await expect(

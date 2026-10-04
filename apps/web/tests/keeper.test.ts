@@ -419,8 +419,18 @@ describe("syncLink extraction", () => {
     expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
       "completed",
     );
+    // A resolved receipt short-circuits, so use a fresh unpaid link: no order
+    // on chain still reports false.
+    const unpaid = await t.mutation(internal.payments.insert, {
+      merchant: Keypair.generate().publicKey.toBase58(),
+      reference,
+      title: "Test order",
+      amount: "1000000",
+      protectionSeconds: 3600,
+      issuedAt: Date.now(),
+    });
     readOrder.mockResolvedValue(null);
-    await expect(t.action(api.paymentActions.sync, { id })).resolves.toBe(
+    await expect(t.action(api.paymentActions.sync, { id: unpaid })).resolves.toBe(
       false,
     );
   });

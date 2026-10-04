@@ -12,6 +12,7 @@ import { merchantClient } from "../src/merchant/client";
 import { refundApproval } from "../src/payments/refunds";
 import { syncLink } from "./syncLink";
 import { serverRpc } from "./rpc";
+import { enforce } from "./rateLimit";
 import type { Id } from "./_generated/dataModel";
 
 const rpc = new Connection("https://api.devnet.solana.com", {
@@ -77,6 +78,18 @@ export const sync = action({
   handler: async (ctx, { id }): Promise<boolean> => {
     const link = await ctx.runQuery(api.payments.get, { id });
     if (!link) throw new Error("Payment link not found.");
+    // A resolved receipt cannot change; record would no-op anyway.
+    if (link.receipt && link.receipt.status !== "paid") return true;
+    // Coalesce, don't deny: at most one chain read and receipt write per 5s
+    // per link, keyed on the validated link id (never the raw id string, or
+    // every garbage string would insert a bucket row). Callers are never
+    // locked out — a coalesced call reports the receipt state we already have.
+    const { allowed } = await ctx.runMutation(internal.rateLimit.hit, {
+      key: `sync:${link._id}`,
+      limit: 1,
+      windowMs: 5_000,
+    });
+    if (!allowed) return Boolean(link.receipt);
     return syncLink(ctx, link, rpc);
   },
 });
@@ -133,6 +146,17 @@ export const requestRefund = action({
         throw new Error("The buyer did not approve this refund request.");
       const link = await ctx.runQuery(api.payments.get, { id: request.id });
       if (!link) throw new Error("Payment link not found.");
+      // Cheap ownership proof before the counter and the RPC: only the
+      // recorded buyer can spend this link's bucket or trigger a chain read.
+      if (
+        !link.receipt ||
+        link.receipt.buyer !== request.buyer ||
+        link.receipt.order !== request.order
+      )
+        throw new Error(
+          "Only the verified buyer can request a refund for this order.",
+        );
+      await enforce(ctx, "refund", link._id, 5, 60_000);
       const receipt = await paymentClient(rpc).readOrder(link);
       if (
         !receipt ||
