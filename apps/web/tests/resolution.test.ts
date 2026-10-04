@@ -263,6 +263,10 @@ describe("order resolution transactions", () => {
     await expect(
       disputed.client.prepareRefundRequest(terms, buyer.publicKey),
     ).rejects.toThrow("already disputed");
+    // A different wallet is not told it disputed anything.
+    await expect(
+      disputed.client.prepareRefundRequest(terms, merchant.publicKey),
+    ).rejects.toThrow("Only the buyer");
     const refunded = await setup({ status: { refunded: {} } as never });
     await expect(
       refunded.client.prepareRefundRequest(terms, buyer.publicKey),
