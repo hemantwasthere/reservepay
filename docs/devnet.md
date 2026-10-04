@@ -49,9 +49,10 @@ bun run idl:sync                    # refresh apps/web/src/merchant/reservepay.{
 
 # 3. Deploy the backend first, to the deployment the frontend uses, so it can
 #    decode what the upgraded program writes:
-#      production:  bun run deploy:backend   (in apps/web)
+#      production:  (cd apps/web && bun run deploy:backend)
 #      the hosted app currently uses dev:oceanic-vole-769 (apps/web/.env.local):
-#                   cd apps/web && bunx convex dev --once
+#                   (cd apps/web && bunx convex dev --once)
+#    The subshell returns you to the repo root for the program path below.
 
 # 4. Upgrade the existing program using its explicit address and cluster.
 #    The wallet must be its upgrade authority. A fresh clone's generated
