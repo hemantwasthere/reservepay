@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import { Keypair } from "@solana/web3.js";
 import nacl from "tweetnacl";
@@ -171,6 +171,26 @@ describe("wallet sign-in", () => {
     );
     expect(await t.run((ctx) => ctx.db.query("sessions").collect())).toEqual([]);
     expect((await signIn(t, other)).token).toMatch(/^[a-f0-9]{64}$/);
+  });
+  it("treats a session expiring exactly now as expired during cleanup", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("sessions", {
+        wallet: seller.publicKey.toBase58(),
+        tokenHash: "bb".repeat(32),
+        createdAt: now - 1_000,
+        expiresAt: now,
+      });
+      await ctx.db.insert("usedNonces", {
+        nonce: "ef".repeat(48),
+        expiresAt: now,
+      });
+    });
+    // expiresAt <= now is expired, as findSession already treats it.
+    expect(await t.mutation(internal.auth.cleanup, {})).toBe(2);
+    vi.useRealTimers();
   });
   it("cleans up expired nonce records, sessions, and legacy rows", async () => {
     const t = convexTest(schema, modules);

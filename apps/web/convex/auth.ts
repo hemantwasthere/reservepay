@@ -40,12 +40,16 @@ export const cleanup = internalMutation({
       index: "by_expires",
       field: "expiresAt",
       cutoff: now,
+      // Expired means expiresAt <= now, as before the shared sweep.
+      inclusive: true,
     });
     const sessions = await sweepExpired(ctx, {
       table: "sessions",
       index: "by_expires",
       field: "expiresAt",
       cutoff: now,
+      // Expired means expiresAt <= now, as before the shared sweep.
+      inclusive: true,
     });
     // Rows from the earlier stored-nonce design are no longer read.
     const legacy = await ctx.db.query("authNonces").take(SWEEP_BATCH);
