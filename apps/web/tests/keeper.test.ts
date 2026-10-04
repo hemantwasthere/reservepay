@@ -409,8 +409,8 @@ describe("keeper run", () => {
   });
 });
 
-describe("syncLink extraction", () => {
-  it("keeps paymentActions.sync behaviour unchanged", async () => {
+describe("receipt non-regression", () => {
+  it("public sync skips resolved receipts; syncById cannot regress them", async () => {
     const t = convexTest(schema, modules);
     const orderAddress = Keypair.generate().publicKey.toBase58();
     const id = await insertLink(t, orderAddress);
