@@ -4,6 +4,13 @@ export const refundReasons = {
   cancellation: "Cancellation requested",
 } as const;
 export type RefundReason = keyof typeof refundReasons;
+// Disputes raised directly on-chain carry no reason; they are stored as
+// "unspecified". Not signable: refundApproval keeps the strict RefundReason.
+export type StoredRefundReason = RefundReason | "unspecified";
+export const refundReasonLabels: Record<StoredRefundReason, string> = {
+  ...refundReasons,
+  unspecified: "Reason not provided",
+};
 export type RefundApproval = {
   id: string;
   order: string;

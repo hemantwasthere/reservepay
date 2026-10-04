@@ -187,21 +187,83 @@ describe("buyer refund requests", () => {
       [],
     );
   });
-  it("refuses a refund after the protection period ends, before the bucket and the RPC", async () => {
+  it("refuses a refund after the protection period ends, decided by the chain", async () => {
     const { t, id, request, receipt } = await setup();
     // The recorded receipt's protection has lapsed (record() would not patch
     // a same-status receipt, so patch directly).
     await t.run((ctx) =>
       ctx.db.patch(id, { receipt: { ...receipt, expiresAt: Date.now() - 1 } }),
     );
-    readOrder.mockClear();
+    // Not refused cheaply: the stored receipt can lag an in-time dispute, so
+    // expiry is decided from the confirmed chain read.
+    readOrder.mockResolvedValue({ ...receipt, expiresAt: Date.now() - 1 });
     await expect(
       t.action(api.paymentActions.requestRefund, sign(request)),
     ).rejects.toThrow("protection period has ended");
-    expect(readOrder).not.toHaveBeenCalled();
-    expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual(
-      [],
+    expect(readOrder).toHaveBeenCalled();
+  });
+  it("accepts the reason after expiry when the dispute was raised in time", async () => {
+    const { t, id, request, receipt } = await setup();
+    // The buyer disputed 20s before expiry and signs 30s later: the stored
+    // receipt is expired and not yet flagged, and even the finalized read
+    // lags; only the confirmed read shows the dispute.
+    await t.run((ctx) =>
+      ctx.db.patch(id, { receipt: { ...receipt, expiresAt: Date.now() - 1 } }),
     );
+    readOrder.mockImplementation(async (_link, commitment) =>
+      commitment === "confirmed"
+        ? { ...receipt, expiresAt: Date.now() - 1, disputed: true }
+        : { ...receipt, expiresAt: Date.now() - 1 },
+    );
+    await t.action(api.paymentActions.requestRefund, sign(request));
+    const link = await t.query(api.payments.get, { id });
+    expect(link?.refundRequest?.reason).toBe("not_received");
+    expect(link?.refundPending).toBe(true);
+  });
+  it("replaces a backfilled unspecified reason with the buyer's signed reason", async () => {
+    const { t, id, request, receipt } = await setup();
+    // The chain-side dispute reached the queue first, with no reason.
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt, disputed: true },
+    });
+    const backfilled = (await t.query(api.payments.get, { id }))
+      ?.refundRequest;
+    expect(backfilled?.reason).toBe("unspecified");
+    readOrder.mockResolvedValue({ ...receipt, disputed: true });
+    await t.action(api.paymentActions.requestRefund, sign(request));
+    const link = await t.query(api.payments.get, { id });
+    expect(link?.refundRequest?.reason).toBe("not_received");
+    expect(link?.refundRequest?.requestedAt).toBe(backfilled?.requestedAt);
+    // The real reason is now locked in.
+    await expect(
+      t.action(
+        api.paymentActions.requestRefund,
+        sign({ ...request, reason: "cancellation" }),
+      ),
+    ).rejects.toThrow("already been requested");
+  });
+  it("returns the rate-limit slot when the on-chain dispute is missing", async () => {
+    const { t, id, request, receipt } = await setup();
+    process.env.REQUIRE_ONCHAIN_DISPUTE = "1";
+    try {
+      readOrder.mockResolvedValue(receipt);
+      await expect(
+        t.action(api.paymentActions.requestRefund, sign(request)),
+      ).rejects.toThrow("on-chain dispute first");
+      // The refusal returned the slot, so retrying once the dispute confirms
+      // is not locked out.
+      expect(
+        await t.run((ctx) => ctx.db.query("rateLimits").collect()),
+      ).toEqual([]);
+      readOrder.mockResolvedValue({ ...receipt, disputed: true });
+      await t.action(api.paymentActions.requestRefund, sign(request));
+      expect((await t.query(api.payments.get, { id }))?.refundPending).toBe(
+        true,
+      );
+    } finally {
+      delete process.env.REQUIRE_ONCHAIN_DISPUTE;
+    }
   });
   it("records the refund outcome only when a request existed", async () => {
     const { t, id, request, receipt } = await setup();

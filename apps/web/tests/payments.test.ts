@@ -217,6 +217,113 @@ describe("merchant-approved payment links", () => {
       "completed",
     );
   });
+  it("backfills a refund request when the chain flags a dispute on a synced paid receipt", async () => {
+    const t = convexTest(schema, modules);
+    const value = terms();
+    const id = await t.mutation(internal.payments.insert, value);
+    const receipt = {
+      order: "order",
+      buyer: "buyer",
+      reserveAmount: "50000",
+      createdAt: 1000,
+      expiresAt: 86401000,
+      status: "paid" as const,
+    };
+    await t.mutation(internal.payments.record, { id, receipt });
+    expect(
+      (await t.query(api.payments.get, { id }))?.refundRequest,
+    ).toBeUndefined();
+    // The chain flags the dispute after the first sync; the early return for
+    // an already-paid receipt must not swallow it.
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt, disputed: true },
+    });
+    const disputed = await t.query(api.payments.get, { id });
+    expect(disputed?.receipt).toEqual({ ...receipt, disputed: true });
+    expect(disputed?.refundPending).toBe(true);
+    expect(disputed?.refundRequest?.reason).toBe("unspecified");
+    const notified = await t.run((ctx) =>
+      ctx.db.query("notifications").collect(),
+    );
+    expect(
+      notified.filter((entry) => entry.kind === "refund_requested"),
+    ).toHaveLength(2);
+    // Repeats keep the original request and do not notify again.
+    const requestedAt = disputed?.refundRequest?.requestedAt;
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt, disputed: true },
+    });
+    const again = await t.query(api.payments.get, { id });
+    expect(again?.refundRequest?.requestedAt).toBe(requestedAt);
+    expect(
+      (await t.run((ctx) => ctx.db.query("notifications").collect())).filter(
+        (entry) => entry.kind === "refund_requested",
+      ),
+    ).toHaveLength(2);
+  });
+  it("never re-opens a resolved receipt from a lagging disputed read", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    const receipt = {
+      order: "order",
+      buyer: "buyer",
+      reserveAmount: "50000",
+      createdAt: 1000,
+      expiresAt: 86401000,
+      status: "paid" as const,
+    };
+    // The dispute is recorded, then the resolver refunds the order.
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt, disputed: true },
+    });
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt, status: "refunded" },
+    });
+    const resolved = await t.query(api.payments.get, { id });
+    expect(resolved?.receipt?.status).toBe("refunded");
+    expect(resolved?.refundPending).toBe(false);
+    expect(resolved?.refundOutcome).toBe("refunded");
+    // A lagging read still says "paid, disputed": it must change nothing —
+    // no receipt rollback, no re-queue, no fresh notification.
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt, disputed: true },
+    });
+    const after = await t.query(api.payments.get, { id });
+    expect(after?.receipt?.status).toBe("refunded");
+    expect(after?.refundPending).toBe(false);
+    expect(after?.refundOutcome).toBe("refunded");
+    expect(
+      (await t.run((ctx) => ctx.db.query("notifications").collect())).filter(
+        (entry) => entry.kind === "refund_requested",
+      ),
+    ).toHaveLength(2);
+  });
+  it("lets a disputed receipt request a refund after expiry", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    const expired = {
+      order: "order",
+      buyer: "buyer",
+      reserveAmount: "50000",
+      createdAt: 1000,
+      expiresAt: 1001,
+      status: "paid" as const,
+      disputed: true,
+    };
+    await t.mutation(internal.payments.requestRefund, {
+      id,
+      receipt: expired,
+      reason: "not_received",
+    });
+    const link = await t.query(api.payments.get, { id });
+    expect(link?.refundPending).toBe(true);
+    expect(link?.refundRequest?.reason).toBe("not_received");
+  });
 });
 
 describe("payment link descriptions", () => {

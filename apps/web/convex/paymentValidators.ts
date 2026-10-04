@@ -28,7 +28,16 @@ export const refundReason = v.union(
   v.literal("not_as_described"),
   v.literal("cancellation"),
 );
+// Stored requests also allow "unspecified": a dispute raised directly on-chain
+// (not through the UI) carries no reason. The buyer-facing action keeps the
+// strict refundReason above.
+export const storedRefundReason = v.union(
+  v.literal("not_received"),
+  v.literal("not_as_described"),
+  v.literal("cancellation"),
+  v.literal("unspecified"),
+);
 export const refundRequestFields = {
-  reason: refundReason,
+  reason: storedRefundReason,
   requestedAt: v.number(),
 };

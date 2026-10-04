@@ -180,26 +180,35 @@ export const requestRefund = action({
       // still a no-op, exactly as the mutation would decide: a repeat with
       // the same reason returns and a different reason is refused, without
       // spending the bucket or a chain read. This also covers a replayed old
-      // approval, which is why freshness is checked after it.
+      // approval, which is why freshness is checked after it. A backfilled
+      // "unspecified" request (a dispute raised directly on-chain) falls
+      // through so the buyer's signed reason can replace it.
       if (link.refundRequest) {
-        if (link.refundRequest.reason !== request.reason)
+        if (link.refundRequest.reason === request.reason) return;
+        if (link.refundRequest.reason !== "unspecified")
           throw new Error("A refund has already been requested for this order.");
-        return;
       }
       // Both known from the recorded receipt, before the bucket and the RPC.
       if (link.receipt.status !== "paid")
         throw new Error("This order is already resolved.");
-      if (link.receipt.expiresAt <= Date.now())
-        throw new Error("The protection period has ended.");
       if (
         request.issuedAt < Date.now() - 600_000 ||
         request.issuedAt > Date.now() + 30_000
       )
         throw new Error("This approval expired. Request the refund again.");
       const claim = await enforce(ctx, "refund", link._id, 5, 60_000);
-      let receipt;
+      let receipt, disputed;
       try {
-        receipt = await paymentClient(rpc).readOrder(link);
+        const client = paymentClient(rpc);
+        // The dispute gate and the expiry decision read at confirmed: the
+        // buyer signs right after the dispute transaction confirms, and
+        // Disputed cannot regress. The stored receipt stays finalized.
+        const [confirmed, finalized] = await Promise.all([
+          client.readOrder(link, "confirmed"),
+          client.readOrder(link),
+        ]);
+        receipt = finalized;
+        disputed = confirmed?.disputed === true || finalized?.disputed === true;
       } catch (error) {
         // An RPC outage must not lock the buyer out of retrying — but a 429
         // keeps the slot: under throttling the buyer's own limit is the
@@ -216,10 +225,19 @@ export const requestRefund = action({
         throw new Error(
           "Only the verified buyer can request a refund for this order.",
         );
+      if (process.env.REQUIRE_ONCHAIN_DISPUTE === "1" && !disputed) {
+        // A deterministic refusal, not a failed chain read: return the slot
+        // so retrying once the dispute confirms is never locked out.
+        await release(ctx, "refund", link._id, claim);
+        throw new ConvexError("Submit the on-chain dispute first.");
+      }
+      if (!disputed && receipt.expiresAt <= Date.now())
+        throw new Error("The protection period has ended.");
       await ctx.runMutation(internal.payments.requestRefund, {
         id: link._id,
         receipt,
         reason: request.reason,
+        disputed,
       });
     } catch (error) {
       throw new ConvexError(

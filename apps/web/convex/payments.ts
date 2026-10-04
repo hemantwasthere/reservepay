@@ -169,11 +169,21 @@ export const record = internalMutation({
     const link = await ctx.db.get(id);
     if (!link) throw new ConvexError("Payment link not found.");
     // A slower RPC response must never roll a resolved receipt back to paid.
+    // A dispute counts as new only while both the stored and the incoming
+    // receipt are still "paid" — a lagging "paid, disputed" read after a
+    // refund or completion must not re-open (or re-queue) the order.
+    const stored = link.receipt;
+    const newlyDisputed =
+      receipt.disputed === true &&
+      receipt.status === "paid" &&
+      (!stored || stored.status === "paid") &&
+      !stored?.disputed;
     if (
-      link.receipt &&
-      (link.receipt.status !== "paid" || link.receipt.status === receipt.status)
+      stored &&
+      (stored.status !== "paid" || stored.status === receipt.status) &&
+      !newlyDisputed
     )
-      return link.receipt;
+      return stored;
     await ctx.db.patch(id, {
       receipt,
       ...(receipt.status !== "paid"
@@ -185,13 +195,28 @@ export const record = internalMutation({
               ? { refundOutcome: receipt.status, refundResolvedAt: Date.now() }
               : {}),
           }
-        : {}),
+        : // A dispute raised directly on-chain (no UI request) still enters
+          // the resolver queue, with no reason attached.
+          newlyDisputed && !link.refundRequest
+          ? {
+              refundRequest: {
+                reason: "unspecified" as const,
+                requestedAt: Date.now(),
+              },
+              refundPending: true,
+            }
+          : {}),
     });
     if (receipt.status !== "paid")
       await notifyOrder(ctx, { ...link, receipt }, receipt.status, [
         link.merchant,
         receipt.buyer,
         link.refundNotifiedResolver,
+      ]);
+    else if (newlyDisputed)
+      await notifyOrder(ctx, { ...link, receipt }, "refund_requested", [
+        link.merchant,
+        receipt.buyer,
       ]);
     return receipt;
   },
@@ -220,27 +245,38 @@ export const requestRefund = internalMutation({
     id: v.id("paymentLinks"),
     receipt: v.object(receiptFields),
     reason: refundReason,
+    // The confirmed-read result from the action: the buyer signs right after
+    // the dispute confirms, which a finalized receipt read can lag behind.
+    disputed: v.optional(v.boolean()),
   },
-  handler: async (ctx, { id, receipt, reason }) => {
+  handler: async (ctx, { id, receipt, reason, disputed }) => {
     const link = await ctx.db.get(id);
     if (!link) throw new ConvexError("Payment link not found.");
-    if (link.refundRequest) {
-      if (link.refundRequest.reason !== reason)
+    const existing = link.refundRequest;
+    if (existing) {
+      if (existing.reason === reason) return;
+      // A chain-side dispute backfills "unspecified"; the buyer's own signed
+      // reason may still replace it, keeping the original request time.
+      if (existing.reason !== "unspecified")
         throw new ConvexError(
           "A refund has already been requested for this order.",
         );
-      return;
     }
     if (
       receipt.status !== "paid" ||
       (link.receipt && link.receipt.status !== "paid")
     )
       throw new ConvexError("This order is already resolved.");
-    if (receipt.expiresAt <= Date.now())
+    // The chain enforced the dispute window at dispute time, so a disputed
+    // order is accepted even when this request lands after expiry.
+    if (receipt.expiresAt <= Date.now() && !receipt.disputed && !disputed)
       throw new ConvexError("The protection period has ended.");
     await ctx.db.patch(id, {
       receipt,
-      refundRequest: { reason, requestedAt: Date.now() },
+      refundRequest: {
+        reason,
+        requestedAt: existing?.requestedAt ?? Date.now(),
+      },
       refundPending: true,
     });
     await notifyOrder(ctx, { ...link, receipt }, "refund_requested", [

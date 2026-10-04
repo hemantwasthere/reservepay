@@ -10,7 +10,9 @@ describe("orderStatus", () => {
   });
   it("throws on unknown variants instead of guessing refunded", () => {
     expect(() => orderStatus({})).toThrow("Unknown order status");
-    expect(() => orderStatus({ cancelled: {} })).toThrow("Unknown order status");
+    expect(() => orderStatus({ cancelled: {} } as never)).toThrow(
+      "Unknown order status",
+    );
   });
   it("flags only the disputed variant", () => {
     expect(isDisputed({ disputed: {} })).toBe(true);

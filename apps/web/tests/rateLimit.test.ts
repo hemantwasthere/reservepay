@@ -527,13 +527,15 @@ describe("paymentActions.requestRefund rate limit", () => {
       await expect(
         t.action(api.paymentActions.requestRefund, sign(request)),
       ).rejects.toThrow("429");
-    expect(readOrder).toHaveBeenCalledTimes(5);
+    // Two parallel reads per attempt: confirmed (dispute gate) and finalized
+    // (the stored receipt).
+    expect(readOrder).toHaveBeenCalledTimes(10);
     // The slots were kept: under throttling the buyer's own limit is the
     // backpressure, not a free retry loop.
     await expect(
       t.action(api.paymentActions.requestRefund, sign(request)),
     ).rejects.toThrow("Too many requests");
-    expect(readOrder).toHaveBeenCalledTimes(5);
+    expect(readOrder).toHaveBeenCalledTimes(10);
     // The next window retries the chain.
     vi.advanceTimersByTime(60_000);
     readOrder.mockResolvedValue({

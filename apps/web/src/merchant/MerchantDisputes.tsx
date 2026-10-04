@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { api } from "../../convex/_generated/api";
 import { exactAmount } from "./client";
 import type { WalletConnection } from "../lib/WalletControl";
-import { refundReasons } from "../payments/refunds";
+import { refundReasonLabels } from "../payments/refunds";
 import { useResolver } from "../payments/useResolver";
 import { PaymentBoundary, usePaymentsReady } from "../payments/PaymentProvider";
 
@@ -143,7 +143,7 @@ function Disputes() {
                     {link.title}
                   </a>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {refundReasons[link.refundRequest!.reason]} ·{" "}
+                    {refundReasonLabels[link.refundRequest!.reason]} ·{" "}
                     {exactAmount(BigInt(link.amount))} USDC
                   </p>
                   <p className="mt-1 font-mono text-[10px] text-muted-foreground">

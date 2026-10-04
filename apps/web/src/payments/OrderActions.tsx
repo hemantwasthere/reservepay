@@ -27,7 +27,12 @@ import {
   transactionResult,
 } from "../merchant/transactions";
 import { paymentClient } from "./chain";
-import { refundApproval, refundReasons, type RefundReason } from "./refunds";
+import {
+  refundApproval,
+  refundReasonLabels,
+  refundReasons,
+  type RefundReason,
+} from "./refunds";
 import {
   loadResolution,
   saveResolution,
@@ -317,7 +322,7 @@ export function OrderActions({
           </h3>
           {link.refundRequest && (
             <div className="mt-3 rounded-md border border-border bg-muted/40 p-4 text-sm leading-6">
-              <p>{refundReasons[link.refundRequest.reason]}</p>
+              <p>{refundReasonLabels[link.refundRequest.reason]}</p>
               <p className="text-xs text-muted-foreground">
                 Requested{" "}
                 {new Date(link.refundRequest.requestedAt).toLocaleString()} ·
