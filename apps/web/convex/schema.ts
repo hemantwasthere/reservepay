@@ -72,10 +72,13 @@ export default defineSchema({
   rateLimits: defineTable({
     key: v.string(),
     windowStart: v.number(),
+    // windowStart + windowMs: the sweep keys off this so a live long window
+    // is never deleted mid-window.
+    expiresAt: v.number(),
     count: v.number(),
   })
     .index("by_key", ["key"])
-    .index("by_window", ["windowStart"]),
+    .index("by_expires_at", ["expiresAt"]),
   // Legacy: the earlier stored-nonce design. Kept optional so existing rows
   // still validate on deploy; auth.cleanup drains it. Remove once empty.
   authNonces: defineTable({

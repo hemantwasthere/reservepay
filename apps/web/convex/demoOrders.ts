@@ -3,8 +3,7 @@ import { calculateSettlement } from "@reservepay/core/settlement";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-
-const CLEANUP_BATCH = 500;
+import { SWEEP_BATCH, sweepExpired } from "./cleanup";
 
 function validateKey(value: string) {
   if (!/^[a-f0-9]{64}$/.test(value)) {
@@ -126,16 +125,15 @@ export const create = mutation({
 export const cleanup = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const stale = await ctx.db
-      .query("demoOrders")
-      .withIndex("by_creation_time", (q) =>
-        q.lt("_creationTime", Date.now() - 24 * 60 * 60_000),
-      )
-      .take(CLEANUP_BATCH);
-    for (const row of stale) await ctx.db.delete(row._id);
-    if (stale.length === CLEANUP_BATCH)
+    const deleted = await sweepExpired(ctx, {
+      table: "demoOrders",
+      index: "by_creation_time",
+      field: "_creationTime",
+      cutoff: Date.now() - 24 * 60 * 60_000,
+    });
+    if (deleted === SWEEP_BATCH)
       await ctx.scheduler.runAfter(0, internal.demoOrders.cleanup, {});
-    return stale.length;
+    return deleted;
   },
 });
 

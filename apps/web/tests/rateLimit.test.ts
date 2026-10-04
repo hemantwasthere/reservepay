@@ -74,6 +74,43 @@ describe("fixed-window rate limiter", () => {
         .allowed,
     ).toBe(false);
   });
+  it("cleanup never resets a window that is still live", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    // A 20-minute window started more than 10 minutes ago: older than the
+    // retention cutoff by windowStart, but its bucket is still in force.
+    await t.mutation(internal.rateLimit.hit, {
+      key: "test:long",
+      limit: 1,
+      windowMs: 20 * 60_000,
+    });
+    vi.advanceTimersByTime(11 * 60_000);
+    expect(await t.mutation(internal.rateLimit.cleanup, {})).toBe(0);
+    expect(
+      (
+        await t.mutation(internal.rateLimit.hit, {
+          key: "test:long",
+          limit: 1,
+          windowMs: 20 * 60_000,
+        })
+      ).allowed,
+    ).toBe(false);
+  });
+  it("release returns a hit to the current window only", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const args = { key: "test:a", limit: 1, windowMs: 10_000 };
+    await t.mutation(internal.rateLimit.hit, args);
+    await t.mutation(internal.rateLimit.unhit, { key: args.key });
+    expect((await t.mutation(internal.rateLimit.hit, args)).allowed).toBe(true);
+    expect((await t.mutation(internal.rateLimit.hit, args)).allowed).toBe(false);
+    // Releasing an expired window is a no-op.
+    vi.advanceTimersByTime(10_000);
+    await t.mutation(internal.rateLimit.unhit, { key: args.key });
+    expect(
+      await t.run((ctx) => ctx.db.query("rateLimits").collect()),
+    ).toHaveLength(1);
+  });
 });
 
 describe("paymentActions.sync coalescing", () => {
