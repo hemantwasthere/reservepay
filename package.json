@@ -10,7 +10,7 @@
     "build": "bun run --filter @reservepay/core build && bun run --filter @reservepay/web build",
     "typecheck": "bun run --filter @reservepay/core build && bun run --filter \"*\" typecheck",
     "test": "bun run --filter @reservepay/core build && bun run --filter \"*\" test",
-    "test:program": "anchor build --ignore-keys && anchor test --skip-build --validator legacy",
+    "test:program": "bun run --filter @reservepay/core build && anchor build --ignore-keys && anchor test --skip-build --validator legacy",
     "idl:sync": "bun apps/web/scripts/idl.ts sync",
     "idl:check": "bun apps/web/scripts/idl.ts check",
     "check": "bun run typecheck && bun run test && bun run build"
