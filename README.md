@@ -173,15 +173,16 @@ Run these from the repository root:
 | `bun run test`         | Core, frontend logic, and Convex tests                        |
 | `bun run build`        | Production frontend build and prerendering                    |
 | `cargo check`          | Rust workspace validation                                     |
+| `bun run build:program` | Build the program; fail on any stack frame over 4096 bytes    |
 | `bun run test:program` | Anchor integration tests on a local validator                 |
 | `bun run idl:sync`     | Copy the built IDL and TS types into `apps/web/src/merchant/` |
 | `bun run idl:check`    | Fail if the committed IDL differs from `target/`              |
 
-The Anchor integration suite additionally requires Rust, the Solana CLI/local validator, and the Anchor CLI. The toolchain used by CI and new builds is pinned in [Anchor.toml](Anchor.toml) `[toolchain]`: **anchor-cli 1.0.2** with **Agave (solana-cli) 3.1.7**. The suite creates a local test mint and tests reserve accounting using disposable test tokens. `bun run test:program` builds the shared package and the program with `--ignore-keys`, then selects Agave's `solana-test-validator` with `--validator legacy`; bare `anchor test` defaults to surfpool in anchor-cli 1.0.x.
+The Anchor integration suite additionally requires Rust, the Solana CLI/local validator, and the Anchor CLI. The toolchain used by CI and new builds is pinned in [Anchor.toml](Anchor.toml) `[toolchain]`: **anchor-cli 1.0.2** with **Agave (solana-cli) 3.1.7**. Because of that pin, any `anchor` command in this repo switches your **global** Solana install (via `agave-install`) and anchor version (via `avm`) to those versions when they differ, which may need a download and affects other projects on the machine; switch back afterwards if you work on projects with different pins. The suite creates a local test mint and tests reserve accounting using disposable test tokens. `bun run test:program` builds the shared package, runs `bun run build:program` (`anchor build --ignore-keys` that also fails on any instruction stack frame over the 4096-byte limit), then selects Agave's `solana-test-validator` with `--validator legacy`; bare `anchor test` defaults to surfpool in anchor-cli 1.0.x.
 
 On a fresh clone, `anchor build` fails with *"Program ID mismatch"*: the deployer's program keypair is not in the repo, so anchor generates a random one that doesn't match `declare_id!`. Build with **`anchor build --ignore-keys`** — the local validator loads the program at the `Anchor.toml` address regardless. Never run `anchor keys sync`: it would rewrite the program ID in `declare_id!` and `Anchor.toml`, pointing the app at a program that doesn't exist.
 
-After changing the program, run `anchor build --ignore-keys && bun run idl:sync` and commit the updated `apps/web/src/merchant/reservepay.{json,ts}` together with the program change — the backend decodes accounts and errors from these files. CI fails the `program` job with a diff when the committed IDL drifts from the build output.
+After changing the program, run `bun run build:program && bun run idl:sync` and commit the updated `apps/web/src/merchant/reservepay.{json,ts}` together with the program change — the backend decodes accounts and errors from these files. CI fails the `program` job with a diff when the committed IDL drifts from the build output.
 
 ## Devnet deployment
 

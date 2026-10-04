@@ -37,29 +37,33 @@ CI and new builds use **anchor-cli 1.0.2** and **Agave 3.1.7**, pinned in `Ancho
 
 > **Warning — the next redeploy changes on-chain bytes.** The existing devnet binary differs from builds produced with the current lockfile and toolchain (`solana program dump` hashes differ). Merging the `CreateOrder` stack fix does not upgrade that live program. After upgrading, smoke-test `create_order` on devnet — create and pay a link end-to-end — before considering the redeploy done.
 
-The upgrade goes **last**: build, sync the IDL, and get the change through review and CI before touching the live program.
+The live program is upgraded only after the change is reviewed, merged, and the backend that decodes it is already deployed:
 
 ```bash
-# 1. Build and sync the IDL the web app decodes against
-anchor build --ignore-keys          # fresh clones lack the deployer keypair; never `anchor keys sync`
+# 1. Build (fails on any instruction frame over the 4096-byte stack limit)
+#    and sync the IDL the backend and web app decode against.
+bun run build:program               # anchor build --ignore-keys + stack guard; never `anchor keys sync`
 bun run idl:sync                    # refresh apps/web/src/merchant/reservepay.{json,ts}
 
 # 2. Commit the program change and the synced IDL together; let CI pass and merge.
 
-# 3. Upgrade the existing program using its explicit address and cluster.
+# 3. Deploy the backend first, to the deployment the frontend uses, so it can
+#    decode what the upgraded program writes:
+#      production:  bun run deploy:backend   (in apps/web)
+#      the hosted app currently uses dev:oceanic-vole-769 (apps/web/.env.local):
+#                   cd apps/web && bunx convex dev --once
+
+# 4. Upgrade the existing program using its explicit address and cluster.
 #    The wallet must be its upgrade authority. A fresh clone's generated
 #    target/deploy/reservepay-keypair.json is NOT the deployed program's key.
 solana program deploy target/deploy/reservepay.so --url devnet \
   --program-id ERFq8y9tC4bjMk4AbLoM7zZXtvRcxsHdCMa9GpSnwxsU \
   --keypair /path/to/upgrade-authority.json
 
-# 4. Smoke-test create_order on devnet (create + pay a link end-to-end).
-
-# 5. Deploy the backend if it changed, to the deployment used by the frontend.
-#    The current hosted app uses dev:oceanic-vole-769 in apps/web/.env.local.
-cd apps/web
-bunx convex dev --once
+# 5. Smoke-test create_order on devnet (create + pay a link end-to-end).
 ```
+
+Backend-first is safe for **additive** IDL changes — new instructions, new enum variants appended last, new error codes — because the new IDL still decodes every existing account. A change that alters an existing account's layout (resized struct, reordered fields or variants) cannot be rolled out this way; plan a migration for it separately.
 
 CI fails the `program` job when `apps/web/src/merchant/` drifts from the build output, so a forgotten `idl:sync` is caught before merge.
 

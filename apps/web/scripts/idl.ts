@@ -70,7 +70,7 @@ async function check() {
   }
   if (drifted) {
     console.error(
-      "IDL drift: run `anchor build --ignore-keys && bun run idl:sync` " +
+      "IDL drift: run `bun run build:program && bun run idl:sync` " +
         "(do not run `anchor keys sync` — it would rewrite the program ID)",
     );
     process.exit(1);
