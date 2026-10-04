@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as authActions from "../authActions.js";
+import type * as cleanup from "../cleanup.js";
 import type * as crons from "../crons.js";
 import type * as demoOrders from "../demoOrders.js";
 import type * as keeper from "../keeper.js";
@@ -42,6 +43,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authActions: typeof authActions;
+  cleanup: typeof cleanup;
   crons: typeof crons;
   demoOrders: typeof demoOrders;
   keeper: typeof keeper;
