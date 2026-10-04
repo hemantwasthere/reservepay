@@ -203,7 +203,8 @@ export const requestRefund = action({
       // it. The stored receipt's flag counts too — no read needed for it.
       const checkedAt = Date.now();
       let receipt,
-        disputed = link.receipt.disputed === true;
+        disputed = link.receipt.disputed === true,
+        resolvedAtConfirmed = false;
       try {
         const client = paymentClient(rpc);
         // The stored receipt is always the finalized read.
@@ -219,9 +220,14 @@ export const requestRefund = action({
           receipt.status === "paid" &&
           !disputed &&
           (requireDispute || receipt.expiresAt <= checkedAt)
-        )
-          disputed =
-            (await client.readOrder(link, "confirmed"))?.disputed === true;
+        ) {
+          const confirmed = await client.readOrder(link, "confirmed");
+          disputed = confirmed?.disputed === true;
+          // The confirmed read can also be ahead on resolution: an order
+          // refunded or completed in the few seconds before finalized catches
+          // up is "already resolved", not a missing dispute or lapsed deadline.
+          resolvedAtConfirmed = Boolean(confirmed && confirmed.status !== "paid");
+        }
       } catch (error) {
         // An RPC outage must not lock the buyer out of retrying — but a 429
         // keeps the slot: under throttling the buyer's own limit is the
@@ -241,7 +247,7 @@ export const requestRefund = action({
       // The fresh read decides resolution, not the cached receipt: a resolver
       // refund that has not synced yet is "already resolved", not a missing
       // dispute or a lapsed deadline.
-      if (receipt.status !== "paid")
+      if (receipt.status !== "paid" || resolvedAtConfirmed)
         throw new Error("This order is already resolved.");
       // A deterministic refusal keeps the slot, like every other non-transient
       // failure: returning it would let a buyer who never disputes replay a

@@ -319,6 +319,80 @@ describe("buyer refund requests", () => {
     // Disputed never regresses, so the stored flag survives the lagging read.
     expect(link?.receipt?.disputed).toBe(true);
   });
+  it("passes the action's clock through, but never past the release grace", async () => {
+    vi.useFakeTimers();
+    const { t, id, request, receipt } = await setup();
+    const near = { ...receipt, expiresAt: Date.now() + 1_000 };
+    await t.mutation(internal.payments.record, { id, receipt: near });
+    // The finalized read takes 2s and crosses the deadline: the action's
+    // clock (taken before the read) decides, so the request is accepted.
+    readOrder.mockImplementation(async () => {
+      vi.advanceTimersByTime(2_000);
+      return near;
+    });
+    await t.action(api.paymentActions.requestRefund, sign(request));
+    expect((await t.query(api.payments.get, { id }))?.refundPending).toBe(
+      true,
+    );
+  });
+  it("refuses when a stalled read lands past the release grace", async () => {
+    vi.useFakeTimers();
+    const { t, id, request, receipt } = await setup();
+    const near = { ...receipt, expiresAt: Date.now() + 1_000 };
+    await t.mutation(internal.payments.record, { id, receipt: near });
+    // The read stalls 62s: by then the keeper may have released the order.
+    readOrder.mockImplementation(async () => {
+      vi.advanceTimersByTime(62_000);
+      return near;
+    });
+    await expect(
+      t.action(
+        api.paymentActions.requestRefund,
+        sign({ ...request, issuedAt: Date.now() }),
+      ),
+    ).rejects.toThrow("protection period has ended");
+    expect((await t.query(api.payments.get, { id }))?.refundRequest).toBe(
+      undefined,
+    );
+  });
+  it("trusts a stored dispute with the gate on: one read, no confirmed read", async () => {
+    const { t, id, request, receipt } = await setup();
+    await t.mutation(internal.payments.record, {
+      id,
+      receipt: { ...receipt, disputed: true },
+    });
+    process.env.REQUIRE_ONCHAIN_DISPUTE = "1";
+    try {
+      // This node's finalized read still lags the dispute.
+      readOrder.mockClear();
+      readOrder.mockResolvedValue(receipt);
+      await t.action(api.paymentActions.requestRefund, sign(request));
+      expect(readOrder).toHaveBeenCalledTimes(1);
+      expect(
+        (await t.query(api.payments.get, { id }))?.refundRequest?.reason,
+      ).toBe("not_received");
+    } finally {
+      delete process.env.REQUIRE_ONCHAIN_DISPUTE;
+    }
+  });
+  it("reports a resolution seen only at confirmed as already resolved", async () => {
+    const { t, request, receipt } = await setup();
+    process.env.REQUIRE_ONCHAIN_DISPUTE = "1";
+    try {
+      // Finalized still shows the order open; confirmed already shows the
+      // resolver's refund.
+      readOrder.mockImplementation(async (_terms, commitment) =>
+        commitment === "confirmed"
+          ? { ...receipt, status: "refunded" as const }
+          : receipt,
+      );
+      await expect(
+        t.action(api.paymentActions.requestRefund, sign(request)),
+      ).rejects.toThrow("already resolved");
+    } finally {
+      delete process.env.REQUIRE_ONCHAIN_DISPUTE;
+    }
+  });
   it("records the refund outcome only when a request existed", async () => {
     const { t, id, request, receipt } = await setup();
     await t.action(api.paymentActions.requestRefund, sign(request));
