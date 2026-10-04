@@ -14,6 +14,7 @@ import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import type { Reservepay } from "../merchant/reservepay";
 import idl from "../merchant/reservepay.json";
 import { ORDER_STATUS_OFFSET, readChainTime } from "./chain";
+import { withRetry } from "../lib/retry";
 
 export type KeeperOpenOrder = {
   order: string;
@@ -53,9 +54,11 @@ export function keeperChain(rpc: Connection) {
     // Open orders only: .all() adds the discriminator filter itself, and
     // bs58.encode([0]) === "1" is the Open status byte.
     async openOrders(): Promise<KeeperOpenOrder[]> {
-      const accounts = await program.account.order.all([
-        { memcmp: { offset: ORDER_STATUS_OFFSET, bytes: bs58.encode([0]) } },
-      ]);
+      const accounts = await withRetry(() =>
+        program.account.order.all([
+          { memcmp: { offset: ORDER_STATUS_OFFSET, bytes: bs58.encode([0]) } },
+        ]),
+      );
       return accounts.map(({ publicKey, account }) => ({
         order: publicKey.toBase58(),
         merchantPda: account.merchant.toBase58(),
@@ -66,8 +69,8 @@ export function keeperChain(rpc: Connection) {
     async merchant(
       merchantPda: string,
     ): Promise<{ authority: string; mint: string } | null> {
-      const account = await program.account.merchant.fetchNullable(
-        new PublicKey(merchantPda),
+      const account = await withRetry(() =>
+        program.account.merchant.fetchNullable(new PublicKey(merchantPda)),
       );
       return account
         ? {
@@ -78,11 +81,12 @@ export function keeperChain(rpc: Connection) {
     },
     async ataExists(mint: PublicKey, authority: PublicKey): Promise<boolean> {
       return (
-        (await rpc.getAccountInfo(getAssociatedTokenAddressSync(mint, authority))) !==
-        null
+        (await withRetry(() =>
+          rpc.getAccountInfo(getAssociatedTokenAddressSync(mint, authority)),
+        )) !== null
       );
     },
-    chainTime: () => readChainTime(rpc),
+    chainTime: () => withRetry(() => readChainTime(rpc)),
     async send(
       instructions: TransactionInstruction[],
       signer: Keypair,

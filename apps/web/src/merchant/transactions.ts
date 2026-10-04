@@ -1,6 +1,7 @@
 import { Transaction, type Connection } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { ReserveAction } from "./client";
+import { withRetry } from "../lib/retry";
 
 export type PendingTransaction = {
   signature: string;
@@ -64,16 +65,21 @@ export async function transactionResult(
   rpc: Connection,
   pending: Pick<PendingTransaction, "signature" | "lastValidBlockHeight">,
 ): Promise<TransactionResult> {
+  // Each read retries on its own, so a recovered block-height check still
+  // triggers the "past expiry → re-read status" lookup in order.
   const getStatus = async () =>
     (
-      await rpc.getSignatureStatuses([pending.signature], {
-        searchTransactionHistory: true,
-      })
+      await withRetry(() =>
+        rpc.getSignatureStatuses([pending.signature], {
+          searchTransactionHistory: true,
+        }),
+      )
     ).value[0];
   let status = await getStatus();
   if (
     !status &&
-    (await rpc.getBlockHeight("finalized")) > pending.lastValidBlockHeight
+    (await withRetry(() => rpc.getBlockHeight("finalized"))) >
+      pending.lastValidBlockHeight
   ) {
     status = await getStatus();
     if (!status) return "expired";

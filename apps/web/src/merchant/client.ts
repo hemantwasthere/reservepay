@@ -18,6 +18,7 @@ import { PROGRAM_ID, merchantAddress, protocolAddress } from "@reservepay/core";
 import type { Reservepay } from "./reservepay";
 import idl from "./reservepay.json";
 import { orderStatus, type OrderStatus } from "../payments/order-status";
+import { withRetry } from "../lib/retry";
 
 export const DEVNET_USDC = new PublicKey(
   "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
@@ -93,14 +94,16 @@ export function merchantClient(
       const {
         value: [deployed, protocol, account, vault, token, wallet],
         context,
-      } = await rpc.getMultipleAccountsInfoAndContext([
-        PROGRAM_ID,
-        protocolAddress(),
-        merchant,
-        reserveVault,
-        tokenAccount,
-        authority,
-      ]);
+      } = await withRetry(() =>
+        rpc.getMultipleAccountsInfoAndContext([
+          PROGRAM_ID,
+          protocolAddress(),
+          merchant,
+          reserveVault,
+          tokenAccount,
+          authority,
+        ]),
+      );
       const decode = <T extends "merchant" | "protocol">(
         name: T,
         info: NonNullable<typeof account>,
@@ -156,9 +159,11 @@ export function merchantClient(
     ): Promise<{ orders: MerchantOrder[]; mismatch: boolean }> {
       const { merchant } = addresses(authority);
       // `merchant` is the first field after the 8-byte order discriminator.
-      const accounts = await program.account.order.all([
-        { memcmp: { offset: 8, bytes: merchant.toBase58() } },
-      ]);
+      const accounts = await withRetry(() =>
+        program.account.order.all([
+          { memcmp: { offset: 8, bytes: merchant.toBase58() } },
+        ]),
+      );
       const orders: MerchantOrder[] = accounts.map(({ publicKey, account }) => ({
         address: publicKey.toBase58(),
         reference: Buffer.from(account.reference).toString("hex"),
