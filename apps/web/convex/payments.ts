@@ -23,30 +23,10 @@ export const get = query({
     return key ? ctx.db.get(key) : null;
   },
 });
-// Compatibility for already-open clients from before wallet sessions. Link
-// terms and receipts remain public (also available through get/refundQueue).
-// Keep this separate from the authenticated API; never add profile data here.
-export const list = query({
-  args: { merchant: v.string() },
-  handler: (ctx, { merchant }) =>
-    ctx.db
-      .query("paymentLinks")
-      .withIndex("by_merchant", (q) => q.eq("merchant", merchant))
-      .order("desc")
-      .take(50),
-});
-// Preserve the session-only array contract for existing tabs and rollbacks.
-export const listForSession = query({
-  args: { session: v.string() },
-  handler: async (ctx, { session }) => {
-    const merchant = await requireMerchant(ctx, session);
-    return ctx.db
-      .query("paymentLinks")
-      .withIndex("by_merchant", (q) => q.eq("merchant", merchant))
-      .order("desc")
-      .take(50);
-  },
-});
+// Link terms and receipts stay public through get/refundQueue. Link history
+// requires a wallet session: the unauthenticated list({ merchant }) and the
+// non-paginated listForSession were removed (frontends older than 998951b
+// lose link history).
 export const listForSessionPaginated = query({
   args: { session: v.string(), paginationOpts: paginationOptsValidator },
   handler: async (ctx, { session, paginationOpts }) => {

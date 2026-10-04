@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as authActions from "../authActions.js";
+import type * as cleanup from "../cleanup.js";
 import type * as crons from "../crons.js";
 import type * as demoOrders from "../demoOrders.js";
 import type * as keeper from "../keeper.js";
@@ -22,6 +23,7 @@ import type * as notifications from "../notifications.js";
 import type * as paymentActions from "../paymentActions.js";
 import type * as paymentValidators from "../paymentValidators.js";
 import type * as payments from "../payments.js";
+import type * as rateLimit from "../rateLimit.js";
 import type * as reconcile from "../reconcile.js";
 import type * as reconcileActions from "../reconcileActions.js";
 import type * as rpc from "../rpc.js";
@@ -41,6 +43,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authActions: typeof authActions;
+  cleanup: typeof cleanup;
   crons: typeof crons;
   demoOrders: typeof demoOrders;
   keeper: typeof keeper;
@@ -53,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   paymentActions: typeof paymentActions;
   paymentValidators: typeof paymentValidators;
   payments: typeof payments;
+  rateLimit: typeof rateLimit;
   reconcile: typeof reconcile;
   reconcileActions: typeof reconcileActions;
   rpc: typeof rpc;

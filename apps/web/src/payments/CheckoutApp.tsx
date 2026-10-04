@@ -329,7 +329,9 @@ function Checkout({
               kind: result === "confirmed" ? "verifying" : "confirming",
             });
         }
-        failures = 0;
+        // A coalesced call verified nothing. Keep any accumulated backoff
+        // until the backend actually checks the chain or has a receipt.
+        if (verified !== null) failures = 0;
       } catch {
         // Only real check failures back off; skips and the running guard's
         // early returns are not failures.

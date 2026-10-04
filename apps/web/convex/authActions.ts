@@ -12,6 +12,7 @@ import {
 } from "../src/lib/sign-in";
 import { issueNonce, signInSecret, verifyNonce } from "./signInNonce";
 import { hashToken } from "./session";
+import { enforce } from "./rateLimit";
 
 const asConvexError = (error: unknown, fallback: string) =>
   error instanceof ConvexError
@@ -62,6 +63,9 @@ export const signIn = action({
         )
       )
         throw new Error("The wallet did not approve this sign-in.");
+      // Only the key holder can reach this point, so only the key holder can
+      // consume the wallet's bucket; garbage signatures cost no write.
+      await enforce(ctx, "signin", challenge.wallet, 10, 60_000);
       // Generated here rather than in the mutation, where randomness is seeded.
       const token = [...crypto.getRandomValues(new Uint8Array(32))]
         .map((byte) => byte.toString(16).padStart(2, "0"))

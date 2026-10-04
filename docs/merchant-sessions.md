@@ -10,19 +10,18 @@ Pending logins are canceled on disconnect, explicit sign-out, wallet switch, or 
 - Contact email and description require the merchant's session. They are not returned by checkout's profile query.
 - Payment terms, wallet addresses, on-chain receipts, and refund reason categories remain public.
 - New frontend link-history queries use `payments.listForSessionPaginated`, which derives the merchant from the session rather than trusting a wallet argument.
-- `payments.listForSession({ session })` retains its original array response for already-open authenticated tabs and frontend rollbacks. Pagination uses a separate endpoint.
-- `payments.list({ merchant })` remains a compatibility endpoint for existing clients and returns only the same public link documents as before this release. Authentication does not make blockchain or public link history confidential.
+- The unauthenticated `payments.list({ merchant })` and the non-paginated `payments.listForSession({ session })` were removed. Link terms and receipts remain public through `payments.get` and the refund queue.
 
 ## Release sequence
 
 1. Confirm which Convex URL the hosted frontend uses. Development and production Convex deployments are distinct; `convex deploy` targets production by default, while `convex dev --once` updates the selected development deployment.
 2. Configure a random server-only `SIGN_IN_SECRET` of at least 32 characters on that deployment if absent. Do not print, commit, or expose it in browser configuration. The README provides a stdin-based setup command. Set `SITE_ORIGIN` if using a custom frontend domain.
 3. Run `bun run check`. Session lifecycle regression tests exercise late nonce, wallet-signature, and session responses; sign-out without an existing token; wallet switching; unmounting; duplicate attempts; and a newer successful login.
-4. Deploy the additive Convex schema/functions first. Retain both the legacy public list API and the session-only array API so old browser tabs continue working. Never repurpose its argument shape for the authenticated endpoint.
-5. Verify public checkout metadata, the legacy list, nonce issuance, signed session creation, authenticated profile/link queries, and revocation. Use disposable test wallets without funds. Do not exercise financial transactions as an authentication smoke test.
+4. Deploy the Convex backend first. The schema is additive (a new `rateLimits` table), but the functions are not: two public queries are removed, so old tabs lose link history once it deploys. Link history is session-only and paginated. Never repurpose a removed endpoint's argument shape for the authenticated API.
+5. Verify public checkout metadata, paginated link history, nonce issuance, signed session creation, authenticated profile queries, and revocation. Use disposable test wallets without funds. Do not exercise financial transactions as an authentication smoke test.
 6. Publish the frontend and check `/`, `/app`, `/app/payments`, `/app/profile`, `/app/disputes`, and a valid `/pay/:id` page. Verify CI and the hosting deployment correspond to the published commit.
 
-A frontend rollback can use the previous frontend with this backend because its public APIs remain compatible. Leave the additive backend deployed during that rollback. Removing the new functions while a new frontend is still in use would break checkout and login.
+A frontend older than `998951b` loses link history against this backend: `payments.list` and `payments.listForSession` were removed. Checkout, sign-in, profile, and public receipt pages are unaffected.
 
 ## Workspace navigation and merchant images
 

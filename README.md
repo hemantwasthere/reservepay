@@ -191,7 +191,7 @@ Vercel builds with `bun run build` and serves `apps/web/dist`. Configure `VITE_C
 
 Deploy backend changes to the matching Convex deployment before enabling frontend code that depends on them. For a production Convex deployment, run `bun run deploy:backend` from `apps/web` with that deployment’s credentials. For a development deployment, use `bunx convex dev --once` there. Check the target deployment carefully; the hosted app still transacts on Solana **devnet**.
 
-The payment-link rollout preserves `payments.list({ merchant })` and `payments.listForSession({ session })` for older browser tabs. The new app uses `payments.listForSessionPaginated` for history. Compatibility endpoints return only the already-public link terms and receipts, never merchant profile fields. Checkout checks current link availability through a server action before preparing payment and again after wallet approval. Deploy the additive backend first, verify the old and new APIs and sign-in, then publish the frontend. See [the deployment checklist](docs/merchant-sessions.md).
+Link history is session-only and paginated: the app pages it through `payments.listForSessionPaginated`, and the unauthenticated `payments.list({ merchant })` and non-paginated `payments.listForSession({ session })` were removed — frontends older than `998951b` lose link history. Link terms and receipts remain public through `payments.get` and the refund queue, never merchant profile fields. Checkout checks current link availability through a server action before preparing payment and again after wallet approval. Deploy the backend first, verify the APIs and sign-in, then publish the frontend. See [the deployment checklist](docs/merchant-sessions.md).
 
 ## Current scope
 

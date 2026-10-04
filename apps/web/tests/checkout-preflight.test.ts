@@ -102,6 +102,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  vi.useRealTimers();
 });
 async function pay() {
   const button = container.querySelector<HTMLButtonElement>(".checkout-pay")!;
@@ -252,4 +253,35 @@ it("decline does not save or send and allows retry", async () => {
   expect(
     container.querySelector<HTMLButtonElement>(".checkout-pay")!.disabled,
   ).toBe(false);
+});
+
+it("preserves polling backoff through a coalesced check and resets it after a verified check", async () => {
+  vi.useFakeTimers();
+  mocks.sync.mockClear();
+  mocks.sync
+    .mockRejectedValueOnce(new Error("429 Too Many Requests"))
+    .mockResolvedValueOnce(null)
+    .mockRejectedValueOnce(new Error("429 Too Many Requests"))
+    .mockResolvedValue(false);
+
+  // An online wake fails; a second wake lands in another tab's claimed
+  // window. That null result verified nothing and must retain the failure.
+  await act(async () => window.dispatchEvent(new Event("online")));
+  await act(async () => window.dispatchEvent(new Event("online")));
+  expect(mocks.sync).toHaveBeenCalledTimes(2);
+  await act(async () => vi.advanceTimersByTimeAsync(19_999));
+  expect(mocks.sync).toHaveBeenCalledTimes(2);
+  await act(async () => vi.advanceTimersByTimeAsync(1));
+  expect(mocks.sync).toHaveBeenCalledTimes(3);
+
+  // A second real failure grows the delay to 40s. Only a verified response
+  // restores the normal 10s polling interval.
+  await act(async () => vi.advanceTimersByTimeAsync(39_999));
+  expect(mocks.sync).toHaveBeenCalledTimes(3);
+  await act(async () => vi.advanceTimersByTimeAsync(1));
+  expect(mocks.sync).toHaveBeenCalledTimes(4);
+  await act(async () => vi.advanceTimersByTimeAsync(9_999));
+  expect(mocks.sync).toHaveBeenCalledTimes(4);
+  await act(async () => vi.advanceTimersByTimeAsync(1));
+  expect(mocks.sync).toHaveBeenCalledTimes(5);
 });

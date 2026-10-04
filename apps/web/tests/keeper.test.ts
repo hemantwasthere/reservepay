@@ -409,8 +409,8 @@ describe("keeper run", () => {
   });
 });
 
-describe("syncLink extraction", () => {
-  it("keeps paymentActions.sync behaviour unchanged", async () => {
+describe("receipt non-regression", () => {
+  it("public sync skips resolved receipts; syncById cannot regress them", async () => {
     const t = convexTest(schema, modules);
     const orderAddress = Keypair.generate().publicKey.toBase58();
     const id = await insertLink(t, orderAddress);
@@ -419,9 +419,25 @@ describe("syncLink extraction", () => {
     expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
       "completed",
     );
-    readOrder.mockResolvedValue(null);
-    await expect(t.action(api.paymentActions.sync, { id })).resolves.toBe(
-      false,
+    // The public sync short-circuits resolved receipts, so the stale re-read
+    // goes through the internal path: record must refuse to regress it.
+    readOrder.mockResolvedValue(receipt(orderAddress, "paid"));
+    await t.action(internal.paymentActions.syncById, { id });
+    expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
+      "completed",
     );
+    // An unpaid link with no order on chain still reports false.
+    const unpaid = await t.mutation(internal.payments.insert, {
+      merchant: Keypair.generate().publicKey.toBase58(),
+      reference,
+      title: "Test order",
+      amount: "1000000",
+      protectionSeconds: 3600,
+      issuedAt: Date.now(),
+    });
+    readOrder.mockResolvedValue(null);
+    await expect(
+      t.action(api.paymentActions.sync, { id: unpaid }),
+    ).resolves.toBe(false);
   });
 });

@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { convexTest } from "convex-test";
+import { anyApi } from "convex/server";
 import { Keypair } from "@solana/web3.js";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
@@ -21,6 +22,8 @@ vi.mock("../src/payments/chain", () => ({
   paymentClient: () => ({ readOrder }),
 }));
 const modules = import.meta.glob("../convex/**/*.ts");
+
+afterEach(() => vi.useRealTimers());
 const seller = Keypair.generate();
 const terms = (): PaymentTerms => ({
   merchant: seller.publicKey.toBase58(),
@@ -38,19 +41,16 @@ const approved = (value: PaymentTerms) => ({
 });
 
 describe("merchant-approved payment links", () => {
-  it("keeps the legacy public list usable while the new session API rolls out", async () => {
+  it("removes the unauthenticated legacy list endpoints", async () => {
     const t = convexTest(schema, modules);
     const value = terms();
-    const id = await t.mutation(internal.payments.insert, value);
-    const oldClient = await t.query(api.payments.list, {
-      merchant: value.merchant,
-    });
-    expect(oldClient).toEqual([await t.query(api.payments.get, { id })]);
-    expect(
-      await t.query(api.payments.list, {
-        merchant: Keypair.generate().publicKey.toBase58(),
-      }),
-    ).toEqual([]);
+    await t.mutation(internal.payments.insert, value);
+    await expect(
+      t.query(anyApi.payments.list, { merchant: value.merchant }),
+    ).rejects.toThrow(/no such export/);
+    await expect(
+      t.query(anyApi.payments.listForSession, { session: "bad-token" }),
+    ).rejects.toThrow(/no such export/);
     await expect(
       t.query(api.payments.listForSessionPaginated, {
         session: "bad-token",
@@ -179,6 +179,7 @@ describe("merchant-approved payment links", () => {
     ).rejects.toThrow("not found");
   });
   it("marks paid only after chain verification and does not regress resolved receipts", async () => {
+    vi.useFakeTimers();
     const t = convexTest(schema, modules),
       value = terms();
     const id = await t.mutation(internal.payments.insert, value);
@@ -186,6 +187,8 @@ describe("merchant-approved payment links", () => {
     expect(await t.action(api.paymentActions.sync, { id })).toBe(false);
     expect((await t.query(api.payments.get, { id }))?.receipt).toBeUndefined();
     readOrder.mockRejectedValue(new Error("order does not match"));
+    // sync coalesces to one chain read per 5s per link; step past the window.
+    vi.advanceTimersByTime(5_000);
     await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
       "does not match",
     );
@@ -199,13 +202,17 @@ describe("merchant-approved payment links", () => {
       status: "paid" as const,
     };
     readOrder.mockResolvedValue(receipt);
+    vi.advanceTimersByTime(5_000);
     expect(await t.action(api.paymentActions.sync, { id })).toBe(true);
     expect((await t.query(api.payments.get, { id }))?.receipt).toEqual(receipt);
     await t.mutation(internal.payments.record, {
       id,
       receipt: { ...receipt, status: "completed" },
     });
-    await t.action(api.paymentActions.sync, { id });
+    // The public sync short-circuits resolved receipts, so the stale re-read
+    // (readOrder still resolves the old "paid" receipt) goes through the
+    // internal path: record must refuse to regress it.
+    await t.action(internal.paymentActions.syncById, { id });
     expect((await t.query(api.payments.get, { id }))?.receipt?.status).toBe(
       "completed",
     );
@@ -511,7 +518,7 @@ describe("titles for protected orders", () => {
 });
 
 describe("payment-link deployment compatibility", () => {
-  it("keeps session-only callers working alongside pagination, with the same ownership rules", async () => {
+  it("keeps session-only callers working with pagination, with the same ownership rules", async () => {
     const t = convexTest(schema, modules);
     const ids = [];
     for (let index = 0; index < 55; index++)
@@ -523,26 +530,35 @@ describe("payment-link deployment compatibility", () => {
       }),
     );
     const { token } = await signIn(t, seller);
-    const legacy = await t.query(api.payments.listForSession, {
+    const all = await t.query(api.payments.listForSessionPaginated, {
       session: token,
+      paginationOpts: { numItems: 50, cursor: null },
     });
-    expect(legacy.map((link) => link._id)).toEqual(ids.slice(-50).reverse());
+    expect(all.page.map((link) => link._id)).toEqual(ids.slice(-50).reverse());
     const paginated = await t.query(api.payments.listForSessionPaginated, {
       session: token,
       paginationOpts: { numItems: 20, cursor: null },
     });
-    expect(paginated.page).toEqual(legacy.slice(0, 20));
+    expect(paginated.page).toEqual(all.page.slice(0, 20));
     expect(paginated.isDone).toBe(false);
     const stranger = await signIn(t, Keypair.generate());
     expect(
-      await t.query(api.payments.listForSession, { session: stranger.token }),
+      (
+        await t.query(api.payments.listForSessionPaginated, {
+          session: stranger.token,
+          paginationOpts: { numItems: 50, cursor: null },
+        })
+      ).page,
     ).toEqual([]);
     await expect(
-      t.query(api.payments.listForSession, { session: "invalid" }),
-    ).rejects.toThrow("Sign in again.");
+      t.query(anyApi.payments.listForSession, { session: "invalid" }),
+    ).rejects.toThrow(/no such export/);
     await t.mutation(api.auth.signOut, { session: token });
     await expect(
-      t.query(api.payments.listForSession, { session: token }),
+      t.query(api.payments.listForSessionPaginated, {
+        session: token,
+        paginationOpts: { numItems: 20, cursor: null },
+      }),
     ).rejects.toThrow("Sign in again.");
   });
 });

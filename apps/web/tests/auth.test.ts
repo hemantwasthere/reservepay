@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import { Keypair } from "@solana/web3.js";
 import nacl from "tweetnacl";
@@ -10,6 +10,8 @@ import { signInMessage } from "../src/lib/sign-in";
 import { signIn, TEST_DOMAIN } from "./session";
 
 const modules = import.meta.glob("../convex/**/*.ts");
+
+afterEach(() => vi.useRealTimers());
 const seller = Keypair.generate();
 const other = Keypair.generate();
 
@@ -171,6 +173,41 @@ describe("wallet sign-in", () => {
     );
     expect(await t.run((ctx) => ctx.db.query("sessions").collect())).toEqual([]);
     expect((await signIn(t, other)).token).toMatch(/^[a-f0-9]{64}$/);
+  });
+  it("refuses to create a session for a nonce that expired before the write", async () => {
+    const t = convexTest(schema, modules);
+    // The action verified the nonce earlier; by the time the mutation runs it
+    // has expired and cleanup may have removed its used-nonce record.
+    await expect(
+      t.mutation(internal.auth.createSession, {
+        wallet: seller.publicKey.toBase58(),
+        nonce: "cd".repeat(48),
+        nonceExpiresAt: Date.now() - 1,
+        tokenHash: "aa".repeat(32),
+      }),
+    ).rejects.toThrow("expired");
+    expect(await t.run((ctx) => ctx.db.query("sessions").collect())).toEqual(
+      [],
+    );
+  });
+  it("treats a session expiring exactly now as expired during cleanup", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("sessions", {
+        wallet: seller.publicKey.toBase58(),
+        tokenHash: "bb".repeat(32),
+        createdAt: now - 1_000,
+        expiresAt: now,
+      });
+      await ctx.db.insert("usedNonces", {
+        nonce: "ef".repeat(48),
+        expiresAt: now,
+      });
+    });
+    // expiresAt <= now is expired, as findSession already treats it.
+    expect(await t.mutation(internal.auth.cleanup, {})).toBe(2);
   });
   it("cleans up expired nonce records, sessions, and legacy rows", async () => {
     const t = convexTest(schema, modules);
