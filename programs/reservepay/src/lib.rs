@@ -323,18 +323,18 @@ impl<'info> FundReserve<'info> {
 #[instruction(reference: [u8; 16])]
 pub struct CreateOrder<'info> {
     #[account(seeds = [b"protocol"], bump = protocol.bump)]
-    pub protocol: Account<'info, Protocol>,
+    pub protocol: Box<Account<'info, Protocol>>,
     #[account(mut, seeds = [b"merchant", merchant.authority.as_ref(), mint.key().as_ref()], bump = merchant.bump, has_one = mint, has_one = reserve_vault)]
-    pub merchant: Account<'info, Merchant>,
+    pub merchant: Box<Account<'info, Merchant>>,
     #[account(init, payer = buyer, space = 8 + Order::INIT_SPACE, seeds = [b"order", merchant.key().as_ref(), reference.as_ref()], bump)]
-    pub order: Account<'info, Order>,
+    pub order: Box<Account<'info, Order>>,
     #[account(mut, token::mint = mint, token::authority = buyer)]
-    pub buyer_token_account: Account<'info, TokenAccount>,
+    pub buyer_token_account: Box<Account<'info, TokenAccount>>,
     #[account(mut, token::mint = mint, token::authority = merchant.authority)]
-    pub merchant_token_account: Account<'info, TokenAccount>,
+    pub merchant_token_account: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    pub reserve_vault: Account<'info, TokenAccount>,
-    pub mint: Account<'info, Mint>,
+    pub reserve_vault: Box<Account<'info, TokenAccount>>,
+    pub mint: Box<Account<'info, Mint>>,
     #[account(mut)]
     pub buyer: Signer<'info>,
     pub token_program: Program<'info, Token>,
