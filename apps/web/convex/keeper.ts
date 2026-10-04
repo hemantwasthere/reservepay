@@ -1,33 +1,30 @@
 import { ConvexError, v } from "convex/values";
-import { internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { RELEASE_GRACE_MS, RELEASE_MARGIN_MS } from "../src/payments/keeper";
 
 // Link lookup for the keeper, keyed "authority:reference" to match
 // selectReleasable. At most 50 references per call.
-export const linksForReferences = internalQuery({
+// It also returns `now` on the Convex backend clock — the same clock
+// payments.requestRefund uses to refuse late requests — and the keeper
+// decides every release cutoff against it, never against its own Node
+// runtime clock, which nothing keeps in sync with the backend. That covers
+// orders with no link too: a merchant can create a link for an existing
+// on-chain order later, and its refund request is refused by this same clock.
+// A read-only mutation rather than a query, so the result (and `now`) is
+// never served from a query cache.
+export const linksForReferences = internalMutation({
   args: {
-    refs: v.array(
-      v.object({
-        authority: v.string(),
-        reference: v.string(),
-        expiresAt: v.number(), // seconds, from the on-chain order
-      }),
-    ),
+    refs: v.array(v.object({ authority: v.string(), reference: v.string() })),
   },
   handler: async (ctx, { refs }) => {
-    // The release cutoff is decided here, on the Convex backend clock — the
-    // same clock payments.requestRefund uses to refuse late requests — not on
-    // the keeper's Node runtime clock, which nothing keeps in sync with it.
-    // The margin then only has to cover a request mutation's run time.
-    const now = Date.now();
     if (refs.length > 50)
       throw new ConvexError("At most 50 references per request.");
+    const now = Date.now();
     const links: Record<
       string,
-      { id: Id<"paymentLinks">; refundPending: boolean; settled: boolean }
+      { id: Id<"paymentLinks">; refundPending: boolean }
     > = {};
-    for (const { authority, reference, expiresAt } of refs) {
+    for (const { authority, reference } of refs) {
       const link = await ctx.db
         .query("paymentLinks")
         .withIndex("by_reference", (q) =>
@@ -38,11 +35,9 @@ export const linksForReferences = internalQuery({
         links[`${authority}:${reference}`] = {
           id: link._id,
           refundPending: link.refundPending === true,
-          settled:
-            now >= expiresAt * 1000 + RELEASE_GRACE_MS + RELEASE_MARGIN_MS,
         };
     }
-    return links;
+    return { now, links };
   },
 });
 // A small set by design; capped so a neglected queue cannot stall a run.

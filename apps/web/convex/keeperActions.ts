@@ -77,7 +77,6 @@ export const run = internalAction({
           ctx.runQuery(internal.keeper.openDisputes, {}),
         ]);
         const chainNow = Number(chainTime);
-        const wallNow = Date.now();
         const openSet = new Set(openOrders.map((order) => order.order));
         // Merchant accounts give authority and mint; cached once per run.
         const merchants = new Map<
@@ -102,8 +101,12 @@ export const run = internalAction({
         }
         const links: Record<
           string,
-          { id: Id<"paymentLinks">; refundPending: boolean; settled: boolean }
+          { id: Id<"paymentLinks">; refundPending: boolean }
         > = {};
+        // The release cutoff is judged on the backend clock each lookup
+        // returns, never this action's own clock. With several batches, the
+        // earliest is the conservative one.
+        let backendNow = Number.POSITIVE_INFINITY;
         // An order whose refund request was never checked looks unlinked, and
         // unlinked orders are treated as safe to release. If the refund-request
         // check did not finish, release nothing this run.
@@ -113,18 +116,16 @@ export const run = internalAction({
             linksComplete = false;
             break;
           }
-          Object.assign(
-            links,
-            await ctx.runQuery(internal.keeper.linksForReferences, {
+          const lookup = await ctx.runMutation(
+            internal.keeper.linksForReferences,
+            {
               refs: candidates
                 .slice(start, start + LINK_BATCH)
-                .map(({ authority, reference, expiresAt }) => ({
-                  authority,
-                  reference,
-                  expiresAt,
-                })),
-            }),
+                .map(({ authority, reference }) => ({ authority, reference })),
+            },
           );
+          Object.assign(links, lookup.links);
+          backendNow = Math.min(backendNow, lookup.now);
         }
         if (!linksComplete)
           console.log(
@@ -135,7 +136,7 @@ export const run = internalAction({
               openOrders: candidates,
               links,
               chainNow,
-              wallNow,
+              wallNow: backendNow,
               limit: candidates.length,
             })
           : [];
