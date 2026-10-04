@@ -88,13 +88,13 @@ The backend mirrors chain disputes into refund requests: reconciliation records 
 bunx convex env set REQUIRE_ONCHAIN_DISPUTE 1
 ```
 
-With it set, the buyer's message is rejected with "Submit the on-chain dispute first." unless a `confirmed` read shows the order Disputed.
+With it set, the buyer's message is rejected with "Submit the on-chain dispute first." unless the order is known to be Disputed: from the receipt Convex already stored, from the finalized chain read, or — only when neither shows it — from a `confirmed` read (finalized can lag a just-confirmed dispute by about 13 seconds). A resolution visible at either read is reported as "already resolved".
 
 **Known limitation (devnet):** a buyer can keep a merchant's reserve locked indefinitely by disputing just before expiry — only the resolver can clear a dispute and there is no grace period. Accepted on devnet; a resolver-inaction timeout is planned before mainnet.
 
 ## Keeper
 
-A Convex cron runs the keeper every 5 minutes. It completes orders whose protection expired (chain clock past expiry, and wall clock at least 60 seconds past it, so no new refund request can still arrive) and that have no pending refund request. Disputed orders are never completed by the keeper: only open orders are release candidates. It also syncs disputes whose on-chain resolution was never recorded, in one batched read per run; orders already recorded as disputed are left to the reconciler, whose scan covers them. The keeper never pays rent: orders whose merchant token account is missing are left for manual release from the receipt page.
+A Convex cron runs the keeper every 5 minutes. It completes orders whose protection expired (chain clock past expiry, and wall clock at least 60 seconds past it) and that have no pending refund request. The 60 seconds hold because the refund-request write refuses an undisputed request by its own clock once 60 seconds have passed since expiry, even if the request was checked before expiry and its chain read stalled. A request for an order disputed on-chain is still accepted after that, but such an order is never a release candidate. Disputed orders are never completed by the keeper: only open orders are release candidates. It also syncs disputes whose on-chain resolution was never recorded, in one batched read per run; orders already recorded as disputed are left to the reconciler, whose scan covers them. The keeper never pays rent: orders whose merchant token account is missing are left for manual release from the receipt page.
 
 ## Reconciliation
 

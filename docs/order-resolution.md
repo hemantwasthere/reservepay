@@ -9,7 +9,7 @@ Connect the wallet that paid, choose **Request refund**, select a public reason,
 Two exceptions to those rules:
 
 - **Reason not provided.** A dispute raised directly on-chain is recorded with the placeholder reason *Reason not provided*. The buyer's own signed reason may replace that placeholder (keeping the original request time) while the order is still open. Once the resolver has decided, a late reason is refused with *already resolved*, and the outcome stays recorded without one. Replacing the placeholder does not send a second inbox notification: the resolver sees the reason on the Disputes page.
-- **Disputed before the deadline.** If the order was flagged `Disputed` on-chain before protection ended, the buyer can still add a reason after the deadline, because the program already enforced the window when the dispute was raised. The backend decides this from a confirmed chain read, since the stored receipt can lag a fresh dispute.
+- **Disputed before the deadline.** If the order was flagged `Disputed` on-chain before protection ended, the buyer can still add a reason after the deadline, because the program already enforced the window when the dispute was raised. The backend counts the dispute if the stored receipt or the finalized chain read shows it, and otherwise checks a confirmed read, since both can lag a fresh dispute by a few seconds. An undisputed request is never accepted later than 60 seconds after the deadline, because the keeper may already have released the order.
 
 `REQUIRE_ONCHAIN_DISPUTE=1` (Convex environment) refuses signed reasons for orders that are not yet `Disputed` on-chain, with *Submit the on-chain dispute first*. Leave it unset until the app's Request refund button sends the dispute transaction.
 
