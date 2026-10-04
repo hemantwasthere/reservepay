@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,21 +48,29 @@ async function check() {
     const current = readFileSync(committed[kind], "utf8");
     if (current === rendered[kind]) continue;
     drifted = true;
-    const expected = join(
-      mkdtempSync(join(tmpdir(), "idl-check-")),
-      `reservepay.${kind}`,
-    );
-    writeFileSync(expected, rendered[kind]);
-    const diff = spawnSync(
-      "git",
-      ["diff", "--no-index", "--color=never", committed[kind], expected],
-      { encoding: "utf8" },
-    );
-    process.stderr.write(diff.stdout);
+    const dir = mkdtempSync(join(tmpdir(), "idl-check-"));
+    try {
+      const expected = join(dir, `reservepay.${kind}`);
+      writeFileSync(expected, rendered[kind]);
+      const diff = spawnSync(
+        "git",
+        ["diff", "--no-index", "--color=never", committed[kind], expected],
+        { encoding: "utf8" },
+      );
+      // Without git (minimal containers) still report the drift clearly.
+      if (diff.error || typeof diff.stdout !== "string")
+        console.error(
+          `${committed[kind]} differs from the build output ` +
+            "(install git to see the diff).",
+        );
+      else process.stderr.write(diff.stdout);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }
   if (drifted) {
     console.error(
-      "IDL drift: run `anchor build --ignore-keys && bun run idl:sync` " +
+      "IDL drift: run `bun run build:program && bun run idl:sync` " +
         "(do not run `anchor keys sync` — it would rewrite the program ID)",
     );
     process.exit(1);
