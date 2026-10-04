@@ -80,11 +80,18 @@ export const sync = action({
   },
 });
 // Lets the keeper record the finalized receipt of an order it released.
+// Uses KEEPER_RPC_URL like the rest of the keeper: under public-RPC rate
+// limiting the sync would otherwise fail silently and leave receipts "paid".
 export const syncById = internalAction({
   args: { id: v.id("paymentLinks") },
   handler: async (ctx, { id }): Promise<void> => {
     const link = await ctx.runQuery(api.payments.get, { id });
-    if (link) await syncLink(ctx, link, rpc);
+    if (!link) return;
+    const keeperRpc = new Connection(
+      process.env.KEEPER_RPC_URL ?? "https://api.devnet.solana.com",
+      { commitment: "finalized", disableRetryOnRateLimit: true },
+    );
+    await syncLink(ctx, link, keeperRpc);
   },
 });
 

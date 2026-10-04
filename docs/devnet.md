@@ -60,7 +60,7 @@ Public devnet `getProgramAccounts` from shared Convex IPs is rate-limited. Point
 bunx convex env set KEEPER_RPC_URL https://your-rpc.example.com
 ```
 
-Without it, the keeper uses `https://api.devnet.solana.com`.
+Without it, the keeper uses `https://api.devnet.solana.com`. The post-release receipt sync (`syncById`) uses the same URL.
 
 ### Operation
 
