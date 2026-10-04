@@ -31,6 +31,38 @@ bun apps/web/scripts/setup-protocol.ts --resolver <new-resolver-pubkey>
 
 Initialization uses the program's default reserve rate of 500 bps. The script prints public keys and the transaction signature only.
 
+## Redeploying the program
+
+CI and new builds use **anchor-cli 1.0.2** and **Agave 3.1.7**, pinned in `Anchor.toml` `[toolchain]`. These pins do not establish which toolchain produced the existing devnet binary.
+
+> **Warning — the next redeploy changes on-chain bytes.** The existing devnet binary differs from builds produced with the current lockfile and toolchain (`solana program dump` hashes differ). Merging the `CreateOrder` stack fix does not upgrade that live program. After upgrading, smoke-test `create_order` on devnet — create and pay a link end-to-end — before considering the redeploy done.
+
+The upgrade goes **last**: build, sync the IDL, and get the change through review and CI before touching the live program.
+
+```bash
+# 1. Build and sync the IDL the web app decodes against
+anchor build --ignore-keys          # fresh clones lack the deployer keypair; never `anchor keys sync`
+bun run idl:sync                    # refresh apps/web/src/merchant/reservepay.{json,ts}
+
+# 2. Commit the program change and the synced IDL together; let CI pass and merge.
+
+# 3. Upgrade the existing program using its explicit address and cluster.
+#    The wallet must be its upgrade authority. A fresh clone's generated
+#    target/deploy/reservepay-keypair.json is NOT the deployed program's key.
+solana program deploy target/deploy/reservepay.so --url devnet \
+  --program-id ERFq8y9tC4bjMk4AbLoM7zZXtvRcxsHdCMa9GpSnwxsU \
+  --keypair /path/to/upgrade-authority.json
+
+# 4. Smoke-test create_order on devnet (create + pay a link end-to-end).
+
+# 5. Deploy the backend if it changed, to the deployment used by the frontend.
+#    The current hosted app uses dev:oceanic-vole-769 in apps/web/.env.local.
+cd apps/web
+bunx convex dev --once
+```
+
+CI fails the `program` job when `apps/web/src/merchant/` drifts from the build output, so a forgotten `idl:sync` is caught before merge.
+
 ## Keeper
 
 A Convex cron runs the keeper every 5 minutes. It completes orders whose protection expired (chain clock past expiry, and wall clock at least 60 seconds past it, so no new refund request can still arrive) and that have no pending refund request. It also syncs disputes whose on-chain resolution was never recorded. The keeper never pays rent: orders whose merchant token account is missing are left for manual release from the receipt page.
