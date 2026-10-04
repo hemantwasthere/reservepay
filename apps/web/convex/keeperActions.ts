@@ -1,5 +1,5 @@
 "use node";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -7,6 +7,7 @@ import { completeOrderInstructions } from "../src/payments/chain";
 import { keeperChain } from "../src/payments/keeper-chain";
 import { selectReleasable, type KeeperOrder } from "../src/payments/keeper";
 import { syncLink } from "./syncLink";
+import { serverRpc } from "./rpc";
 import type { Id } from "./_generated/dataModel";
 
 const RELEASE_LIMIT = 5;
@@ -48,10 +49,7 @@ export const run = internalAction({
     }
     const started = Date.now();
     const outOfTime = () => Date.now() - started > MAX_RUN_MS;
-    const rpc = new Connection(
-      process.env.KEEPER_RPC_URL ?? "https://api.devnet.solana.com",
-      { commitment: "confirmed", disableRetryOnRateLimit: true },
-    );
+    const rpc = serverRpc("confirmed");
     const chain = keeperChain(rpc);
     let released = 0,
       skipped = 0,
