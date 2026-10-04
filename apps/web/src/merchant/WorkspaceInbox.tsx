@@ -217,10 +217,18 @@ function InboxShell({
   retry?: () => void;
 }) {
   const [signing, setSigning] = useState(false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    // Site navigation keeps the workspace mounted behind the landing page.
+    // Close its portal when Back/Forward changes the visible page.
+    const close = () => setOpen(false);
+    window.addEventListener("popstate", close);
+    return () => window.removeEventListener("popstate", close);
+  }, []);
   const signedIn =
     ready && session.status === "signed-in" && Boolean(session.token);
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button
           variant="ghost"

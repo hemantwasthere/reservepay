@@ -148,3 +148,15 @@ it("ignores a late session failure from the previous wallet", async () => {
   expect(document.body.textContent).toContain("Order for wallet-b");
   expect(document.body.textContent).not.toContain("Order for wallet-a");
 });
+
+it("closes the inbox on browser history navigation while the workspace stays mounted", async () => {
+  await act(async () =>
+    root.render(
+      createElement(WorkspaceInbox, { active, session: session("wallet-a") }),
+    ),
+  );
+  await open();
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  await act(async () => window.dispatchEvent(new PopStateEvent("popstate")));
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
