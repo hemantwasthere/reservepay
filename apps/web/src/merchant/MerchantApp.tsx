@@ -8,6 +8,7 @@ import {
   WorkspaceSidebarTrigger,
   type WorkspacePage,
 } from "./WorkspaceSidebar";
+import { BackgroundStatus } from "./BackgroundStatus";
 import { MerchantPayments } from "./MerchantPayments";
 import { MerchantProfile } from "./MerchantProfile";
 import { MerchantDisputes } from "./MerchantDisputes";
@@ -264,7 +265,7 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
                 <p>
                   This workspace uses{" "}
                   <strong>test USDC on Solana devnet</strong>. Tokens have no
-                  monetary value. Each action asks for your wallet’s approval.
+                  monetary value. Payments and reserve changes ask for your wallet’s approval.
                 </p>
               </div>
               {/* Keep each workspace view mounted so its queries and form state survive navigation. */}
@@ -308,6 +309,7 @@ export function MerchantApp({ page = "overview" }: { page?: WorkspacePage }) {
                   setLocked={setLocked}
                 />
               </div>
+              <BackgroundStatus />
               <footer
                 className={
                   "merchant-footer flex justify-between gap-[14px] py-[23px] px-0 [border-top:1px_solid_var(--line)] mt-[29px] [font:9px_var(--mono)] text-muted-foreground items-center flex-wrap [&_span]:inline-flex [&_span]:gap-[7px] [&_span]:items-center [&_a]:inline-flex [&_a]:gap-[7px] [&_a]:items-center max-[640px]:text-[8px] max-[640px]:gap-[8px]"

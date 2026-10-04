@@ -25,6 +25,9 @@ import type * as rpc from "../rpc.js";
 import type * as session from "../session.js";
 import type * as signInNonce from "../signInNonce.js";
 import type * as syncLink from "../syncLink.js";
+import type * as trackWorker from "../trackWorker.js";
+import type * as workerValidators from "../workerValidators.js";
+import type * as workers from "../workers.js";
 
 import type {
   ApiFromModules,
@@ -50,6 +53,9 @@ declare const fullApi: ApiFromModules<{
   session: typeof session;
   signInNonce: typeof signInNonce;
   syncLink: typeof syncLink;
+  trackWorker: typeof trackWorker;
+  workerValidators: typeof workerValidators;
+  workers: typeof workers;
 }>;
 
 /**

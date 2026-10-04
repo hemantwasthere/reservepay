@@ -12,7 +12,7 @@ Everything on this page is public information. Keep key material out of docs, gi
 | Protocol resolver | [`32Sq2bL8zdH6iQinTohLzeQSG33vHn6qzcijBULpzfGp`](https://explorer.solana.com/address/32Sq2bL8zdH6iQinTohLzeQSG33vHn6qzcijBULpzfGp?cluster=devnet) |
 | Devnet USDC mint | [`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`](https://explorer.solana.com/address/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU?cluster=devnet) |
 
-The keeper uses a dedicated keypair, created as described below. Record its public key here once it exists; the secret goes only into the Convex `KEEPER_SECRET_KEY` environment variable.
+The hosted devnet keeper uses dedicated wallet `5556UPZyL24ikCtuv3x5tmxzbz9ASFAKi1rjJEApMS4z`. Its secret is stored in the Convex `KEEPER_SECRET_KEY` environment variable, never in browser configuration or Git. It was initially funded with 0.05 test SOL.
 
 ## Protocol setup
 
@@ -50,18 +50,17 @@ Receipts are read at finalized commitment and `payments.record` never regresses 
 
 ```bash
 # Dedicated keypair — never the authority or resolver key:
-solana-keygen new -o keeper.json
+solana-keygen new -o ~/.config/solana/reservepay-keeper.json
 solana airdrop 1 <keeper-pubkey> --url devnet
 ```
 
-`KEEPER_SECRET_KEY` expects the base58 encoding of the 64-byte secret key. From `apps/web`, this converts `keeper.json` and sends it to the selected deployment without printing it:
+`KEEPER_SECRET_KEY` expects the base58 encoding of the 64-byte secret key. From `apps/web`, this converts the keeper key file and sends it to the selected deployment without printing it:
 
 ```bash
-bun -e 'console.log(require("bs58").encode(Uint8Array.from(JSON.parse(require("fs").readFileSync("keeper.json", "utf8")))))' | bunx convex env set KEEPER_SECRET_KEY
-rm keeper.json
+bun -e 'import bs58 from "bs58"; import {readFileSync} from "node:fs"; import {homedir} from "node:os"; console.log(bs58.encode(Uint8Array.from(JSON.parse(readFileSync(homedir()+"/.config/solana/reservepay-keeper.json", "utf8")))))' | bunx convex env set KEEPER_SECRET_KEY
 ```
 
-If the variable is unset or invalid, every keeper run skips with `{ skipped: "unconfigured" }` and changes nothing. Unsetting it stops all releases immediately; reconciliation keeps running because it needs no key.
+If the variable is unset or invalid, every keeper run skips with `{ skipped: "unconfigured" }` and records the disabled status without changing orders. Unsetting it stops new keeper runs; an already-running action may finish its current work. Reconciliation keeps running because it needs no key.
 
 ### RPC
 
@@ -75,4 +74,25 @@ bunx convex env set SOLANA_RPC_URL https://your-rpc.example.com
 
 ### Operation
 
-One run releases at most 5 orders and stops starting new work after 4 minutes. A confirmed release schedules a receipt sync 90 seconds later (finalization takes about 13 seconds). Expected races — a resolver or merchant completing the same order first — are logged and counted as skipped. The keeper spends only transaction fees, never token-account rent; check its SOL balance after the first hour and top up with a devnet airdrop when low.
+One run attempts at most 5 releases and stops starting new work after 4 minutes. The queue starts with the oldest eligible orders, then resumes after the last attempted order on the following run, including after failed sends. This prevents frozen token accounts or repeated preflight failures from blocking newer orders. Missing token accounts are skipped before the attempt limit. A confirmed release schedules a receipt sync 90 seconds later (finalization takes about 13 seconds). Expected races — a resolver or merchant completing the same order first — are logged and counted as skipped. The keeper spends only transaction fees, never token-account rent; check its SOL balance after the first hour and top up with a devnet airdrop when low.
+
+## Service health and recovery
+
+The merchant workspace shows **Payment updates** and **Automatic releases**, their current status, and time since the last successful run. The backend stores one heartbeat per worker in `workerHealth`; public status exposes fixed issue codes and timestamps only. An overlapping older run cannot overwrite a newer result. Unexpected action errors count as failures; raw RPC errors are never saved or logged by these workers.
+
+- Payment updates become delayed after 6 minutes without a new run, or when an unfinished run exceeds 2 minutes.
+- Automatic releases become delayed after 15 minutes without a new run, or when an unfinished run exceeds 5 minutes.
+- A keeper balance below 0.001 devnet SOL shows **Fee wallet needs funding**. Top up the public keeper address with test SOL, then the next successful run clears the warning.
+- Missing configuration shows **Not enabled**. A failed or incomplete run stays visible until a later run succeeds. Unpaid links with no on-chain order are normal and do not trigger a warning.
+
+Inspect or verify recovery from `apps/web`:
+
+```bash
+bunx convex run workers:status '{}'
+bunx convex run reconcileActions:run '{}'
+bunx convex run keeperActions:run '{}'
+```
+
+A keeper invocation can release eligible devnet orders. If runs fail repeatedly, check Convex cron execution and backend RPC configuration. Missing merchant token accounts require manual completion, which can create the account with wallet approval. For failed token transfers, inspect the merchant token account before retrying. Buyers can refresh their receipt while background updates recover; merchants and resolvers retain manual resolution controls.
+
+These are dashboard health indicators. External paging, refund notifications and deadline reminders are the next milestone; no email or push notification is sent yet.

@@ -41,9 +41,7 @@ export function programError(err: unknown): string | null {
 
 export function failedTransaction(action: string, err: unknown): Error {
   const name = programError(err);
-  return new Error(
-    `${action} failed: ${name ?? JSON.stringify(err)}`,
-  );
+  return new Error(`${action} failed: ${name ?? JSON.stringify(err)}`);
 }
 
 export function keeperChain(rpc: Connection) {
@@ -86,6 +84,7 @@ export function keeperChain(rpc: Connection) {
         )) !== null
       );
     },
+    balance: (wallet: PublicKey) => withRetry(() => rpc.getBalance(wallet)),
     chainTime: () => withRetry(() => readChainTime(rpc)),
     async send(
       instructions: TransactionInstruction[],

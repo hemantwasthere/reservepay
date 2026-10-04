@@ -6,7 +6,17 @@ import {
   refundRequestFields,
 } from "./paymentValidators";
 
+import { workerName, workerIssue } from "./workerValidators";
+
 export default defineSchema({
+  workerHealth: defineTable({
+    name: workerName,
+    generation: v.number(),
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    lastSuccessAt: v.optional(v.number()),
+    issue: workerIssue,
+  }).index("by_name", ["name"]),
   paymentLinks: defineTable({
     ...termsFields,
     receipt: v.optional(v.object(receiptFields)),
@@ -15,7 +25,9 @@ export default defineSchema({
     // Recorded when a requested refund resolves, so dispute history can be
     // built without a backfill. "completed" means the reserve was released
     // (by the resolver or by anyone after expiry), not that it was rejected.
-    refundOutcome: v.optional(v.union(v.literal("refunded"), v.literal("completed"))),
+    refundOutcome: v.optional(
+      v.union(v.literal("refunded"), v.literal("completed")),
+    ),
     refundResolvedAt: v.optional(v.number()),
     // Not part of the signed terms; the merchant can toggle it any time.
     deactivatedAt: v.optional(v.number()),

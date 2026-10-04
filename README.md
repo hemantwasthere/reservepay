@@ -82,7 +82,7 @@ flowchart LR
 ```
 
 - **Web app:** React, TypeScript, Vite, Tailwind CSS, and shadcn components.
-- **Application backend:** Convex stores merchant profiles, hashed session tokens, approved link terms, verified receipts, and signed refund requests. It verifies signatures and chain state; it does not hold wallet keys.
+- **Application backend:** Convex stores merchant profiles, hashed session tokens, approved link terms, verified receipts, and signed refund requests. It verifies signatures and chain state. The optional keeper holds a dedicated devnet fee key for permissionless completion; merchant, buyer, and resolver keys remain in their wallets.
 - **Solana program:** Rust and Anchor enforce reserve coverage, payment splits, withdrawals, refunds, and completion.
 - **Shared core:** Settlement calculations, program addresses, and PDA derivation.
 - **Hosting:** Vercel serves the frontend. Convex functions and schema are deployed separately.
@@ -189,8 +189,8 @@ The payment-link rollout preserves `payments.list({ merchant })` and `payments.l
 
 - **Single-use USDC links:** up to 10,000 USDC with 1 hour, 1 day, or 7 days of protection in the current UI.
 - **Recent history:** the latest 50 merchant links; the resolver's dispute queue paginates.
-- **Receipt updates:** background reconciliation every two minutes, browser polling, and manual refresh. A configured keeper also releases expired undisputed orders.
+- **Receipt updates:** background reconciliation every two minutes, browser polling, and manual refresh. The hosted devnet keeper releases expired undisputed orders. Workspace service status shows failed, delayed, disabled and underfunded background workers.
 - **Resolver-based refunds:** full refunds only, with wallet approval.
-- **Test network:** mainnet launch, operational monitoring, and a security audit remain separate work.
+- **Test network:** mainnet launch, external alerting, and a security audit remain separate work.
 
 For UI changes, follow the [component conventions](apps/web/src/components/README.md). For payment changes, keep the [order-resolution rules](docs/order-resolution.md) and on-chain accounting in sync.

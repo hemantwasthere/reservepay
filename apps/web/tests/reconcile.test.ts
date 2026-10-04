@@ -325,6 +325,7 @@ describe("reconcile run", () => {
       scanFailed: true,
       skipped: ["scan"],
     });
+    expect((await t.query(api.workers.status, {}))[0]).toMatchObject({ issue: "failed", lastSuccessAt: null });
     // Only the catch-up sweep read anything; the paid link was untouched.
     expect(readOrders).toHaveBeenCalledTimes(1);
     expect(readOrders.mock.calls[0][0].map(({ id }: { id: string }) => id))
@@ -346,6 +347,7 @@ describe("reconcile run", () => {
       scanFailed: false,
       skipped: ["disputes", "paid", "unsynced"],
     });
+    expect((await t.query(api.workers.status, {}))[0]).toMatchObject({ issue: "incomplete", lastSuccessAt: null });
     expect(readOrders).not.toHaveBeenCalled();
   });
   it("counts mismatches without failing the batch", async () => {

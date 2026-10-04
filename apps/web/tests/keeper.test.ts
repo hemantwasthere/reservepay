@@ -7,6 +7,7 @@ import schema from "../convex/schema";
 import { selectReleasable, type KeeperOrder } from "../src/payments/keeper";
 
 const fns = vi.hoisted(() => ({
+  balance: vi.fn(),
   openOrders: vi.fn(),
   merchant: vi.fn(),
   ataExists: vi.fn(),
@@ -72,6 +73,7 @@ beforeEach(() => {
   for (const fn of Object.values(fns)) fn.mockReset();
   readOrder.mockReset();
   readOrder.mockResolvedValue(null);
+  fns.balance.mockResolvedValue(1_000_000_000);
   fns.openOrders.mockResolvedValue([]);
   fns.merchant.mockResolvedValue({
     authority: authority.publicKey.toBase58(),
@@ -194,6 +196,33 @@ describe("keeper run", () => {
     });
     expect(fns.openOrders).not.toHaveBeenCalled();
   });
+  it("counts a failed scan instead of reporting a successful empty run", async () => {
+    const t = convexTest(schema, modules);
+    fns.openOrders.mockRejectedValue(new Error("RPC unavailable"));
+    await expect(
+      t.action(internal.keeperActions.run, {}),
+    ).resolves.toMatchObject({ failed: 1 });
+    expect(fns.send).not.toHaveBeenCalled();
+  });
+  it("counts a failed dispute sync", async () => {
+    const t = convexTest(schema, modules);
+    await insertLink(t, Keypair.generate().publicKey.toBase58(), true);
+    readOrder.mockRejectedValue(new Error("RPC unavailable"));
+    await expect(
+      t.action(internal.keeperActions.run, {}),
+    ).resolves.toMatchObject({ failed: 1 });
+  });
+  it("does not log private RPC URLs on failures", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const t = convexTest(schema, modules);
+    fns.openOrders.mockRejectedValue(
+      new Error("https://rpc.example/private-api-key"),
+    );
+    await t.action(internal.keeperActions.run, {});
+    expect(error.mock.calls.flat().map(String).join(" ")).not.toContain(
+      "private-api-key",
+    );
+  });
   it("releases an expired undisputed order and syncs the receipt after 90s", async () => {
     vi.useFakeTimers();
     const t = convexTest(schema, modules);
@@ -247,6 +276,55 @@ describe("keeper run", () => {
     expect(result).toEqual({ released: 1, skipped: 5, failed: 0, synced: 0 });
     expect(fns.send).toHaveBeenCalledTimes(1);
   });
+  it("advances past repeatedly failing orders on the next run", async () => {
+    const t = convexTest(schema, modules);
+    const orders = Array.from({ length: 6 }, (_, i) => openOrder(900_000 + i));
+    fns.openOrders.mockResolvedValue(orders);
+    fns.send.mockImplementation(async (instructions) => {
+      if (instructions[0].keys[2].pubkey.toBase58() !== orders[5].order)
+        throw new Error("frozen token account");
+      return "healthy-order-signature";
+    });
+    expect(await t.action(internal.keeperActions.run, {})).toMatchObject({
+      failed: 5,
+    });
+    // The sixth, healthy order is now first in the next batch.
+    expect(await t.action(internal.keeperActions.run, {})).toMatchObject({
+      released: 1,
+    });
+  });
+  it("persists missing configuration, low funds, failure and recovery", async () => {
+    const t = convexTest(schema, modules);
+    const status = async () =>
+      (await t.query(api.workers.status, {})).find(
+        (row) => row.name === "keeper",
+      );
+    delete process.env.KEEPER_SECRET_KEY;
+    await t.action(internal.keeperActions.run, {});
+    expect(await status()).toMatchObject({
+      issue: "unconfigured",
+      lastSuccessAt: null,
+    });
+    process.env.KEEPER_SECRET_KEY = SECRET;
+    fns.balance.mockResolvedValue(0);
+    await t.action(internal.keeperActions.run, {});
+    expect(await status()).toMatchObject({
+      issue: "low_funds",
+      lastSuccessAt: null,
+    });
+    fns.balance.mockResolvedValue(1_000_000_000);
+    fns.openOrders.mockRejectedValueOnce(new Error("unavailable"));
+    await t.action(internal.keeperActions.run, {});
+    expect(await status()).toMatchObject({
+      issue: "failed",
+      lastSuccessAt: null,
+    });
+    await t.action(internal.keeperActions.run, {});
+    expect(await status()).toMatchObject({
+      issue: null,
+      lastSuccessAt: expect.any(Number),
+    });
+  });
   it("blocks release when a refund request is pending", async () => {
     const t = convexTest(schema, modules);
     // A request filed 30s before expiry is still pending at release time.
@@ -292,7 +370,9 @@ describe("keeper run", () => {
     expect(result).toEqual({ released: 1, skipped: 0, failed: 1, synced: 0 });
     fns.send.mockReset();
     fns.send.mockRejectedValue(
-      new Error("custom program error: OrderClosed: the order has already been resolved"),
+      new Error(
+        "custom program error: OrderClosed: the order has already been resolved",
+      ),
     );
     result = await t.action(internal.keeperActions.run, {});
     expect(result).toEqual({ released: 0, skipped: 2, failed: 0, synced: 0 });
