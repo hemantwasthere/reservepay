@@ -263,6 +263,33 @@ describe("merchant-approved payment links", () => {
       ),
     ).toHaveLength(2);
   });
+  it("records an order disputed on-chain before its first sync", async () => {
+    const t = convexTest(schema, modules);
+    const id = await t.mutation(internal.payments.insert, terms());
+    // No receipt yet: the first sync already sees the dispute. The request is
+    // backfilled and notifications carry the new receipt's deadline.
+    const receipt = {
+      order: "order",
+      buyer: "buyer",
+      reserveAmount: "50000",
+      createdAt: 1000,
+      expiresAt: 86401000,
+      status: "paid" as const,
+      disputed: true,
+    };
+    await t.mutation(internal.payments.record, { id, receipt });
+    const link = await t.query(api.payments.get, { id });
+    expect(link?.receipt).toEqual(receipt);
+    expect(link?.refundPending).toBe(true);
+    expect(link?.refundRequest?.reason).toBe("unspecified");
+    const notified = await t.run((ctx) =>
+      ctx.db.query("notifications").collect(),
+    );
+    expect(
+      notified.filter((entry) => entry.kind === "refund_requested"),
+    ).toHaveLength(2);
+    expect(notified.every((entry) => entry.expiresAt === 86401000)).toBe(true);
+  });
   it("never re-opens a resolved receipt from a lagging disputed read", async () => {
     const t = convexTest(schema, modules);
     const id = await t.mutation(internal.payments.insert, terms());
