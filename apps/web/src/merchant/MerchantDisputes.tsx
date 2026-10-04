@@ -30,12 +30,18 @@ function deadline(expiresAt: number, now: number) {
 
 export function MerchantDisputes({ active }: { active: WalletConnection | null }) {
   const ready = usePaymentsReady();
-  const { resolver, error } = useResolver();
+  const { resolver, error, checking } = useResolver();
   if (!ready) return null;
   if (error)
     return (
       <p role="status" className="my-4 text-xs text-muted-foreground">
         {error}
+      </p>
+    );
+  if (checking)
+    return (
+      <p role="status" className="my-4 text-xs text-muted-foreground">
+        Checking the protocol resolver…
       </p>
     );
   // UI gating only, not a security boundary: the on-chain has_one = resolver

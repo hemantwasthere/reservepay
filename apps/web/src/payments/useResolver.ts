@@ -8,6 +8,7 @@ import { paymentClient } from "./chain";
 export function useResolver(intervalMs = 30_000) {
   const [resolver, setResolver] = useState("");
   const [error, setError] = useState("");
+  const [checked, setChecked] = useState(false);
   useEffect(() => {
     let stopped = false;
     const refresh = async () => {
@@ -16,6 +17,7 @@ export function useResolver(intervalMs = 30_000) {
         if (!stopped) {
           setResolver(value.toBase58());
           setError("");
+          setChecked(true);
         }
       } catch {
         if (!stopped) {
@@ -31,5 +33,7 @@ export function useResolver(intervalMs = 30_000) {
       clearInterval(timer);
     };
   }, [intervalMs]);
-  return { resolver, error };
+  // "checking" is distinct from "not the resolver": the first read has not
+  // finished and the last read did not fail.
+  return { resolver, error, checking: !checked && !error };
 }
