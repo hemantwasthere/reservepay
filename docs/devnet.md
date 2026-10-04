@@ -31,6 +31,34 @@ bun apps/web/scripts/setup-protocol.ts --resolver <new-resolver-pubkey>
 
 Initialization uses the program's default reserve rate of 500 bps. The script prints public keys and the transaction signature only.
 
+## Redeploying the program
+
+The deployed artefact is built with **anchor-cli 1.0.2** and **Agave 3.1.7**, pinned in `Anchor.toml` `[toolchain]`.
+
+> **Warning — the next redeploy changes on-chain bytes.** The program currently deployed on devnet predates this repo's lockfile and does not match any local build (a `solana program dump` hash differs). It also predates the `CreateOrder` stack fix, so devnet is running a build this repo cannot reproduce. After upgrading, smoke-test `create_order` on devnet — create and pay a link end-to-end — before considering the redeploy done.
+
+The upgrade goes **last**: build, sync the IDL, and get the change through review and CI before touching the live program.
+
+```bash
+# 1. Build and sync the IDL the web app decodes against
+anchor build --ignore-keys          # fresh clones lack the deployer keypair; never `anchor keys sync`
+bun run idl:sync                    # refresh apps/web/src/merchant/reservepay.{json,ts}
+
+# 2. Commit the program change and the synced IDL together; let CI pass and merge.
+
+# 3. Upgrade the live program. Anchor.toml's provider is Localnet, so without
+#    --provider.cluster devnet this deploys to a local validator while looking
+#    successful — always pass the flag explicitly.
+anchor deploy --provider.cluster devnet   # upgrades ERFq…wxsU in place
+
+# 4. Smoke-test create_order on devnet (create + pay a link end-to-end).
+
+# 5. Deploy the backend if it changed.
+bun run --filter @reservepay/web deploy:backend
+```
+
+CI fails the `program` job when `apps/web/src/merchant/` drifts from the build output, so a forgotten `idl:sync` is caught before merge.
+
 ## Keeper
 
 A Convex cron runs the keeper every 5 minutes. It completes orders whose protection expired (chain clock past expiry, and wall clock at least 60 seconds past it, so no new refund request can still arrive) and that have no pending refund request. It also syncs disputes whose on-chain resolution was never recorded. The keeper never pays rent: orders whose merchant token account is missing are left for manual release from the receipt page.

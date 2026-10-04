@@ -174,8 +174,14 @@ Run these from the repository root:
 | `bun run build`        | Production frontend build and prerendering                    |
 | `cargo check`          | Rust workspace validation                                     |
 | `bun run test:program` | Anchor integration tests on a local validator                 |
+| `bun run idl:sync`     | Copy the built IDL and TS types into `apps/web/src/merchant/` |
+| `bun run idl:check`    | Fail if the committed IDL differs from `target/`              |
 
-The Anchor integration suite additionally requires Rust, the Solana CLI/local validator, and an Anchor CLI compatible with the program’s **0.30.1** dependencies. Review [Anchor.toml](Anchor.toml) for the local provider and wallet configuration. The suite creates a local test mint and tests reserve accounting using disposable test tokens.
+The Anchor integration suite additionally requires Rust, the Solana CLI/local validator, and the Anchor CLI. The toolchain that builds the deployed artefact is pinned in [Anchor.toml](Anchor.toml) `[toolchain]`: **anchor-cli 1.0.2** with **Agave (solana-cli) 3.1.7**. The suite creates a local test mint and tests reserve accounting using disposable test tokens. anchor-cli 1.0.x runs tests on the surfpool validator by default; pass `--validator legacy` to use Agave's `solana-test-validator` instead.
+
+On a fresh clone, `anchor build` fails with *"Program ID mismatch"*: the deployer's program keypair is not in the repo, so anchor generates a random one that doesn't match `declare_id!`. Build with **`anchor build --ignore-keys`** — the local validator loads the program at the `Anchor.toml` address regardless. Never run `anchor keys sync`: it would rewrite the program ID in `declare_id!` and `Anchor.toml`, pointing the app at a program that doesn't exist.
+
+After changing the program, run `anchor build --ignore-keys && bun run idl:sync` and commit the updated `apps/web/src/merchant/reservepay.{json,ts}` together with the program change — the backend decodes accounts and errors from these files. CI fails the `program` job with a diff when the committed IDL drifts from the build output.
 
 ## Devnet deployment
 
