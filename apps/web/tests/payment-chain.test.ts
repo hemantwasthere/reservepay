@@ -40,6 +40,7 @@ const state = {
 const rpc = () =>
   ({
     getAccountInfo: vi.fn(async () => null),
+    getMultipleAccountsInfo: vi.fn(async () => []),
     getLatestBlockhash: vi.fn(async () => ({
       blockhash: Keypair.generate().publicKey.toBase58(),
       lastValidBlockHeight: 100,
@@ -133,5 +134,90 @@ describe("real checkout transaction", () => {
       );
       await expect(client.readOrder(terms)).rejects.toThrow("does not match");
     }
+  });
+});
+
+describe("batched order reads", () => {
+  const encodeOrder = async (
+    client: ReturnType<typeof paymentClient>,
+    connection: Connection,
+    changes = {},
+  ) => {
+    const coder = new Program<Reservepay>(idl as Reservepay, { connection })
+      .coder.accounts;
+    return {
+      data: await coder.encode("order", {
+        merchant: client.addresses(terms).merchant,
+        buyer: buyer.publicKey,
+        buyerTokenAccount: buyer.publicKey,
+        reference: Array.from(referenceBytes(terms.reference)),
+        amount: new BN(terms.amount),
+        reserveAmount: new BN(50000),
+        createdAt: new BN(100),
+        expiresAt: new BN(86500),
+        status: { open: {} },
+        bump: 1,
+        ...changes,
+      }),
+      owner: PROGRAM_ID,
+      executable: false,
+      lamports: 1000,
+      rentEpoch: 0,
+    };
+  };
+  it("chunks reads at 100 accounts per RPC call, at finalized by default", async () => {
+    const connection = rpc();
+    vi.mocked(connection.getMultipleAccountsInfo).mockImplementation(
+      async (keys) => keys.map(() => null),
+    );
+    const items = Array.from({ length: 201 }, (_, index) => ({
+      id: `link-${index}`,
+      terms,
+    }));
+    const results = await paymentClient(connection).readOrders(items);
+    const calls = vi.mocked(connection.getMultipleAccountsInfo).mock.calls;
+    expect(calls.map(([keys]) => keys)).toHaveLength(3);
+    expect(calls[0][0]).toHaveLength(100);
+    expect(calls[1][0]).toHaveLength(100);
+    expect(calls[2][0]).toHaveLength(1);
+    expect(calls[0][1]).toBe("finalized");
+    expect(results.size).toBe(201);
+    expect(results.get("link-0")).toBeNull();
+  });
+  it("maps a missing account to null and a mismatch to an Error entry while the others decode", async () => {
+    const connection = rpc(),
+      client = paymentClient(connection);
+    const valid = await encodeOrder(client, connection);
+    const wrongAmount = await encodeOrder(client, connection, {
+      amount: new BN(1),
+    });
+    vi.mocked(connection.getMultipleAccountsInfo).mockResolvedValue([
+      valid,
+      wrongAmount,
+      null,
+    ]);
+    const results = await client.readOrders([
+      { id: "valid", terms },
+      { id: "mismatch", terms },
+      { id: "missing", terms },
+    ]);
+    expect(results.get("valid")).toMatchObject({
+      buyer: buyer.publicKey.toBase58(),
+      reserveAmount: "50000",
+      status: "paid",
+    });
+    const mismatch = results.get("mismatch");
+    expect(mismatch).toBeInstanceOf(Error);
+    expect((mismatch as Error).message).toContain("does not match");
+    expect(results.get("missing")).toBeNull();
+  });
+  it("rejects when a chunk read fails so the caller retries the page", async () => {
+    const connection = rpc();
+    vi.mocked(connection.getMultipleAccountsInfo).mockRejectedValue(
+      new Error("RPC unavailable"),
+    );
+    await expect(
+      paymentClient(connection).readOrders([{ id: "link-1", terms }]),
+    ).rejects.toThrow("RPC unavailable");
   });
 });

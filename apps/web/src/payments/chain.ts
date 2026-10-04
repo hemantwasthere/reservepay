@@ -7,6 +7,7 @@ import {
   Transaction,
   ComputeBudgetProgram,
   SYSVAR_CLOCK_PUBKEY,
+  type AccountInfo,
   type TransactionInstruction,
 } from "@solana/web3.js";
 import {
@@ -25,13 +26,23 @@ import { DEVNET_USDC, merchantClient } from "../merchant/client";
 import type { Reservepay } from "../merchant/reservepay";
 import idl from "../merchant/reservepay.json";
 import { referenceBytes, validateTerms, type PaymentTerms } from "./terms";
-import { orderStatus } from "./order-status";
+import { orderStatus, type OrderStatus } from "./order-status";
+import { withRetry } from "../lib/retry";
 
 // Byte offset of the 1-byte status enum inside a serialized Order account:
 // 8 discriminator + 32 merchant + 32 buyer + 32 buyer_token_account
 // + 16 reference + 4×8 (amount, reserve, created_at, expires_at).
 // Open = 0 (programs/reservepay/src/lib.rs).
 export const ORDER_STATUS_OFFSET = 152;
+
+export type OrderReceipt = {
+  order: string;
+  buyer: string;
+  reserveAmount: string;
+  createdAt: number;
+  expiresAt: number;
+  status: OrderStatus;
+};
 
 export async function readChainTime(rpc: Connection): Promise<bigint> {
   const clock = await rpc.getAccountInfo(SYSVAR_CLOCK_PUBKEY, "confirmed");
@@ -106,51 +117,99 @@ export function paymentClient(rpc: Connection, mint = DEVNET_USDC) {
       merchantTokenAccount: getAssociatedTokenAddressSync(mint, authority),
     };
   };
+  // Owner, merchant, reference, amount and window validation shared by the
+  // single and batched reads; throws the same "does not match" error.
+  const decodeState = (
+    terms: PaymentTerms,
+    account: AccountInfo<Buffer> | null,
+  ) => {
+    if (!account) return null;
+    if (!account.owner.equals(PROGRAM_ID))
+      throw new Error("Unexpected order account owner.");
+    const state = program.coder.accounts.decode<
+      IdlAccounts<Reservepay>["order"]
+    >("order", account.data);
+    if (
+      !state.merchant.equals(addresses(terms).merchant) ||
+      !Buffer.from(state.reference).equals(
+        Buffer.from(referenceBytes(terms.reference)),
+      ) ||
+      state.amount.toString() !== terms.amount ||
+      !state.expiresAt
+        .sub(state.createdAt)
+        .eq(new BN(terms.protectionSeconds))
+    )
+      throw new Error(
+        "The on-chain order does not match this payment link. Do not send another payment.",
+      );
+    return state;
+  };
+  const toReceipt = (
+    terms: PaymentTerms,
+    state: NonNullable<ReturnType<typeof decodeState>>,
+  ): OrderReceipt => ({
+    order: addresses(terms).order.toBase58(),
+    buyer: state.buyer.toBase58(),
+    reserveAmount: state.reserveAmount.toString(),
+    createdAt: state.createdAt.toNumber() * 1000,
+    expiresAt: state.expiresAt.toNumber() * 1000,
+    status: orderStatus(state.status),
+  });
+  const decodeOrder = (
+    terms: PaymentTerms,
+    account: AccountInfo<Buffer> | null,
+  ): OrderReceipt | null => {
+    const state = decodeState(terms, account);
+    return state ? toReceipt(terms, state) : null;
+  };
   return {
     addresses,
     async readState(
       terms: PaymentTerms,
       commitment: "confirmed" | "finalized" = "finalized",
     ) {
-      const { merchant, order } = addresses(terms);
-      const account = await rpc.getAccountInfo(order, commitment);
-      if (!account) return null;
-      if (!account.owner.equals(PROGRAM_ID))
-        throw new Error("Unexpected order account owner.");
-      const state = program.coder.accounts.decode<
-        IdlAccounts<Reservepay>["order"]
-      >("order", account.data);
-      if (
-        !state.merchant.equals(merchant) ||
-        !Buffer.from(state.reference).equals(
-          Buffer.from(referenceBytes(terms.reference)),
-        ) ||
-        state.amount.toString() !== terms.amount ||
-        !state.expiresAt
-          .sub(state.createdAt)
-          .eq(new BN(terms.protectionSeconds))
-      )
-        throw new Error(
-          "The on-chain order does not match this payment link. Do not send another payment.",
-        );
-      return state;
+      const { order } = addresses(terms);
+      const account = await withRetry(() =>
+        rpc.getAccountInfo(order, commitment),
+      );
+      return decodeState(terms, account);
     },
     async readOrder(
       terms: PaymentTerms,
       commitment: "confirmed" | "finalized" = "finalized",
     ) {
       const state = await this.readState(terms, commitment);
-      if (!state) return null;
-      const { order } = addresses(terms);
-      const status = orderStatus(state.status);
-      return {
-        order: order.toBase58(),
-        buyer: state.buyer.toBase58(),
-        reserveAmount: state.reserveAmount.toString(),
-        createdAt: state.createdAt.toNumber() * 1000,
-        expiresAt: state.expiresAt.toNumber() * 1000,
-        status,
-      };
+      return state ? toReceipt(terms, state) : null;
+    },
+    // Batched reads for the reconciler: 100 accounts per RPC call, each
+    // chunk retried. A link whose order does not match gets an Error entry
+    // so one bad order never fails the batch; a failed chunk rejects the
+    // call so the caller can retry the same page next run.
+    async readOrders(
+      items: { id: string; terms: PaymentTerms }[],
+      commitment: "confirmed" | "finalized" = "finalized",
+    ): Promise<Map<string, OrderReceipt | null | Error>> {
+      const results = new Map<string, OrderReceipt | null | Error>();
+      for (let start = 0; start < items.length; start += 100) {
+        const chunk = items.slice(start, start + 100);
+        const accounts = await withRetry(() =>
+          rpc.getMultipleAccountsInfo(
+            chunk.map(({ terms }) => addresses(terms).order),
+            commitment,
+          ),
+        );
+        chunk.forEach(({ id, terms }, index) => {
+          try {
+            results.set(id, decodeOrder(terms, accounts[index]));
+          } catch (error) {
+            results.set(
+              id,
+              error instanceof Error ? error : new Error(String(error)),
+            );
+          }
+        });
+      }
+      return results;
     },
     async readResolver() {
       const account = await rpc.getAccountInfo(protocolAddress(), "confirmed");
