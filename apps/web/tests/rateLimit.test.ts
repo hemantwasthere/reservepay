@@ -163,8 +163,10 @@ describe("fixed-window rate limiter", () => {
         count: 99,
       }),
     );
-    // An old legacy row with no expiresAt: a missing field indexes as
-    // undefined, which sorts first, so the by_expires_at lt() sweep reaches it.
+    // A second legacy row with no expiresAt. Its age doesn't matter: a missing
+    // field indexes as undefined, which sorts first, so the by_expires_at lt()
+    // sweep removes every such row (hit() already treats them as expired).
+    // This relies on Convex's index ordering; convex-test models it.
     await t.run((ctx) =>
       ctx.db.insert("rateLimits", {
         key: "test:legacy-unswept",
