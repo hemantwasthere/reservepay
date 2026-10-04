@@ -63,9 +63,7 @@ export const run = internalAction({
       let released = 0,
         skipped = 0,
         failed = 0,
-        synced = 0,
-        // Receipt writes left for the next run when the budget ran out.
-        deferred = 0;
+        synced = 0;
       let lowFunds = false;
       try {
         lowFunds = (await chain.balance(keeper.publicKey)) < 1_000_000;
@@ -104,7 +102,7 @@ export const run = internalAction({
         }
         const links: Record<
           string,
-          { id: Id<"paymentLinks">; refundPending: boolean }
+          { id: Id<"paymentLinks">; refundPending: boolean; settled: boolean }
         > = {};
         // An order whose refund request was never checked looks unlinked, and
         // unlinked orders are treated as safe to release. If the refund-request
@@ -120,7 +118,11 @@ export const run = internalAction({
             await ctx.runQuery(internal.keeper.linksForReferences, {
               refs: candidates
                 .slice(start, start + LINK_BATCH)
-                .map(({ authority, reference }) => ({ authority, reference })),
+                .map(({ authority, reference, expiresAt }) => ({
+                  authority,
+                  reference,
+                  expiresAt,
+                })),
             }),
           );
         }
@@ -228,7 +230,12 @@ export const run = internalAction({
           const result = await syncLinks(ctx, staleDisputes, rpc, outOfTime);
           synced += result.synced;
           failed += result.failed + result.mismatched;
-          deferred += result.deferred;
+          // Deferring only happens once the budget is spent, which already
+          // marks the run incomplete below; log how many were left.
+          if (result.deferred > 0)
+            console.log(
+              `keeper: out of time; ${result.deferred} resolved-dispute sync(s) deferred to the next run.`,
+            );
         }
       } catch {
         failed += 1;
@@ -240,7 +247,7 @@ export const run = internalAction({
           ? "low_funds"
           : failed > 0
             ? "failed"
-            : outOfTime() || skipped > 0 || deferred > 0
+            : outOfTime() || skipped > 0
               ? "incomplete"
               : null,
       };

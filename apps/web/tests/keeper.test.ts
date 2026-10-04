@@ -212,8 +212,8 @@ describe("selectReleasable", () => {
         order(3000, { authority: "a3", reference: "r3" }),
       ],
       links: {
-        "a1:r1": { id: "link-1", refundPending: true },
-        "a2:r2": { id: "link-2", refundPending: false },
+        "a1:r1": { id: "link-1", refundPending: true, settled: true },
+        "a2:r2": { id: "link-2", refundPending: false, settled: true },
       },
       chainNow: 4000,
       wallNow: 5_000_000,
@@ -221,6 +221,19 @@ describe("selectReleasable", () => {
     expect(selected.map((order) => order.reference)).toEqual(["r2", "r3"]);
     expect(selected[0].linkId).toBe("link-2");
     expect(selected[1].linkId).toBeUndefined();
+  });
+  it("waits for the backend clock even when the keeper's clock says go", () => {
+    // The keeper's (Node) clock is past the cutoff, but the backend clock —
+    // the one the refund mutation uses — says a request could still commit.
+    const selected = selectReleasable({
+      openOrders: [order(1000, { authority: "a1", reference: "r1" })],
+      links: {
+        "a1:r1": { id: "link-1", refundPending: false, settled: false },
+      },
+      chainNow: 4000,
+      wallNow: 5_000_000,
+    });
+    expect(selected).toEqual([]);
   });
 });
 
@@ -511,6 +524,23 @@ describe("keeper run", () => {
       failed: 1,
       synced: 0,
     });
+  });
+  it("decides the release cutoff on the backend clock in the link query", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const orderAddress = Keypair.generate().publicKey.toBase58();
+    await insertLink(t, orderAddress);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const cutoff = (RELEASE_GRACE_MS + RELEASE_MARGIN_MS) / 1000;
+    const lookup = (expiresAt: number) =>
+      t.query(internal.keeper.linksForReferences, {
+        refs: [
+          { authority: authority.publicKey.toBase58(), reference, expiresAt },
+        ],
+      });
+    const key = `${authority.publicKey.toBase58()}:${reference}`;
+    expect((await lookup(nowSeconds - cutoff + 1))[key]?.settled).toBe(false);
+    expect((await lookup(nowSeconds - cutoff - 1))[key]?.settled).toBe(true);
   });
   it("counts a race with a fresh dispute as skipped, not failed", async () => {
     const t = convexTest(schema, modules);

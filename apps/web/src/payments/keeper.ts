@@ -11,7 +11,9 @@ export type KeeperOrder = {
   expiresAt: number; // seconds
 };
 
-export type KeeperLink = { id: string; refundPending: boolean };
+// settled: the backend clock (shared with the refund mutation) is past the
+// release cutoff, so no undisputed request can still be committed for it.
+export type KeeperLink = { id: string; refundPending: boolean; settled: boolean };
 
 export type ReleasableOrder = KeeperOrder & { linkId?: string };
 
@@ -43,7 +45,12 @@ export function selectReleasable<T extends KeeperOrder>({
       if (order.expiresAt > chainNow) return false;
       if (order.expiresAt * 1000 + RELEASE_GRACE_MS + RELEASE_MARGIN_MS > wallNow)
         return false;
-      return links[`${order.authority}:${order.reference}`]?.refundPending !== true;
+      // An order with no link can't have a refund request. A linked one is
+      // released only once the backend clock — the one the refund mutation
+      // uses — is past the cutoff too, and it has no pending request.
+      const link = links[`${order.authority}:${order.reference}`];
+      if (!link) return true;
+      return link.settled && !link.refundPending;
     })
     .sort((a, b) => a.expiresAt - b.expiresAt)
     .slice(0, limit)
