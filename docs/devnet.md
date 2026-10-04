@@ -94,7 +94,7 @@ With it set, the buyer's message is rejected with "Submit the on-chain dispute f
 
 ## Keeper
 
-A Convex cron runs the keeper every 5 minutes. It completes orders whose protection expired (chain clock past expiry, and wall clock at least 60 seconds past it, so no new refund request can still arrive) and that have no pending refund request. Disputed orders are never completed by the keeper: only open orders are release candidates. It also syncs disputes whose on-chain resolution was never recorded, treating chain-disputed orders as still open. The keeper never pays rent: orders whose merchant token account is missing are left for manual release from the receipt page.
+A Convex cron runs the keeper every 5 minutes. It completes orders whose protection expired (chain clock past expiry, and wall clock at least 60 seconds past it, so no new refund request can still arrive) and that have no pending refund request. Disputed orders are never completed by the keeper: only open orders are release candidates. It also syncs disputes whose on-chain resolution was never recorded, in one batched read per run; orders already recorded as disputed are left to the reconciler, whose scan covers them. The keeper never pays rent: orders whose merchant token account is missing are left for manual release from the receipt page.
 
 ## Reconciliation
 
@@ -156,7 +156,7 @@ Anonymous endpoints are bounded so no caller can spend unlimited RPC reads or wr
 
 `null` means the call verified nothing. Checkout preserves any accumulated retry backoff when a call is coalesced; only a verified response resets the polling interval. Independent pending-transaction confirmation checks continue during coalesced calls.
 
-`requestRefund` refuses cheaply before spending its bucket or a chain read: unknown or unsynced payments, non-buyer signatures, repeat requests (a same-reason retry is a no-op even after resolution), already-resolved orders, and stale approvals. The 5/min bucket is spent only when the request reaches the chain read, and a transient RPC failure returns it (except 429, as above). Expiry and the on-chain-dispute gate are decided from that read (at confirmed, in parallel with the finalized receipt read) because the stored receipt can lag an in-time dispute; a "submit the on-chain dispute first" refusal also returns the slot, so retrying after the dispute confirms is never locked out.
+`requestRefund` refuses cheaply before spending its bucket or a chain read: unknown or unsynced payments, non-buyer signatures, repeat requests (a same-reason retry is a no-op even after resolution), already-resolved orders, and stale approvals. The 5/min bucket is spent only when the request reaches the chain read, and a transient RPC failure returns it (except 429, as above). Expiry and the on-chain-dispute gate are decided from the chain, because the stored receipt can lag an in-time dispute: one finalized read, plus a confirmed read only when it can change the outcome (the gate is on, or protection has ended) and no source already shows the dispute. The deadline is compared against the action's timestamp, which is passed to the mutation so a request made before expiry cannot be refused by a later mutation clock. Like every other deterministic failure, a "submit the on-chain dispute first" refusal keeps its slot — five per minute is plenty to retry once the dispute confirms.
 
 `paymentActions.requirePayable`, `payments.get`, the refund queue and `authActions.requestNonce` stay unlimited: they are read-only or stateless and perform no write or chain read.
 
