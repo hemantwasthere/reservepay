@@ -517,6 +517,42 @@ describe("paymentActions.requestRefund rate limit", () => {
     });
     await t.action(api.paymentActions.requestRefund, sign(request));
   });
+  it("keeps the slot when one read is rate limited and the other is a 503", async () => {
+    vi.useFakeTimers();
+    const { t, request } = await setup();
+    // The 503 settles first; with Promise.all that alone used to decide, and
+    // returned the slot despite the 429. Both must qualify to release it.
+    readOrder.mockImplementation(async (_terms, commitment) => {
+      throw commitment === "confirmed"
+        ? rpcError("429 Too Many Requests: you are rate limited")
+        : rpcError("503 Service Unavailable: upstream error");
+    });
+    for (let i = 0; i < 5; i++)
+      await expect(
+        t.action(api.paymentActions.requestRefund, sign(request)),
+      ).rejects.toThrow();
+    await expect(
+      t.action(api.paymentActions.requestRefund, sign(request)),
+    ).rejects.toThrow("Too many requests");
+  });
+  it("keeps the slot when one read mismatches and the other is a 503", async () => {
+    vi.useFakeTimers();
+    const { t, request } = await setup();
+    readOrder.mockImplementation(async (_terms, commitment) => {
+      throw commitment === "confirmed"
+        ? new Error(
+            "The on-chain order does not match this payment link. Do not send another payment.",
+          )
+        : rpcError("503 Service Unavailable: upstream error");
+    });
+    for (let i = 0; i < 5; i++)
+      await expect(
+        t.action(api.paymentActions.requestRefund, sign(request)),
+      ).rejects.toThrow();
+    await expect(
+      t.action(api.paymentActions.requestRefund, sign(request)),
+    ).rejects.toThrow("Too many requests");
+  });
   it("keeps the buyer's bucket when the RPC is rate limited", async () => {
     vi.useFakeTimers();
     const { t, request } = await setup();

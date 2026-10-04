@@ -276,7 +276,8 @@ describe("buyer refund requests", () => {
         ).rejects.toThrow("on-chain dispute first");
       // Each refusal is a deterministic failure, so it keeps its slot: a buyer
       // who never disputes cannot replay an approval for unlimited reads.
-      // Each attempt costs at most two reads (finalized, then confirmed).
+      // Each attempt costs exactly two reads, finalized and confirmed, made
+      // in parallel.
       expect(readOrder).toHaveBeenCalledTimes(10);
       await expect(
         t.action(api.paymentActions.requestRefund, sign(request)),
@@ -297,15 +298,25 @@ describe("buyer refund requests", () => {
     }
   });
   it("always reads both commitments, in parallel", async () => {
-    const { t, request } = await setup();
-    // Gate off and protection still running: still two reads, because the
-    // confirmed read alone can show a just-confirmed resolution.
-    await t.action(api.paymentActions.requestRefund, sign(request));
-    expect(readOrder).toHaveBeenCalledTimes(2);
+    const { t, id, request, receipt } = await setup();
+    // Hold both reads open: if they were sequential, the second would never
+    // start while the first is still pending.
+    const pending: (() => void)[] = [];
+    readOrder.mockImplementation(
+      () =>
+        new Promise((resolve) => pending.push(() => resolve(receipt))),
+    );
+    const done = t.action(api.paymentActions.requestRefund, sign(request));
+    await vi.waitFor(() => expect(pending).toHaveLength(2));
     expect(readOrder.mock.calls.map((call) => call[1]).sort()).toEqual([
       "confirmed",
       undefined,
     ]);
+    for (const resolve of pending) resolve();
+    await done;
+    expect((await t.query(api.payments.get, { id }))?.refundPending).toBe(
+      true,
+    );
   });
   it("refuses a request on an order resolved at confirmed, even with the gate off", async () => {
     const { t, id, request, receipt } = await setup();
@@ -351,10 +362,11 @@ describe("buyer refund requests", () => {
     const { t, id, request, receipt } = await setup();
     const near = { ...receipt, expiresAt: Date.now() + 1_000 };
     await t.mutation(internal.payments.record, { id, receipt: near });
-    // The finalized read takes 2s and crosses the deadline: the action's
-    // clock (taken before the read) decides, so the request is accepted.
-    readOrder.mockImplementation(async () => {
-      vi.advanceTimersByTime(2_000);
+    // The reads take 2s and cross the deadline: the action's clock (taken
+    // before them) decides, so the request is accepted. Advance the clock
+    // once, on one of the two parallel reads, so the stall is exactly 2s.
+    readOrder.mockImplementation(async (_terms, commitment) => {
+      if (commitment !== "confirmed") vi.advanceTimersByTime(2_000);
       return near;
     });
     await t.action(api.paymentActions.requestRefund, sign(request));
@@ -369,8 +381,11 @@ describe("buyer refund requests", () => {
     await t.mutation(internal.payments.record, { id, receipt: near });
     // The read stalls past the grace: by then the keeper may have released
     // the order.
-    readOrder.mockImplementation(async () => {
-      vi.advanceTimersByTime(RELEASE_GRACE_MS + 2_000);
+    // Advance once (on one of the two parallel reads): the stall lands just
+    // past the grace — expiry is 1s away, so 2s past the grace from now.
+    readOrder.mockImplementation(async (_terms, commitment) => {
+      if (commitment !== "confirmed")
+        vi.advanceTimersByTime(RELEASE_GRACE_MS + 2_000);
       return near;
     });
     await expect(

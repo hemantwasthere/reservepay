@@ -7,7 +7,7 @@ import { action, internalAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { termsFields, refundReason } from "./paymentValidators";
 import { paymentApproval } from "../src/payments/terms";
-import { paymentClient } from "../src/payments/chain";
+import { paymentClient, type OrderReceipt } from "../src/payments/chain";
 import { merchantClient } from "../src/merchant/client";
 import { refundApproval } from "../src/payments/refunds";
 import { syncLink } from "./syncLink";
@@ -202,34 +202,43 @@ export const requestRefund = action({
       // request made before expiry counts even when the mutation lands after
       // it. The stored receipt's flag counts too — no read needed for it.
       const checkedAt = Date.now();
-      let receipt,
-        disputed = link.receipt.disputed === true,
-        resolvedAtConfirmed = false;
-      try {
-        const client = paymentClient(rpc);
-        // Both reads, in parallel. The stored receipt is always the finalized
-        // read. The confirmed read can be ~13s ahead of it in either
-        // direction that matters: a just-confirmed dispute, or a resolver's
-        // just-confirmed refund/completion — which must be "already resolved"
-        // whether or not the gate is on or protection has ended. Refund
-        // requests are rare and capped at 5/min per link, so the second read
-        // is cheap; skipping it was a source of wrong outcomes.
-        const [finalized, confirmed] = await Promise.all([
-          client.readOrder(link),
-          client.readOrder(link, "confirmed"),
-        ]);
-        receipt = finalized;
-        disputed ||=
-          finalized?.disputed === true || confirmed?.disputed === true;
-        resolvedAtConfirmed = Boolean(confirmed && confirmed.status !== "paid");
-      } catch (error) {
-        // An RPC outage must not lock the buyer out of retrying — but a 429
-        // keeps the slot: under throttling the buyer's own limit is the
-        // backpressure, not a free retry loop.
-        if (releasesRateLimitSlot(error))
+      // Both reads, in parallel. The stored receipt is always the finalized
+      // read. The confirmed read can be ~13s ahead of it in either direction
+      // that matters: a just-confirmed dispute, or a resolver's
+      // just-confirmed refund/completion — which must be "already resolved"
+      // whether or not the gate is on or protection has ended. Refund
+      // requests are rare and capped at 5/min per link, so the second read
+      // is cheap. allSettled, not all: both reads always finish before
+      // deciding, so whether the slot comes back can't depend on which
+      // failure lands first, and no read is left running after we return.
+      const client = paymentClient(rpc);
+      const reads = await Promise.allSettled([
+        client.readOrder(link),
+        client.readOrder(link, "confirmed"),
+      ]);
+      const failures = reads.flatMap((read) =>
+        read.status === "rejected" ? [read.reason as unknown] : [],
+      );
+      if (failures.length > 0) {
+        // An RPC outage must not lock the buyer out of retrying, so the slot
+        // comes back — but only when every failed read was a server or
+        // network error. A 429 keeps it (under throttling the buyer's own
+        // limit is the backpressure) and so does a deterministic failure such
+        // as a mismatched order.
+        if (failures.every(releasesRateLimitSlot))
           await release(ctx, "refund", link._id, claim);
-        throw error;
+        throw failures[0];
       }
+      const [receipt, confirmed] = reads.map(
+        (read) => (read as PromiseFulfilledResult<OrderReceipt | null>).value,
+      );
+      const disputed =
+        link.receipt.disputed === true ||
+        receipt?.disputed === true ||
+        confirmed?.disputed === true;
+      const resolvedAtConfirmed = Boolean(
+        confirmed && confirmed.status !== "paid",
+      );
       if (
         !receipt ||
         receipt.buyer !== request.buyer ||

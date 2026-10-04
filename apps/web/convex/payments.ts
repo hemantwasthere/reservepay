@@ -246,9 +246,9 @@ export const requestRefund = internalMutation({
     id: v.id("paymentLinks"),
     receipt: v.object(receiptFields),
     reason: refundReason,
-    // Dispute state as decided by the action: the stored receipt's flag, the
-    // finalized receipt, or — when it can change the outcome — a confirmed
-    // read (finalized can lag a just-confirmed dispute by ~13s).
+    // Dispute state as decided by the action: the stored receipt's flag, or
+    // either of its two parallel reads, finalized or confirmed (finalized can
+    // lag a just-confirmed dispute by ~13s).
     disputed: v.optional(v.boolean()),
     // The action's clock, so a request made before expiry is not refused by
     // a mutation that runs after it.
