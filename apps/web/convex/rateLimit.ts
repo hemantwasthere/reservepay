@@ -109,30 +109,20 @@ export async function enforce(
 // Cron entry point. Rows are only read while their window is live, so rows
 // expired for more than ten minutes are dead weight. Deletes in bounded,
 // indexed batches and reschedules itself until the backlog is drained.
-// Legacy rows from the earlier build have windowStart and no expiresAt, so
-// the by_expires_at sweep never reaches them; they get their own pass over
-// by_window (their windows were at most a minute, so anything this old is
-// long dead). The gt(0) bound excludes converged rows: a missing field
-// indexes as undefined, which sorts first and would otherwise match lt.
+// Rows from the earlier build have no expiresAt; a missing field indexes as
+// undefined, which sorts before every number, so this same lt() range
+// sweeps them too.
 export const cleanup = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const cutoff = Date.now() - RETENTION_MS;
-    const expired = await sweepExpired(ctx, {
+    const deleted = await sweepExpired(ctx, {
       table: "rateLimits",
       index: "by_expires_at",
       field: "expiresAt",
-      cutoff,
+      cutoff: Date.now() - RETENTION_MS,
     });
-    const legacyRows = await ctx.db
-      .query("rateLimits")
-      .withIndex("by_window", (q) =>
-        q.gt("windowStart", 0).lt("windowStart", cutoff),
-      )
-      .take(SWEEP_BATCH);
-    for (const row of legacyRows) await ctx.db.delete(row._id);
-    if (expired === SWEEP_BATCH || legacyRows.length === SWEEP_BATCH)
+    if (deleted === SWEEP_BATCH)
       await ctx.scheduler.runAfter(0, internal.rateLimit.cleanup, {});
-    return expired + legacyRows.length;
+    return deleted;
   },
 });
