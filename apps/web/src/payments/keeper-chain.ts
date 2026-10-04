@@ -22,6 +22,29 @@ export type KeeperOpenOrder = {
   expiresAt: number; // seconds
 };
 
+// confirmTransaction does not throw for a failed transaction in this web3.js
+// version, so callers must check value.err. This names known program errors
+// (for example OrderClosed) from the IDL.
+export function programError(err: unknown): string | null {
+  if (typeof err !== "object" || err === null || !("InstructionError" in err))
+    return null;
+  const [, inner] = (err as { InstructionError: [number, unknown] })
+    .InstructionError;
+  if (typeof inner !== "object" || inner === null || !("Custom" in inner))
+    return null;
+  const code = (inner as { Custom: number }).Custom;
+  const errors =
+    (idl as { errors?: { code: number; name: string }[] }).errors ?? [];
+  return errors.find((error) => error.code === code)?.name ?? null;
+}
+
+export function failedTransaction(action: string, err: unknown): Error {
+  const name = programError(err);
+  return new Error(
+    `${action} failed: ${name ?? JSON.stringify(err)}`,
+  );
+}
+
 export function keeperChain(rpc: Connection) {
   const program = new Program<Reservepay>(idl as Reservepay, {
     connection: rpc,
@@ -77,7 +100,12 @@ export function keeperChain(rpc: Connection) {
         skipPreflight: false,
         preflightCommitment: "confirmed",
       });
-      await rpc.confirmTransaction({ signature, ...lifetime }, "confirmed");
+      const confirmation = await rpc.confirmTransaction(
+        { signature, ...lifetime },
+        "confirmed",
+      );
+      if (confirmation.value.err)
+        throw failedTransaction("Release transaction", confirmation.value.err);
       return signature;
     },
   };

@@ -16,6 +16,7 @@ import {
   Transaction,
 } from "@solana/web3.js";
 import { planProtocolSetup, protocolAddress } from "@reservepay/core";
+import { failedTransaction } from "../src/payments/keeper-chain";
 import type { Reservepay } from "../src/merchant/reservepay";
 import idl from "../src/merchant/reservepay.json";
 
@@ -108,6 +109,13 @@ else if (plan.action !== "noop") {
     transaction.serialize(),
     { skipPreflight: false, preflightCommitment: "confirmed" },
   );
-  await connection.confirmTransaction(signature, "confirmed");
+  const confirmation = await connection.confirmTransaction(
+    signature,
+    "confirmed",
+  );
+  // confirmTransaction does not throw for a failed transaction; a failed
+  // setup must not print a signature as if it worked.
+  if (confirmation.value.err)
+    throw failedTransaction("Setup transaction", confirmation.value.err);
   console.log(`Signature: ${signature}`);
 }
