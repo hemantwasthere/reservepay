@@ -16,6 +16,11 @@ export const createSession = internalMutation({
     tokenHash: v.string(),
   },
   handler: async (ctx, { wallet, nonce, nonceExpiresAt, tokenHash }) => {
+    // Re-check expiry inside the transaction: the action verified the nonce
+    // earlier, and cleanup may have deleted its usedNonces row since
+    // (expiresAt <= now), which would otherwise let a replay through.
+    if (nonceExpiresAt <= Date.now())
+      throw new ConvexError("This sign-in link expired. Try again.");
     const used = await ctx.db
       .query("usedNonces")
       .withIndex("by_nonce", (q) => q.eq("nonce", nonce))
