@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
+import type { FunctionReference } from "convex/server";
 import { Keypair } from "@solana/web3.js";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { api, internal } from "../convex/_generated/api";
+import type { ActionCtx } from "../convex/_generated/server";
 import schema from "../convex/schema";
+import { release } from "../convex/rateLimit";
 import { refundApproval, type RefundApproval } from "../src/payments/refunds";
 import { signInMessage } from "../src/lib/sign-in";
 import { signIn, TEST_DOMAIN } from "./session";
@@ -14,6 +17,14 @@ vi.mock("../src/payments/chain", () => ({
   paymentClient: () => ({ readOrder }),
 }));
 const modules = import.meta.glob("../convex/**/*.ts");
+
+// release() is an action-side helper; this exercises it against the test
+// backend without going through a public action.
+const asActionCtx = (t: ReturnType<typeof convexTest>): ActionCtx =>
+  ({
+    runMutation: (reference: FunctionReference<"mutation">, args: unknown) =>
+      t.mutation(reference, args as never),
+  }) as unknown as ActionCtx;
 
 // Several tests drive dozens of actions; the 5s default is borderline when
 // the full suite runs in parallel.
@@ -152,10 +163,12 @@ describe("fixed-window rate limiter", () => {
         count: 99,
       }),
     );
+    // An old legacy row: Convex omits documents missing the indexed field, so
+    // the by_expires_at sweep can never reach it — by_window does.
     await t.run((ctx) =>
       ctx.db.insert("rateLimits", {
         key: "test:legacy-unswept",
-        windowStart: Date.now(),
+        windowStart: Date.now() - 11 * 60_000,
         count: 99,
       }),
     );
@@ -169,12 +182,37 @@ describe("fixed-window rate limiter", () => {
         })
       ).allowed,
     ).toBe(true);
-    // The untouched legacy row is removed by the sweep.
+    // The reused row converges to the new shape.
+    const reused = (
+      await t.run((ctx) => ctx.db.query("rateLimits").collect())
+    ).find((row) => row.key === "test:legacy");
+    expect(reused?.expiresAt).toBe(Date.now() + 1_000);
+    expect(reused?.windowStart).toBeUndefined();
+    // The old legacy row is swept; the live reused row survives.
     await t.mutation(internal.rateLimit.cleanup, {});
     const keys = (
       await t.run((ctx) => ctx.db.query("rateLimits").collect())
     ).map((row) => row.key);
-    expect(keys).not.toContain("test:legacy-unswept");
+    expect(keys).toEqual(["test:legacy"]);
+  });
+  it("release ignores a denied claim", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const args = { key: "test:a", limit: 1, windowMs: 10_000 };
+    const first = await t.mutation(internal.rateLimit.hit, args);
+    const denied = await t.mutation(internal.rateLimit.hit, args);
+    expect(denied.allowed).toBe(false);
+    // A denied claim only observed the live window; releasing it must not
+    // free the claim that window belongs to.
+    await release(asActionCtx(t), "test", "a", denied);
+    expect(
+      (await t.run((ctx) => ctx.db.query("rateLimits").collect()))[0]?.count,
+    ).toBe(1);
+    // Releasing the real claim still works through the same helper.
+    await release(asActionCtx(t), "test", "a", first);
+    expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual(
+      [],
+    );
   });
 });
 
@@ -231,7 +269,7 @@ describe("paymentActions.sync coalescing", () => {
     vi.useFakeTimers();
     const t = convexTest(schema, modules);
     const id = await insertLink(t);
-    readOrder.mockRejectedValue(new Error("503 Service Unavailable"));
+    readOrder.mockRejectedValue(new Error("503 Service Unavailable: upstream error"));
     await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
       "503",
     );
@@ -240,6 +278,28 @@ describe("paymentActions.sync coalescing", () => {
     // retries the chain instead of getting a coalesced answer.
     await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
       "503",
+    );
+    expect(readOrder).toHaveBeenCalledTimes(2);
+  });
+  it("keeps the bucket when the chain read is rate limited", async () => {
+    vi.useFakeTimers();
+    const t = convexTest(schema, modules);
+    const id = await insertLink(t);
+    readOrder.mockRejectedValue(
+      new Error("429 Too Many Requests: you are rate limited"),
+    );
+    await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
+      "429",
+    );
+    expect(readOrder).toHaveBeenCalledTimes(1);
+    // The slot was kept: while devnet throttles, other callers are coalesced
+    // instead of each doing a retry-wrapped read that fails again.
+    expect(await t.action(api.paymentActions.sync, { id })).toBeNull();
+    expect(readOrder).toHaveBeenCalledTimes(1);
+    // The next window tries the chain again.
+    vi.advanceTimersByTime(5_000);
+    await expect(t.action(api.paymentActions.sync, { id })).rejects.toThrow(
+      "429",
     );
     expect(readOrder).toHaveBeenCalledTimes(2);
   });
@@ -414,12 +474,43 @@ describe("paymentActions.requestRefund rate limit", () => {
   });
   it("an RPC outage does not lock the buyer out", async () => {
     const { t, request } = await setup();
-    readOrder.mockRejectedValue(new Error("429 Too Many Requests"));
+    readOrder.mockRejectedValue(
+      new Error("503 Service Unavailable: upstream error"),
+    );
     for (let i = 0; i < 8; i++)
       await expect(
         t.action(api.paymentActions.requestRefund, sign(request)),
-      ).rejects.toThrow("429");
+      ).rejects.toThrow("503");
     // Recovered: the transient failures returned their claims.
+    readOrder.mockResolvedValue({
+      order: request.order,
+      buyer: request.buyer,
+      reserveAmount: "50000",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 3_600_000,
+      status: "paid" as const,
+    });
+    await t.action(api.paymentActions.requestRefund, sign(request));
+  });
+  it("keeps the buyer's bucket when the RPC is rate limited", async () => {
+    vi.useFakeTimers();
+    const { t, request } = await setup();
+    readOrder.mockRejectedValue(
+      new Error("429 Too Many Requests: you are rate limited"),
+    );
+    for (let i = 0; i < 5; i++)
+      await expect(
+        t.action(api.paymentActions.requestRefund, sign(request)),
+      ).rejects.toThrow("429");
+    expect(readOrder).toHaveBeenCalledTimes(5);
+    // The slots were kept: under throttling the buyer's own limit is the
+    // backpressure, not a free retry loop.
+    await expect(
+      t.action(api.paymentActions.requestRefund, sign(request)),
+    ).rejects.toThrow("Too many requests");
+    expect(readOrder).toHaveBeenCalledTimes(5);
+    // The next window retries the chain.
+    vi.advanceTimersByTime(60_000);
     readOrder.mockResolvedValue({
       order: request.order,
       buyer: request.buyer,

@@ -76,12 +76,14 @@ export default defineSchema({
     // earlier build (which had windowStart and no expiresAt) still validate;
     // hit() treats a missing value as expired and the sweep removes them.
     expiresAt: v.optional(v.number()),
-    // Legacy, no longer written. Remove once old rows have been swept.
+    // Legacy, no longer written; hit() unsets it on reset and cleanup drains
+    // the remaining rows via by_window. Remove once old rows have been swept.
     windowStart: v.optional(v.number()),
     count: v.number(),
   })
     .index("by_key", ["key"])
-    .index("by_expires_at", ["expiresAt"]),
+    .index("by_expires_at", ["expiresAt"])
+    .index("by_window", ["windowStart"]),
   // Legacy: the earlier stored-nonce design. Kept optional so existing rows
   // still validate on deploy; auth.cleanup drains it. Remove once empty.
   authNonces: defineTable({

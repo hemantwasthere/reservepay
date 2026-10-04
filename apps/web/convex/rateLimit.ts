@@ -21,10 +21,12 @@ export const hit = internalMutation({
       .query("rateLimits")
       .withIndex("by_key", (q) => q.eq("key", key))
       .unique();
-    // Rows written before expiresAt existed count as expired.
+    // Rows written before expiresAt existed count as expired; the reset also
+    // unsets the legacy windowStart so reused rows converge to the new shape.
     if (!row || row.expiresAt === undefined || row.expiresAt <= now) {
       const window = { expiresAt: now + windowMs, count: 1 };
-      if (row) await ctx.db.patch(row._id, window);
+      if (row)
+        await ctx.db.patch(row._id, { ...window, windowStart: undefined });
       else await ctx.db.insert("rateLimits", { key, ...window });
       return { allowed: true, retryAfterMs: 0, expiresAt: window.expiresAt };
     }
@@ -76,8 +78,11 @@ export async function release(
   ctx: ActionCtx,
   scope: string,
   subject: string,
-  claim: Pick<Claim, "expiresAt">,
+  claim: Claim,
 ): Promise<void> {
+  // A denied claim borrowed nothing; decrementing would free a hit from the
+  // live window it merely observed.
+  if (!claim.allowed) return;
   await ctx.runMutation(internal.rateLimit.unhit, {
     key: key(scope, subject),
     expiresAt: claim.expiresAt,
@@ -104,17 +109,30 @@ export async function enforce(
 // Cron entry point. Rows are only read while their window is live, so rows
 // expired for more than ten minutes are dead weight. Deletes in bounded,
 // indexed batches and reschedules itself until the backlog is drained.
+// Legacy rows from the earlier build have windowStart and no expiresAt, so
+// the by_expires_at sweep never reaches them; they get their own pass over
+// by_window (their windows were at most a minute, so anything this old is
+// long dead). The gt(0) bound excludes converged rows: a missing field
+// indexes as undefined, which sorts first and would otherwise match lt.
 export const cleanup = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const deleted = await sweepExpired(ctx, {
+    const cutoff = Date.now() - RETENTION_MS;
+    const expired = await sweepExpired(ctx, {
       table: "rateLimits",
       index: "by_expires_at",
       field: "expiresAt",
-      cutoff: Date.now() - RETENTION_MS,
+      cutoff,
     });
-    if (deleted === SWEEP_BATCH)
+    const legacyRows = await ctx.db
+      .query("rateLimits")
+      .withIndex("by_window", (q) =>
+        q.gt("windowStart", 0).lt("windowStart", cutoff),
+      )
+      .take(SWEEP_BATCH);
+    for (const row of legacyRows) await ctx.db.delete(row._id);
+    if (expired === SWEEP_BATCH || legacyRows.length === SWEEP_BATCH)
       await ctx.scheduler.runAfter(0, internal.rateLimit.cleanup, {});
-    return deleted;
+    return expired + legacyRows.length;
   },
 });

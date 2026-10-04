@@ -165,11 +165,10 @@ describe("buyer refund requests", () => {
     const link = await t.query(api.payments.get, { id });
     expect(link?.receipt?.status).toBe("refunded");
     expect(link?.refundPending).toBe(false);
-    // A resolved order rejects new requests before the bucket and the RPC.
+    // A repeat request after resolution is a no-op, exactly as the mutation
+    // would decide — refused repeats cost no bucket and no chain read.
     readOrder.mockClear();
-    await expect(
-      t.action(api.paymentActions.requestRefund, sign(request)),
-    ).rejects.toThrow("already resolved");
+    await t.action(api.paymentActions.requestRefund, sign(request));
     expect(readOrder).not.toHaveBeenCalled();
     expect(link?.refundRequest?.reason).toBe("not_received");
   });
@@ -183,6 +182,22 @@ describe("buyer refund requests", () => {
     await expect(
       t.action(api.paymentActions.requestRefund, sign(request)),
     ).rejects.toThrow("already resolved");
+    expect(readOrder).not.toHaveBeenCalled();
+    expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual(
+      [],
+    );
+  });
+  it("refuses a refund after the protection period ends, before the bucket and the RPC", async () => {
+    const { t, id, request, receipt } = await setup();
+    // The recorded receipt's protection has lapsed (record() would not patch
+    // a same-status receipt, so patch directly).
+    await t.run((ctx) =>
+      ctx.db.patch(id, { receipt: { ...receipt, expiresAt: Date.now() - 1 } }),
+    );
+    readOrder.mockClear();
+    await expect(
+      t.action(api.paymentActions.requestRefund, sign(request)),
+    ).rejects.toThrow("protection period has ended");
     expect(readOrder).not.toHaveBeenCalled();
     expect(await t.run((ctx) => ctx.db.query("rateLimits").collect())).toEqual(
       [],

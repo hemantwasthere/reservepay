@@ -11,6 +11,9 @@ const TRANSIENT_STATUS = /\b(429|50[234]) (?:[A-Z]|:)/;
 const TRANSIENT_NETWORK =
   /Too Many Requests|Failed to fetch|NetworkError|Load failed|fetch failed|ECONNRESET|ETIMEDOUT|socket hang up/i;
 
+const RATE_LIMITED_STATUS = /\b429 (?:[A-Z]|:)/;
+const RATE_LIMITED_TEXT = /Too Many Requests/i;
+
 export function isTransient(error: unknown): boolean {
   // ConvexError messages are for users; program and validation errors ("does
   // not match") are deterministic. Neither is helped by retrying.
@@ -18,6 +21,15 @@ export function isTransient(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   if (/does not match/i.test(message)) return false;
   return TRANSIENT_STATUS.test(message) || TRANSIENT_NETWORK.test(message);
+}
+
+// 429 specifically. A dedicated matcher because TRANSIENT_NETWORK also
+// matches the "Too Many Requests" text, so isTransient's parts cannot be
+// re-tested from outside.
+export function isRateLimited(error: unknown): boolean {
+  if (error instanceof ConvexError) return false;
+  const message = error instanceof Error ? error.message : String(error);
+  return RATE_LIMITED_STATUS.test(message) || RATE_LIMITED_TEXT.test(message);
 }
 
 function abortError(): Error {

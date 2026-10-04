@@ -13,7 +13,7 @@ import { refundApproval } from "../src/payments/refunds";
 import { syncLink } from "./syncLink";
 import { serverRpc } from "./rpc";
 import { enforce, allow, release } from "./rateLimit";
-import { isTransient } from "../src/lib/retry";
+import { isTransient, isRateLimited } from "../src/lib/retry";
 import type { Id } from "./_generated/dataModel";
 
 const rpc = new Connection("https://api.devnet.solana.com", {
@@ -94,12 +94,16 @@ export const sync = action({
     try {
       return await syncLink(ctx, link, rpc);
     } catch (error) {
-      // Only a transient failure (rate limit, gateway, network) returns the
-      // claim so the next caller retries. A deterministic failure keeps it:
-      // anyone can create an on-chain order with a link's reference and a
-      // wrong amount, after which every read throws "does not match" — if
-      // that released the bucket, the coalescer would be bypassed entirely.
-      if (isTransient(error)) await release(ctx, "sync", link._id, claim);
+      // A transient failure (gateway, network) returns the claim so the next
+      // caller retries the chain — but not a 429: while devnet is throttling,
+      // keeping the slot turns the coalescer into backpressure instead of
+      // every caller doing a retry-wrapped read and handing it back. A
+      // deterministic failure keeps it too: anyone can create an on-chain
+      // order with a link's reference and a wrong amount, after which every
+      // read throws "does not match" — if that released the bucket, the
+      // coalescer would be bypassed entirely.
+      if (isTransient(error) && !isRateLimited(error))
+        await release(ctx, "sync", link._id, claim);
       throw error;
     }
   },
@@ -172,19 +176,21 @@ export const requestRefund = action({
         throw new Error(
           "Only the verified buyer can request a refund for this order.",
         );
-      // A resolved order is known from the recorded receipt; a still-open
-      // pending request proceeds — it needs the fresh chain read.
-      if (link.receipt.status !== "paid")
-        throw new Error("This order is already resolved.");
-      // One request per order: a repeat with the same reason is a no-op and
-      // a different reason is refused, exactly as the mutation would decide,
-      // but without spending the bucket or a chain read. This also covers a
-      // replayed old approval, which is why freshness is checked after it.
+      // One request per order, checked first so a retry after resolution is
+      // still a no-op, exactly as the mutation would decide: a repeat with
+      // the same reason returns and a different reason is refused, without
+      // spending the bucket or a chain read. This also covers a replayed old
+      // approval, which is why freshness is checked after it.
       if (link.refundRequest) {
         if (link.refundRequest.reason !== request.reason)
           throw new Error("A refund has already been requested for this order.");
         return;
       }
+      // Both known from the recorded receipt, before the bucket and the RPC.
+      if (link.receipt.status !== "paid")
+        throw new Error("This order is already resolved.");
+      if (link.receipt.expiresAt <= Date.now())
+        throw new Error("The protection period has ended.");
       if (
         request.issuedAt < Date.now() - 600_000 ||
         request.issuedAt > Date.now() + 30_000
@@ -195,8 +201,11 @@ export const requestRefund = action({
       try {
         receipt = await paymentClient(rpc).readOrder(link);
       } catch (error) {
-        // An RPC outage must not lock the buyer out of retrying.
-        if (isTransient(error)) await release(ctx, "refund", link._id, claim);
+        // An RPC outage must not lock the buyer out of retrying — but a 429
+        // keeps the slot: under throttling the buyer's own limit is the
+        // backpressure, not a free retry loop.
+        if (isTransient(error) && !isRateLimited(error))
+          await release(ctx, "refund", link._id, claim);
         throw error;
       }
       if (

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
-import { isTransient, withRetry } from "../src/lib/retry";
+import { isTransient, isRateLimited, withRetry } from "../src/lib/retry";
 
 describe("isTransient", () => {
   it.each([
@@ -33,6 +33,29 @@ describe("isTransient", () => {
   });
   it("never retries a ConvexError, even with a transient-looking message", () => {
     expect(isTransient(new ConvexError("429 Too Many Requests"))).toBe(false);
+  });
+});
+
+describe("isRateLimited", () => {
+  it.each([
+    "429 Too Many Requests: you are rate limited",
+    "429 : rate limited", // HTTP/2: empty status text
+    "Too many requests, slow down",
+  ])("matches: %s", (message) => {
+    expect(isRateLimited(new Error(message))).toBe(true);
+  });
+  it.each([
+    "502 Bad Gateway: upstream error",
+    "503 Service Unavailable: try again",
+    "Failed to fetch",
+    // 429 inside a base58 account, not an HTTP status
+    "failed to get info about account 4Zx429abc: invalid param",
+    "The on-chain order does not match this payment link. Do not send another payment.",
+  ])("does not match: %s", (message) => {
+    expect(isRateLimited(new Error(message))).toBe(false);
+  });
+  it("never matches a ConvexError", () => {
+    expect(isRateLimited(new ConvexError("429 Too Many Requests"))).toBe(false);
   });
 });
 
