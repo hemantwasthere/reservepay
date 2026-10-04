@@ -222,6 +222,31 @@ describe("keeper run", () => {
     expect(result).toEqual({ released: 0, skipped: 1, failed: 0, synced: 0 });
     expect(fns.send).not.toHaveBeenCalled();
   });
+  it("does not let five older orders with missing token accounts starve a releasable order", async () => {
+    const t = convexTest(schema, modules);
+    const blockedAuthority = Keypair.generate().publicKey.toBase58();
+    const healthyMerchant = Keypair.generate().publicKey.toBase58();
+    const orders = Array.from({ length: 6 }, (_, index) => ({
+      ...openOrder(900_000 + index),
+      merchantPda: index === 5 ? healthyMerchant : merchantPda,
+    }));
+    fns.openOrders.mockResolvedValue(orders);
+    fns.merchant.mockImplementation(async (address: string) => ({
+      authority:
+        address === healthyMerchant
+          ? authority.publicKey.toBase58()
+          : blockedAuthority,
+      mint,
+    }));
+    fns.ataExists.mockImplementation(async (_mint, owner) =>
+      owner.equals(authority.publicKey),
+    );
+
+    const result = await t.action(internal.keeperActions.run, {});
+
+    expect(result).toEqual({ released: 1, skipped: 5, failed: 0, synced: 0 });
+    expect(fns.send).toHaveBeenCalledTimes(1);
+  });
   it("blocks release when a refund request is pending", async () => {
     const t = convexTest(schema, modules);
     // A request filed 30s before expiry is still pending at release time.

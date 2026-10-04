@@ -15,7 +15,7 @@ Connect the resolver wallet configured in the deployed protocol. The **Disputes*
 - **Approve full refund:** return the entire payment from the reserve to the original buyer token account.
 - **Reject refund & complete:** release the retained portion to the merchant and unlock the order’s full liability. This permanently closes the order, including any pending refund request.
 
-Both decisions require the resolver’s on-chain transaction signature. The backend has no wallet keys and cannot move funds. The signing wallet needs devnet SOL for fees and, if necessary, recreating an associated token account.
+Both decisions require the resolver’s on-chain transaction signature. The backend never holds buyer, merchant, or resolver keys. An optionally configured keeper uses its own fee-paying key to complete expired undisputed orders; it cannot approve refunds. The signing wallet needs devnet SOL for fees and, if necessary, recreating an associated token account.
 
 After protection ends, the merchant can also complete the order, and a keeper releases expired undisputed orders automatically (see [devnet operations](devnet.md)). The client checks Solana’s clock before offering the transaction; the program enforces its own deadline and resolver rules. The underlying program permits anyone to complete after expiry, while the UI offers completion to the merchant and resolver. The keeper never completes an order with a pending refund request; the Disputes page flags those as **Overdue — decide now**.
 
