@@ -251,7 +251,8 @@ export const requestRefund = internalMutation({
     // lag a just-confirmed dispute by ~13s).
     disputed: v.optional(v.boolean()),
     // The action's clock, so a request made before expiry is not refused by
-    // a mutation that runs after it.
+    // a mutation that runs a little after it — but never more than
+    // RELEASE_GRACE_MS after expiry (see the check below).
     checkedAt: v.optional(v.number()),
   },
   handler: async (ctx, { id, receipt, reason, disputed, checkedAt }) => {
@@ -274,8 +275,10 @@ export const requestRefund = internalMutation({
       throw new ConvexError("This order is already resolved.");
     // The chain enforced the dispute window at dispute time, so a disputed
     // order — flagged by any source, including the stored receipt — is
-    // accepted even when this request lands after expiry. The deadline is
-    // compared against the action's clock, not this mutation's.
+    // accepted even when this request lands after expiry. For an undisputed
+    // order the deadline is compared against the action's clock (checkedAt),
+    // and additionally against this mutation's own clock once
+    // RELEASE_GRACE_MS has passed — see below.
     const isDisputed =
       receipt.disputed === true ||
       disputed === true ||

@@ -199,8 +199,9 @@ export const requestRefund = action({
       const claim = await enforce(ctx, "refund", link._id, 5, 60_000);
       const requireDispute = process.env.REQUIRE_ONCHAIN_DISPUTE === "1";
       // One timestamp for the whole request, shared with the mutation: a
-      // request made before expiry counts even when the mutation lands after
-      // it. The stored receipt's flag counts too — no read needed for it.
+      // request made before expiry still counts if the mutation lands shortly
+      // after it — within RELEASE_GRACE_MS of expiry, after which the mutation
+      // refuses by its own clock because the keeper may release the order.
       const checkedAt = Date.now();
       // Both reads, in parallel. The stored receipt is always the finalized
       // read. The confirmed read can be ~13s ahead of it in either direction
