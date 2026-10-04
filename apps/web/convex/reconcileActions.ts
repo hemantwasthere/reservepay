@@ -108,7 +108,9 @@ export const run = internalAction({
         if (unsynced.length + newDisputes.length > 0 && !outOfTime()) {
           for (const link of [...unsynced, ...newDisputes])
             syncedInScan.add(link._id);
-          // One batched read for both: a link is in at most one list.
+          // One batched read for both. An order that flips Open → Disputed
+          // between the two scans can land its link in both lists and get
+          // read twice this run — harmless: the second record is a no-op.
           count(await syncLinks(ctx, [...unsynced, ...newDisputes], receipts));
         } else if (unsynced.length + newDisputes.length > 0) {
           complete = false;

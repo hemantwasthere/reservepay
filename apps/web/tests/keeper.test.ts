@@ -16,11 +16,14 @@ const fns = vi.hoisted(() => ({
   send: vi.fn(),
 }));
 vi.mock("../src/payments/keeper-chain", () => ({ keeperChain: () => fns }));
-const { readOrder } = vi.hoisted(() => ({ readOrder: vi.fn() }));
+const { readOrder, readOrders } = vi.hoisted(() => ({
+  readOrder: vi.fn(),
+  readOrders: vi.fn(),
+}));
 vi.mock("../src/payments/chain", async (importOriginal) => {
   const original =
     await importOriginal<typeof import("../src/payments/chain")>();
-  return { ...original, paymentClient: () => ({ readOrder }) };
+  return { ...original, paymentClient: () => ({ readOrder, readOrders }) };
 });
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -74,6 +77,11 @@ beforeEach(() => {
   for (const fn of Object.values(fns)) fn.mockReset();
   readOrder.mockReset();
   readOrder.mockResolvedValue(null);
+  readOrders.mockReset();
+  readOrders.mockImplementation(
+    async (items: { id: string }[]) =>
+      new Map(items.map(({ id }) => [id, null])),
+  );
   fns.balance.mockResolvedValue(1_000_000_000);
   fns.openOrders.mockResolvedValue([]);
   fns.disputedOrders.mockResolvedValue([]);
@@ -209,7 +217,7 @@ describe("keeper run", () => {
   it("counts a failed dispute sync", async () => {
     const t = convexTest(schema, modules);
     await insertLink(t, Keypair.generate().publicKey.toBase58(), true);
-    readOrder.mockRejectedValue(new Error("RPC unavailable"));
+    readOrders.mockRejectedValue(new Error("RPC unavailable"));
     await expect(
       t.action(internal.keeperActions.run, {}),
     ).resolves.toMatchObject({ failed: 1 });
@@ -337,7 +345,7 @@ describe("keeper run", () => {
     expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 0 });
     expect(fns.send).not.toHaveBeenCalled();
     // The dispute is still open on-chain, so reconciliation leaves it alone.
-    expect(readOrder).not.toHaveBeenCalled();
+    expect(readOrders).not.toHaveBeenCalled();
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(1);
   });
   it("releases nothing when the run ends before every refund request is checked", async () => {
@@ -409,15 +417,17 @@ describe("keeper run", () => {
     // move it on, so the keeper leaves it to the reconciler — no RPC read.
     const result = await t.action(internal.keeperActions.run, {});
     expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 0 });
-    expect(readOrder).not.toHaveBeenCalled();
+    expect(readOrders).not.toHaveBeenCalled();
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(1);
   });
   it("still syncs a dispute resolved on-chain that was never recorded as disputed", async () => {
     const t = convexTest(schema, modules);
     const orderAddress = Keypair.generate().publicKey.toBase58();
-    await insertLink(t, orderAddress, true);
+    const id = await insertLink(t, orderAddress, true);
     // A Convex-only request whose order was refunded on-chain.
-    readOrder.mockResolvedValue(receipt(orderAddress, "refunded"));
+    readOrders.mockResolvedValue(
+      new Map([[id, receipt(orderAddress, "refunded")]]),
+    );
     const result = await t.action(internal.keeperActions.run, {});
     expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 1 });
     expect(await t.query(api.payments.refundQueue, {})).toHaveLength(0);
@@ -437,7 +447,9 @@ describe("keeper run", () => {
     const t = convexTest(schema, modules);
     const orderAddress = Keypair.generate().publicKey.toBase58();
     const id = await insertLink(t, orderAddress, true);
-    readOrder.mockResolvedValue(receipt(orderAddress, "refunded"));
+    readOrders.mockResolvedValue(
+      new Map([[id, receipt(orderAddress, "refunded")]]),
+    );
     const result = await t.action(internal.keeperActions.run, {});
     expect(result).toEqual({ released: 0, skipped: 0, failed: 0, synced: 1 });
     const link = await t.query(api.payments.get, { id });

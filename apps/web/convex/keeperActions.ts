@@ -7,7 +7,7 @@ import { internal } from "./_generated/api";
 import { completeOrderInstructions } from "../src/payments/chain";
 import { keeperChain } from "../src/payments/keeper-chain";
 import { selectReleasable, type KeeperOrder } from "../src/payments/keeper";
-import { syncLink } from "./syncLink";
+import { syncLinks } from "./syncLink";
 import { serverRpc } from "./rpc";
 import type { Id } from "./_generated/dataModel";
 
@@ -208,25 +208,22 @@ export const run = internalAction({
           }
         }
         // Reconcile disputes resolved on-chain but never synced (for example a
-        // resolver who closed the tab right after signing). Disputes still open
-        // on-chain are skipped, so this costs no RPC for them: Open orders are
-        // in openSet, and an order recorded as Disputed (which only the
-        // resolver can leave) is left to the reconciler, whose scan includes
-        // Disputed orders.
-        for (const link of disputes) {
-          if (outOfTime()) break;
-          if (
-            !link.receipt ||
-            openSet.has(link.receipt.order) ||
-            link.receipt.disputed
-          )
-            continue;
-          try {
-            if (await syncLink(ctx, link, rpc)) synced += 1;
-          } catch {
-            failed += 1;
-            console.error("keeper: could not sync a resolved dispute.");
-          }
+        // resolver who closed the tab right after signing). One batched read
+        // for all of them — the same step the reconciler runs — never one read
+        // per link. Disputes still open on-chain are skipped, so this costs no
+        // RPC for them: Open orders are in openSet, and an order recorded as
+        // Disputed (which only the resolver can leave) is left to the
+        // reconciler, whose scan includes Disputed orders.
+        const staleDisputes = disputes.filter(
+          (link) =>
+            link.receipt &&
+            !openSet.has(link.receipt.order) &&
+            !link.receipt.disputed,
+        );
+        if (staleDisputes.length > 0 && !outOfTime()) {
+          const result = await syncLinks(ctx, staleDisputes, rpc);
+          synced += result.synced;
+          failed += result.failed + result.mismatched;
         }
       } catch {
         failed += 1;
