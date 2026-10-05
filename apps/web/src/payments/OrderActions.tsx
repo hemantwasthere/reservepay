@@ -59,6 +59,8 @@ export function OrderActions({
   setLocked: (value: boolean) => void;
   isCurrent: (value: WalletConnection) => boolean;
 }) {
+  // Enable only after the matching backend and program are deployed.
+  const onchainDisputes = import.meta.env.VITE_ONCHAIN_DISPUTES === "true";
   const receipt = link.receipt!;
   const requestRefund = useAction(api.paymentActions.requestRefund);
   const sync = useAction(api.paymentActions.sync);
@@ -73,6 +75,13 @@ export function OrderActions({
   const [loaded, setLoaded] = useState(false);
   const [pending, setPending] = useState<PendingResolution | null>(null);
   const [message, setMessage] = useState("");
+  const [resolvedOrder, setResolvedOrder] = useState<string | null>(null);
+  const [verifiedDispute, setVerifiedDispute] = useState<string | null>(null);
+  const disputed = Boolean(
+    receipt.disputed || verifiedDispute === receipt.order,
+  );
+  const needsReason =
+    !link.refundRequest || link.refundRequest.reason === "unspecified";
   const lastDialog = useRef<Resolution | "request">("request");
   if (dialog) lastDialog.current = dialog;
   const displayedAction = dialog ?? lastDialog.current;
@@ -113,7 +122,12 @@ export function OrderActions({
   useEffect(() => {
     const read = () => {
       try {
-        if (receipt.status !== "paid") clearResolution(link._id);
+        const saved = loadResolution(link._id);
+        if (
+          receipt.status !== "paid" ||
+          (receipt.disputed && saved?.action === "dispute")
+        )
+          clearResolution(link._id);
         setPending(loadResolution(link._id));
         setJournalError("");
       } catch (e) {
@@ -124,15 +138,36 @@ export function OrderActions({
     read();
     window.addEventListener("storage", read);
     return () => window.removeEventListener("storage", read);
-  }, [link._id, receipt.status]);
+  }, [link._id, receipt.status, receipt.disputed]);
   useEffect(() => {
     if (!pending || receipt.status !== "paid") return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const check = async () => {
       try {
-        await sync({ id: link._id });
+        // Receipt synchronization must not block recovery when Convex is unavailable.
+        void sync({ id: link._id }).catch(() => {});
         const result = await transactionResult(connection, pending);
+        if (pending.action === "dispute" && result === "confirmed") {
+          const current = await client.readOrder(link, "confirmed");
+          if (cancelled) return;
+          if (current && (current.disputed || current.status !== "paid")) {
+            clearResolution(link._id);
+            setPending(null);
+            if (current.status === "paid") {
+              setVerifiedDispute(current.order);
+              setMessage(
+                "Dispute confirmed on-chain. Add your reason below if you have not submitted it yet.",
+              );
+            } else {
+              setResolvedOrder(current.order);
+              setMessage(
+                "The resolver has already decided this order. Refreshing the receipt…",
+              );
+            }
+            return;
+          }
+        }
         if (cancelled) return;
         if (result === "failed" || result === "expired") {
           clearResolution(link._id);
@@ -171,43 +206,15 @@ export function OrderActions({
       return;
     const wallet = active,
       action = dialog;
+    let disputeKnown = disputed;
     inFlight.current = true;
     setLocked(true);
     setError("");
     setMessage("");
     try {
-      if (action === "request") {
-        if (!wallet.wallet.signMessage)
-          throw new Error("Use a wallet that supports message signing.");
-        const request = {
-          id: link._id,
-          order: receipt.order,
-          buyer: wallet.account.address,
-          reason,
-          issuedAt: Date.now(),
-        };
-        setBusy("Approve the request in your wallet…");
-        let signature: Uint8Array;
-        try {
-          signature = await wallet.wallet.signMessage(
-            wallet.account.address,
-            refundApproval(request),
-          );
-        } catch (e) {
-          if (isWalletRejection(e)) throw new WalletRejected();
-          throw e;
-        }
-        if (!isCurrent(wallet))
-          throw new Error("Your wallet changed. Please try again.");
-        setBusy("Saving your request…");
-        await requestRefund({ ...request, signature: bs58.encode(signature) });
-        if (mounted.current) {
-          setDialog(null);
-          setMessage(
-            "Refund requested. The resolver can now review this order.",
-          );
-        }
-      } else {
+      const sendTransaction = async (
+        transactionAction: PendingResolution["action"],
+      ) => {
         const send = async () => {
           if (loadResolution(link._id))
             throw new Error(
@@ -216,11 +223,11 @@ export function OrderActions({
           if (!wallet.wallet.signTransaction)
             throw new Error("Use a wallet that supports devnet transactions.");
           setBusy("Checking the on-chain order…");
-          const prepared = await client.prepareResolution(
-            link,
-            new PublicKey(wallet.account.address),
-            action,
-          );
+          const signer = new PublicKey(wallet.account.address);
+          const prepared =
+            transactionAction === "dispute"
+              ? await client.prepareRefundRequest(link, signer)
+              : await client.prepareResolution(link, signer, transactionAction);
           if (!isCurrent(wallet))
             throw new Error("Your wallet changed. Please try again.");
           setBusy("Approve the transaction in your wallet…");
@@ -244,7 +251,7 @@ export function OrderActions({
             signature: signed.signature,
             lastValidBlockHeight: prepared.lastValidBlockHeight,
             signer: wallet.account.address,
-            action,
+            action: transactionAction,
           };
           saveResolution(link._id, saved); // Persist before broadcast, including ambiguous RPC failures.
           if (mounted.current) {
@@ -276,6 +283,59 @@ export function OrderActions({
             },
           );
         else await send();
+      };
+      if (action === "request") {
+        setBusy("Checking the on-chain order…");
+        const current = await client.readOrder(link, "confirmed");
+        if (!isCurrent(wallet))
+          throw new Error("Your wallet changed. Please try again.");
+        if (!current || current.status !== "paid")
+          throw new Error(
+            "This order is already resolved or has not been paid.",
+          );
+        if (current.buyer !== wallet.account.address)
+          throw new Error("Only the buyer can dispute this order.");
+        if (current.disputed) {
+          disputeKnown = true;
+          setVerifiedDispute(current.order);
+        }
+        if (onchainDisputes && !current.disputed) {
+          await sendTransaction("dispute");
+          return;
+        }
+
+        if (!wallet.wallet.signMessage)
+          throw new Error("Use a wallet that supports message signing.");
+        const request = {
+          id: link._id,
+          order: receipt.order,
+          buyer: wallet.account.address,
+          reason,
+          issuedAt: Date.now(),
+        };
+        setBusy("Approve the request in your wallet…");
+        let signature: Uint8Array;
+        try {
+          signature = await wallet.wallet.signMessage(
+            wallet.account.address,
+            refundApproval(request),
+          );
+        } catch (e) {
+          if (isWalletRejection(e)) throw new WalletRejected();
+          throw e;
+        }
+        if (!isCurrent(wallet))
+          throw new Error("Your wallet changed. Please try again.");
+        setBusy("Saving your request…");
+        await requestRefund({ ...request, signature: bs58.encode(signature) });
+        if (mounted.current) {
+          setDialog(null);
+          setMessage(
+            "Refund requested. The resolver can now review this order.",
+          );
+        }
+      } else {
+        await sendTransaction(action);
       }
     } catch (e) {
       if (mounted.current)
@@ -283,7 +343,11 @@ export function OrderActions({
           // The message renders behind an open dialog; close it so the
           // buyer actually sees the cancellation.
           setDialog(null);
-          setMessage("Cancelled in your wallet. Nothing was submitted.");
+          setMessage(
+            action === "request" && disputeKnown
+              ? "Reason signing cancelled. Your on-chain dispute remains active; you can add a reason later."
+              : "Cancelled in your wallet. Nothing was submitted.",
+          );
         } else setError(errorText(e));
     } finally {
       inFlight.current = false;
@@ -295,8 +359,23 @@ export function OrderActions({
   const isMerchant = active?.account.address === link.merchant;
   const isBuyer = active?.account.address === receipt.buyer;
   const expired = now >= receipt.expiresAt;
-  const disabled = Boolean(busy || pending || journalError || !loaded);
-  const canRequest = isBuyer && !expired && !link.refundRequest;
+  const disabled = Boolean(
+    busy ||
+      pending ||
+      journalError ||
+      !loaded ||
+      resolvedOrder === receipt.order,
+  );
+  const canRequest =
+    isBuyer &&
+    ((needsReason && (!expired || disputed)) ||
+      (onchainDisputes && !disputed && !expired));
+  const canComplete = isResolver || (isMerchant && expired && !disputed);
+  const requestLabel = disputed
+    ? "Add refund reason"
+    : link.refundRequest
+      ? "Protect refund request"
+      : "Request refund";
   return (
     <section
       className="mt-6 border-t border-border pt-6"
@@ -318,8 +397,17 @@ export function OrderActions({
       ) : (
         <>
           <h3 className="text-base font-medium">
-            {link.refundRequest ? "Refund requested" : "Manage this order"}
+            {disputed
+              ? "Dispute awaiting review"
+              : link.refundRequest
+                ? "Refund requested"
+                : "Manage this order"}
           </h3>
+          {disputed && (
+            <span className="mt-3 inline-flex rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium">
+              Disputed on-chain
+            </span>
+          )}
           {link.refundRequest && (
             <div className="mt-3 rounded-md border border-border bg-muted/40 p-4 text-sm leading-6">
               <p>{refundReasonLabels[link.refundRequest.reason]}</p>
@@ -331,11 +419,13 @@ export function OrderActions({
             </div>
           )}
           <p className="my-3 text-xs leading-6 text-muted-foreground">
-            {expired
-              ? "The protection period has ended. The merchant can complete this order."
-              : "The buyer can request a full refund during the protection period. Only the configured resolver can approve it."}{" "}
-            A request does not extend protection or prevent completion. A
-            completed order cannot be refunded.
+            {disputed
+              ? "Only the resolver can refund or complete this order, including after protection ends. A dispute does not guarantee a refund."
+              : expired
+                ? "The protection period has ended. This undisputed order can be completed and cannot be disputed."
+                : onchainDisputes
+                  ? "First approve an on-chain dispute, then sign a public reason. A confirmed dispute prevents release until the resolver decides."
+                  : "Refund requests are currently recorded off-chain. A request does not extend protection or prevent completion. The resolver must approve a refund before completion."}
           </p>
           {!active && (
             <p className="my-3 text-sm text-muted-foreground">
@@ -343,32 +433,39 @@ export function OrderActions({
               order.
             </p>
           )}
-          {isBuyer &&
-            !expired &&
-            !link.refundRequest &&
-            !active?.wallet.signMessage && (
+          {canRequest &&
+            (!active?.wallet.signMessage ||
+              (onchainDisputes &&
+                !disputed &&
+                !active?.wallet.signTransaction)) && (
               <p className="my-3 text-xs text-muted-foreground">
-                Switch to a wallet with message signing to request a refund.
+                Use a wallet with message and devnet transaction signing to
+                request a refund.
               </p>
             )}
-          {(isResolver || (isMerchant && expired)) &&
-            !active?.wallet.signTransaction && (
-              <p className="my-3 text-xs text-muted-foreground">
-                Switch to a wallet with devnet transaction signing to resolve
-                this order.
-              </p>
-            )}
+          {canComplete && !active?.wallet.signTransaction && (
+            <p className="my-3 text-xs text-muted-foreground">
+              Switch to a wallet with devnet transaction signing to resolve this
+              order.
+            </p>
+          )}
           <div className="flex flex-wrap gap-3">
             {canRequest && (
               <Button
                 variant="outline"
-                disabled={disabled || !active?.wallet.signMessage}
+                disabled={
+                  disabled ||
+                  !active?.wallet.signMessage ||
+                  (onchainDisputes &&
+                    !disputed &&
+                    !active?.wallet.signTransaction)
+                }
                 onClick={() => {
                   setError("");
                   setDialog("request");
                 }}
               >
-                Request refund
+                {requestLabel}
               </Button>
             )}
             {isResolver && (
@@ -383,7 +480,7 @@ export function OrderActions({
                 Approve full refund
               </Button>
             )}
-            {(isResolver || (isMerchant && expired)) && (
+            {canComplete && (
               <Button
                 variant="brand"
                 disabled={disabled || !active?.wallet.signTransaction}
@@ -411,7 +508,11 @@ export function OrderActions({
               rel="noreferrer"
             >
               View pending{" "}
-              {pending.action === "refund" ? "refund" : "completion"}
+              {pending.action === "dispute"
+                ? "dispute"
+                : pending.action === "refund"
+                  ? "refund"
+                  : "completion"}
               <ArrowUpRight size={14} />
             </a>
           )}
@@ -447,7 +548,11 @@ export function OrderActions({
             </DialogTitle>
             <DialogDescription className="leading-6">
               {displayedAction === "request"
-                ? "Sign a message to submit this request. Your reason is public. The resolver must approve a separate transaction; this does not extend protection or guarantee a refund."
+                ? disputed
+                  ? "Your dispute is active on-chain. Sign a message to add a public reason; no second dispute transaction is needed. The resolver decides whether to refund."
+                  : onchainDisputes
+                    ? "Step 1: approve the dispute transaction (a devnet SOL fee applies). Step 2: after confirmation, choose Add refund reason and sign your public reason. Only the resolver can then release or refund this order."
+                    : "Sign a public reason. This off-chain request does not prevent completion or guarantee a refund."
                 : displayedAction === "refund"
                   ? `Return ${exactAmount(BigInt(link.amount))} devnet USDC from the merchant’s reserve to the original buyer. This closes the order permanently.`
                   : `Release ${exactAmount(BigInt(receipt.reserveAmount))} devnet USDC to the merchant and unlock this order’s full liability. This permanently closes the order and prevents any refund${link.refundRequest ? ", including the buyer’s pending request" : ""}.`}
@@ -505,7 +610,9 @@ export function OrderActions({
             >
               {busy && <LoaderCircle className="size-4 animate-spin" />}
               {displayedAction === "request"
-                ? "Sign refund request"
+                ? onchainDisputes && !disputed
+                  ? "Approve dispute in wallet"
+                  : "Sign refund reason"
                 : "Review in wallet"}
             </Button>
           </DialogFooter>

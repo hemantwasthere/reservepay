@@ -68,7 +68,7 @@ _Sample devnet payment link. No wallet is connected in this screenshot._
 
 ## Protection has a deadline
 
-A buyer’s signed message records their refund request; it does not transfer funds. The program also supports flagging the order `Disputed` on-chain — the app’s transaction step for that is still rolling out, so UI requests are off-chain for now. **A request does not move the protection deadline or guarantee a refund.** A dispute must be raised on-chain before the deadline; once it is, the order is held for the resolver even after the deadline passes: only the configured resolver can then complete or refund it, and the resolver can still approve a refund after the deadline.
+A buyer’s signed message records their refund request; it does not transfer funds. When `VITE_ONCHAIN_DISPUTES=true`, the buyer first approves an on-chain dispute, then signs a public reason after confirmation. Reloads and cancelled reason signing can resume without submitting another dispute. The flag defaults off until the matching backend and program are deployed; requests remain off-chain during that staged rollout. **A request does not move the protection deadline or guarantee a refund.** A dispute must be raised on-chain before the deadline; once it is, the order is held for the resolver even after the deadline passes: only the configured resolver can then complete or refund it, and the resolver can still approve a refund after the deadline.
 
 For undisputed orders, completion after protection expires is permissionless in the program; the app offers it to the merchant and resolver, and a configured, funded keeper completes expired undisputed orders automatically. The resolver can also complete early. Once an order is completed, it cannot be refunded through the program.
 
@@ -136,6 +136,7 @@ VITE_CONVEX_SITE_URL=https://your-deployment.convex.site
 | Variable               | Used for                                                                             |
 | ---------------------- | ------------------------------------------------------------------------------------ |
 | `CONVEX_DEPLOYMENT`    | Convex CLI deployment selection; use the value generated for your project            |
+| `VITE_ONCHAIN_DISPUTES` | Set to `true` only after the dispute-capable backend and program are deployed; rebuild the frontend. Defaults off. |
 | `VITE_CONVEX_URL`      | Frontend connection to the Convex backend                                            |
 | `VITE_CONVEX_SITE_URL` | Convex HTTP endpoint; currently not consumed by app code                             |
 | `VERCEL_OIDC_TOKEN`    | Optional Vercel CLI authentication in root `.env.local`; not required to run the app |

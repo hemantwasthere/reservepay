@@ -537,7 +537,7 @@ describe("reservepay", () => {
       [Buffer.from("order"), merchant.toBuffer(), Buffer.from(reference)],
       workspaceProgram.programId,
     )[0];
-    await workspaceProgram.methods
+    const created = await workspaceProgram.methods
       .createOrder(reference, new anchor.BN(10_000_000), new anchor.BN(3_600))
       .accountsStrict({
         protocol,
@@ -554,6 +554,8 @@ describe("reservepay", () => {
       .signers([buyer])
       .rpc();
 
+    await provider.connection.confirmTransaction(created, "confirmed");
+
     let disputedEvent: {
       order: PublicKey;
       merchant: PublicKey;
@@ -566,12 +568,26 @@ describe("reservepay", () => {
         disputedEvent = event;
       },
     );
-    const signature = await workspaceProgram.methods
-      .requestRefund()
-      .accountsStrict({ order, buyer: buyer.publicKey })
-      .signers([buyer])
-      .rpc();
-    await provider.connection.confirmTransaction(signature, "confirmed");
+    // Exercise the same transaction builder and signature validation as the UI.
+    const prepared = await paymentClient(provider.connection, mint).prepareRefundRequest(
+      {
+        merchant: payer.publicKey.toBase58(),
+        reference: Buffer.from(reference).toString("hex"),
+        title: "Dispute integration",
+        amount: "10000000",
+        protectionSeconds: 3600,
+        issuedAt: Date.now(),
+      },
+      buyer.publicKey,
+    );
+    prepared.transaction.sign(buyer);
+    const signed = validateSignedTransaction(prepared.transaction, prepared.transaction.serialize());
+    const signature = await provider.connection.sendRawTransaction(signed.bytes);
+    const confirmation = await provider.connection.confirmTransaction(
+      { signature, blockhash: prepared.blockhash, lastValidBlockHeight: prepared.lastValidBlockHeight },
+      "confirmed",
+    );
+    expect(confirmation.value.err).to.equal(null);
     await new Promise((resolve) => setTimeout(resolve, 1_000));
     await workspaceProgram.removeEventListener(listener);
 

@@ -161,7 +161,7 @@ function Disputes() {
                           : "border-border text-muted-foreground"
                     }`}
                   >
-                    {badge.text}
+                    {link.receipt?.disputed && "On-chain · "}{badge.text}
                   </span>
                   <Button asChild variant="outline">
                     <a href={`/pay/${link._id}`}>

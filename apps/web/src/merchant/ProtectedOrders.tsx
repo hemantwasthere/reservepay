@@ -150,12 +150,13 @@ export function ProtectedOrders({
         >
           {shown.map((order) => {
             const link = titles[order.reference];
-            const disputed = order.status === "paid" && Boolean(link?.refundPending);
+            const disputed =
+              order.status === "paid" && Boolean(order.disputed || link?.refundPending);
             const releasable =
               order.status === "paid" &&
               order.expiresAt <= now &&
               link !== undefined &&
-              !link.refundPending;
+              !disputed;
             return (
             <li key={order.address} className={"py-[16px]"}>
               <div
@@ -199,7 +200,9 @@ export function ProtectedOrders({
                   className={`text-[11px] whitespace-nowrap ${disputed || (order.status === "paid" && order.expiresAt <= now) ? "text-[light-dark(#805e2e,var(--warning))]" : order.status === "paid" ? "text-[light-dark(#476238,var(--primary))]" : "text-muted-foreground"}`}
                 >
                   {disputed
-                    ? "Refund requested · awaiting resolver"
+                    ? order.disputed
+                      ? "Disputed on-chain · awaiting resolver"
+                      : "Refund requested · awaiting resolver"
                     : remaining(order, now)}
                 </div>
                 <div className={"flex items-center gap-[12px]"}>

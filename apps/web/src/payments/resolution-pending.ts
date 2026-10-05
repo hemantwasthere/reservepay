@@ -4,7 +4,7 @@ export type PendingResolution = {
   signature: string;
   lastValidBlockHeight: number;
   signer: string;
-  action: Resolution;
+  action: Resolution | "dispute";
 };
 const key = (id: string) => `reservepay:devnet:resolution:${id}`;
 export function loadResolution(id: string): PendingResolution | null {
@@ -18,7 +18,7 @@ export function loadResolution(id: string): PendingResolution | null {
     value.lastValidBlockHeight <= 0 ||
     typeof value.signer !== "string" ||
     bs58.decode(value.signer).length !== 32 ||
-    !["refund", "complete"].includes(value.action)
+    !["refund", "complete", "dispute"].includes(value.action)
   )
     throw new Error(
       "Saved resolution could not be read. Check the on-chain order before retrying.",

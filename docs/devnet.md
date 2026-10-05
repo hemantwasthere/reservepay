@@ -74,7 +74,9 @@ The dispute-flag upgrade appends the `Disputed` variant to `OrderStatus` (status
 
 1. Deploy the backend with the new IDL **first** (`REQUIRE_ONCHAIN_DISPUTE` unset). A backend on the old IDL cannot decode status byte 3, and nothing can be Disputed yet, so this order is safe.
 2. Check headroom before upgrading: the ProgramData account allocates 375,424 bytes. If the new `target/deploy/reservepay.so` is larger, extend first with `solana program extend ERFq8y9tC4bjMk4AbLoM7zZXtvRcxsHdCMa9GpSnwxsU <extra-bytes> --url devnet`.
-3. Upgrade as above, then ship the frontend transaction flow, then set `REQUIRE_ONCHAIN_DISPUTE=1` (below).
+3. Upgrade as above. Build and deploy the frontend with `VITE_ONCHAIN_DISPUTES=true` against that backend. The flag defaults off so deploying the frontend alone cannot send an instruction the live program does not support.
+4. Verify the buyer flow on devnet: pay a link, request a dispute, wait for confirmation, then add the public reason. Cancel reason signing and retry; reload during confirmation; add a reason to a script-created dispute after expiry. Confirm the merchant has no release control while the resolver can refund or complete.
+5. Only after those checks pass, set `REQUIRE_ONCHAIN_DISPUTE=1` in the same Convex deployment (below). Keep issue #12 open until this deployed verification is complete. Once enforcement is enabled, do not disable the frontend flag without coordinating backend enforcement.
 
 **Do not roll the program back once any order is Disputed.** The old binary fails to deserialize status byte 3: that order could never complete or refund, and its `locked_liability` would block `withdraw_reserve` for the merchant. Forward-fix the backend, or roll back application logic only while retaining the new IDL, receipt validators, and dispute handling. A pre-dispute backend cannot decode status byte 3 or accept stored `disputed` fields and `unspecified` reasons. Optional fields make old documents readable by the new schema, not new documents readable by the old schema. Leave the upgraded program in place.
 
@@ -82,7 +84,7 @@ The dispute-flag upgrade appends the `Disputed` variant to `OrderStatus` (status
 
 `request_refund(order, buyer)` flags an open order `Disputed`; it must be called by the buyer before the protection window ends. A disputed order is resolvable only by the protocol resolver (`refund_order` or `complete_order`); the keeper never releases it. New program errors: `DisputeWindowClosed` (6007, dispute raised after expiry) and `OrderUnderDispute` (6008, non-resolver resolution attempt on a disputed order).
 
-The backend mirrors chain disputes into refund requests: reconciliation records `receipt.disputed: true` and backfills a request with the reason `unspecified` (shown as **Reason not provided**); the buyer's signed reason can still replace it afterwards, keeping the original request time. While the env var `REQUIRE_ONCHAIN_DISPUTE` is unset, the signed-message `requestRefund` action also accepts requests without an on-chain dispute (rollout mode, until the frontend sends the dispute transaction). Set it to `1` once the frontend ships:
+The backend mirrors chain disputes into refund requests: reconciliation records `receipt.disputed: true` and backfills a request with the reason `unspecified` (shown as **Reason not provided**); the buyer's signed reason can still replace it afterwards, keeping the original request time. While the env var `REQUIRE_ONCHAIN_DISPUTE` is unset, the signed-message `requestRefund` action also accepts requests without an on-chain dispute (rollout mode, until the frontend sends the dispute transaction). Set it to `1` only after the frontend flag is enabled and the deployed flow passes the checks above:
 
 ```bash
 bunx convex env set REQUIRE_ONCHAIN_DISPUTE 1

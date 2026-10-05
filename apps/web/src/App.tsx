@@ -1007,7 +1007,7 @@ const questions = [
   ],
   [
     "Can I use ReservePay for real payments today?",
-    "Not yet. This checkout is an interactive simulation and does not submit payment transactions. The merchant dashboard is live on Solana devnet for wallet-signed registration, reserve deposits, and withdrawals. Buyer checkout is still in development.",
+    "ReservePay currently uses Solana devnet test tokens, not real money. Merchant payment links support wallet-signed buyer checkout, and the dashboard supports registration, reserve deposits, and withdrawals. The interactive preview on this page is a simulation and does not submit payment transactions.",
   ],
 ];
 
@@ -1282,7 +1282,7 @@ export function App() {
                     "demo-badge [font:7px_var(--mono)] tracking-[1px] bg-[#edf0e7] [border:1px_solid_#dce2d3] text-muted-foreground py-[4px] px-[6px]"
                   }
                 >
-                  EXAMPLE
+                  SAMPLE DATA
                 </span>
               </div>
               <div
