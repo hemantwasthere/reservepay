@@ -76,7 +76,7 @@ The dispute-flag upgrade appends the `Disputed` variant to `OrderStatus` (status
 2. Check headroom before upgrading: the ProgramData account allocates 375,424 bytes. If the new `target/deploy/reservepay.so` is larger, extend first with `solana program extend ERFq8y9tC4bjMk4AbLoM7zZXtvRcxsHdCMa9GpSnwxsU <extra-bytes> --url devnet`.
 3. Upgrade as above, then ship the frontend transaction flow, then set `REQUIRE_ONCHAIN_DISPUTE=1` (below).
 
-**Do not roll the program back once any order is Disputed.** The old binary fails to deserialize status byte 3: that order could never complete or refund, and its `locked_liability` would block `withdraw_reserve` for the merchant. Roll the backend back instead (the new receipt fields are optional) and leave the program.
+**Do not roll the program back once any order is Disputed.** The old binary fails to deserialize status byte 3: that order could never complete or refund, and its `locked_liability` would block `withdraw_reserve` for the merchant. Forward-fix the backend, or roll back application logic only while retaining the new IDL, receipt validators, and dispute handling. A pre-dispute backend cannot decode status byte 3 or accept stored `disputed` fields and `unspecified` reasons. Optional fields make old documents readable by the new schema, not new documents readable by the old schema. Leave the upgraded program in place.
 
 ## On-chain disputes
 
