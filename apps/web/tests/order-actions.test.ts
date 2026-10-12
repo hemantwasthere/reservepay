@@ -3,6 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { Keypair } from "@solana/web3.js";
+import { ConvexError } from "convex/values";
 import bs58 from "bs58";
 import { OrderActions } from "../src/payments/OrderActions";
 import { ProtectedOrders } from "../src/merchant/ProtectedOrders";
@@ -302,6 +303,20 @@ it("allows a failed reason API call to retry without another dispute transaction
   await click("Sign refund reason");
   expect(mock.request).toHaveBeenCalledTimes(2);
   expect(mock.prepare).not.toHaveBeenCalled();
+});
+
+it("explains a refund-request rate limit instead of showing the raw server text", async () => {
+  link.receipt!.disputed = true;
+  mock.request.mockRejectedValueOnce(
+    new ConvexError("Too many requests. Try again in 42 seconds."),
+  );
+  await render();
+  await click("Add refund reason");
+  await click("Sign refund reason");
+  expect(document.body.textContent).toContain(
+    "This order received several refund requests in a short period. Please wait 42 seconds, then try again.",
+  );
+  expect(document.body.textContent).not.toContain("Too many requests");
 });
 
 it("refuses to submit a signed reason after switching wallets", async () => {

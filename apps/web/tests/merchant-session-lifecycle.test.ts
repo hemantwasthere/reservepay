@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { getFunctionName } from "convex/server";
+import { ConvexError } from "convex/values";
 import type { WalletConnection } from "../src/lib/WalletControl";
 import { readSession } from "../src/lib/merchant-session";
 
@@ -241,5 +242,22 @@ describe("merchant session lifecycle", () => {
     expect(current.status).toBe("signed-out");
     expect(readSession(active.account.address)).toBeNull();
     expect(mocks.signOut).toHaveBeenCalledWith({ session: session().token });
+  });
+
+  it("explains a sign-in rate limit instead of showing the raw server text", async () => {
+    mocks.signIn.mockRejectedValueOnce(
+      new ConvexError("Too many requests. Try again in 1 seconds."),
+    );
+    await render(wallet());
+    await act(async () => {
+      await current.signIn();
+    });
+    expect(current.status).toBe("signed-out");
+    expect(mocks.notify).toHaveBeenCalledWith({
+      title: "Could not sign in",
+      description:
+        "You’ve tried to sign in several times in a short period. Please wait 1 second, then try again.",
+      tone: "error",
+    });
   });
 });

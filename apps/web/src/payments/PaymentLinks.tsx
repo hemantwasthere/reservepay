@@ -485,7 +485,9 @@ function LinkManager({
                 )}
                 {link.refundPending && (
                   <span className="text-xs text-amber-800">
-                    Refund requested · awaiting resolver
+                    {link.receipt?.disputed
+                      ? "Disputed on-chain · awaiting resolver"
+                      : "Refund requested · awaiting resolver"}
                   </span>
                 )}
               </div>

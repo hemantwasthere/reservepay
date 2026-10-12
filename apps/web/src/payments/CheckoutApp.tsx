@@ -870,7 +870,15 @@ function Receipt({
       >
         <div>
           <dt>Status</dt>
-          <dd>{receipt.status === "paid" ? "Paid" : receipt.status}</dd>
+          <dd>
+            {receipt.status === "paid"
+              ? receipt.disputed
+                ? "Paid · disputed on-chain"
+                : "Paid"
+              : receipt.status === "completed"
+                ? "Completed"
+                : "Refunded"}
+          </dd>
         </div>
         <div>
           <dt>Received by merchant</dt>

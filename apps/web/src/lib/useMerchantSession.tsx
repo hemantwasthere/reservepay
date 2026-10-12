@@ -13,6 +13,7 @@ import bs58 from "bs58";
 import { api } from "../../convex/_generated/api";
 import type { WalletConnection } from "./WalletControl";
 import { readSession, rememberSession } from "./merchant-session";
+import { rateLimitMessage } from "./rate-limit";
 import { signInMessage } from "./sign-in";
 import { useToast } from "./Toast";
 import { paymentsConfigured } from "../payments/PaymentProvider";
@@ -184,7 +185,7 @@ function useMerchantSession(active: WalletConnection | null): MerchantSession {
           title: "Could not sign in",
           description:
             error instanceof ConvexError && typeof error.data === "string"
-              ? error.data
+              ? rateLimitMessage(error.data, "sign-in")
               : error instanceof Error
                 ? error.message
                 : "Try again in a moment.",

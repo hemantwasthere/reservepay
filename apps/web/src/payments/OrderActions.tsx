@@ -20,6 +20,7 @@ import {
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import type { WalletConnection } from "../lib/WalletControl";
+import { rateLimitMessage } from "../lib/rate-limit";
 import { isWalletRejection, WalletRejected } from "../lib/wallets";
 import { connection, exactAmount, explorer } from "../merchant/client";
 import {
@@ -42,9 +43,10 @@ import {
 } from "./resolution-pending";
 
 const client = paymentClient(connection);
+// The only Convex error here comes from requestRefund, whose bucket is per order.
 const errorText = (error: unknown) =>
   error instanceof ConvexError
-    ? String(error.data)
+    ? rateLimitMessage(String(error.data), "refund")
     : error instanceof Error
       ? error.message
       : "Please try again.";
