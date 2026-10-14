@@ -1132,6 +1132,7 @@ function MerchantWorkspace({
                 "button button-dark transfer-submit w-[100%] mt-[15px] text-[12px] min-h-[43px]"
               }
               disabled={!enabled || !state?.registered || !amountValid}
+              type="submit"
             >
               {busy || pending ? (
                 <LoaderCircle
